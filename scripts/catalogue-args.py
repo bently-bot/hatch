@@ -5,7 +5,11 @@ import json, shlex, sys
 mode, app_id = sys.argv[1], sys.argv[2]
 cat = json.load(open(sys.argv[3] if len(sys.argv) > 3 else "catalogue/catalogue.json"))
 a = next(x for x in cat["apps"] if x["id"] == app_id)
-if mode == "install":
+if mode == "install" and a.get("flatpak"):
+    argv = ["/usr/local/bin/hatch-flatpak", "install", a["flatpak"]]
+elif mode == "launch" and a.get("command", [""])[0] == "hatch-flatpak-run":
+    argv = a["command"]   # run by the host side from the app's spec (scripts/guest-run.sh, FlatpakSpec.kt)
+elif mode == "install":
     argv = ["/usr/local/bin/hatch-install-app"]
     if a.get("packages"): argv += ["--packages", " ".join(a["packages"])]
     r = a.get("repo")

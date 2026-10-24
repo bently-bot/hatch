@@ -61,6 +61,8 @@ write_spec() {
     echo "env LD_LIBRARY_PATH=/app/lib:/usr/$GLDIR/default/lib"
     echo "env LIBGL_DRIVERS_PATH=/usr/$GLDIR/default/lib/dri"
     echo "env __EGL_VENDOR_LIBRARY_DIRS=/usr/$GLDIR/default/share/glvnd/egl_vendor.d:/usr/share/glvnd/egl_vendor.d"
+    echo "env PULSE_SERVER=tcp:127.0.0.1:47141"
+    echo "env NO_AT_BRIDGE=1"
     echo "env GSK_RENDERER=cairo"
     # GNOME 49+ image loading (glycin) sandboxes loaders with bwrap; proot is the sandbox here.
     echo "env GLYCIN_DISABLE_SANDBOX=1"
@@ -82,9 +84,35 @@ case "$ACT" in
     flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
     # Only English locale extensions (the full GNOME locale pack is ~1 GB).
     flatpak config --system --set languages en >/dev/null 2>&1 || true
-    echo "hatch: adding Flathub's $ID"
+    echo "hatch: checking Flathub's $ID"
+    # Sizes for the store's "N MB to download - M GB on disk", in apt's own wording so one parser handles both.
+    info() { flatpak remote-info --system flathub "$1" 2>/dev/null; }
+    field() { sed -n "s/^ *$1: *//p" | head -1; }
+    bytes() { sed 's/\xc2\xa0/ /g' | awk '{v=$1; gsub(/[^0-9.]/,"",v); u=$2; if(u=="kB"||u=="KB")m=1e3; else if(u=="MB")m=1e6; else if(u=="GB")m=1e9; else m=1; printf "%d", v*m}'; }
+    AI=$(info "$ID"); [ -n "$AI" ] || { echo "hatch: $ID not found on Flathub" >&2; exit 4; }
+    DL=$(echo "$AI" | field Download | bytes); DISK=$(echo "$AI" | field Installed | bytes)
+    RTREF=$(echo "$AI" | field Runtime)
+    if [ -n "$RTREF" ] && ! flatpak info --system "$RTREF" >/dev/null 2>&1; then
+      RI=$(info "runtime/$RTREF"); DL=$((DL + $(echo "$RI" | field Download | bytes))); DISK=$((DISK + $(echo "$RI" | field Installed | bytes)))
+    fi
+    [ "$DL" -gt 0 ] && echo "Need to get $((DL / 1000)) kB of archives."
+    [ "$DISK" -gt 0 ] && echo "After this operation, $((DISK / 1000)) kB of additional disk space will be used."
+    echo "hatch: downloading $ID from Flathub"
+    mkdir -p $FP/repo/objects; BASE=$(du -sk $FP/repo/objects 2>/dev/null | cut -f1)
     # bwrap can't create namespaces here: its export/trigger steps print errors but the deploy itself succeeds.
-    flatpak install --system -y --noninteractive flathub "$ID" 2>&1 | grep -v 'bwrap: Creating new namespace failed' || true
+    ( flatpak install --system -y --noninteractive flathub "$ID" 2>&1; echo "flatpak-exit:$?" ) | grep -v 'bwrap: Creating new namespace failed' > /tmp/hatch-flatpak.$$ &
+    BG=$!
+    while kill -0 $BG 2>/dev/null; do
+      sleep 3
+      if [ "${DL:-0}" -gt 0 ]; then
+        NOW=$(du -sk $FP/repo/objects 2>/dev/null | cut -f1); PCT=$(( (NOW - BASE) * 100000 / DL ))
+        [ "$PCT" -gt 99 ] && PCT=99; echo "dlstatus:1:$PCT:Downloading"
+      fi
+    done
+    wait $BG || true
+    cat /tmp/hatch-flatpak.$$; R=$(sed -n 's/^flatpak-exit://p' /tmp/hatch-flatpak.$$); rm -f /tmp/hatch-flatpak.$$
+    [ -d "$FP/app/$ID" ] || { echo "hatch: flatpak install failed (exit ${R:-?})" >&2; exit 5; }
+    echo "pmstatus:$ID:90:Setting up $ID"
     write_spec ;;
   spec) write_spec ;;
   uninstall)

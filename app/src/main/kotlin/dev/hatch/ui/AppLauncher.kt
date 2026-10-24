@@ -27,7 +27,8 @@ object AppLauncher {
         if (cmd.isNullOrEmpty()) return Result.Error("$label isn't installed.")
         val rt = HatchApp.instance.runtime
         val waylandDir = rt.ensureAppSocket(appId).absolutePath
-        val argv = GuestScripts.launchArgv(cmd, wine = rec?.wine == true, x11 = rec?.x11 == true)
+        val argv = if (cmd.firstOrNull() == dev.hatch.guest.FlatpakSpec.RUN) cmd
+            else GuestScripts.launchArgv(cmd, wine = rec?.wine == true, x11 = rec?.x11 == true)
         val gpu = Gpu.useGpu(Gpu.mode(context), Gpu.info(context, LinuxRuntime.rootfsDir(context)))
         val ok = AppSession.start(context, appId, argv, waylandDir, extraEnv = Gpu.env(gpu), onExit = { rt.guestExited(appId) })
         Log.i(TAG, "rendering for $appId: ${if (gpu) "GPU (Turnip/KGSL + Zink)" else "software"}")

@@ -72,7 +72,8 @@ object GuestScripts {
         payloadDest: String? = null,
         desktopId: String? = null,
         repo: dev.hatch.store.AptRepo? = null,
-    ): String = buildList {
+        flatpak: String? = null,
+    ): String = if (!flatpak.isNullOrEmpty()) "$BIN/hatch-flatpak install ${sq(flatpak)} 2>&1" else buildList {
         add("$BIN/hatch-install-app")
         if (packages.isNotEmpty()) { add("--packages"); add(sq(packages.joinToString(" "))) }
         if (repo != null) {

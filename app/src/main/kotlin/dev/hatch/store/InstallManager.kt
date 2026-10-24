@@ -67,6 +67,7 @@ object InstallManager {
                     payloadDest = payload?.extractTo,
                     desktopId = app.desktopId,
                     repo = app.repo,
+                    flatpak = app.flatpak,
                 )
                 val tail = ArrayDeque<String>()
                 val apt = AptProgress()
@@ -148,7 +149,9 @@ object InstallManager {
             _progress.value = Progress.Working(app.id, "Removing…")
             val rec = InstalledApps.get(context, app.id)
             if (rec != null) StubInstaller.uninstall(context, rec.stubPackage)
-            if (app.packages.isNotEmpty() && !app.wine) {
+            if (app.flatpak.isNotEmpty()) {
+                LinuxRuntime.run(context, "${GuestScripts.BIN}/hatch-flatpak uninstall ${dev.hatch.guest.sq(app.flatpak)} 2>&1", timeoutMs = 600_000)
+            } else if (app.packages.isNotEmpty() && !app.wine) {
                 Apt.remove(context, app.packages)
             }
             InstalledApps.remove(context, app.id)

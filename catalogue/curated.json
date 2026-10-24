@@ -5,6 +5,7 @@
   "cursor",
   "code",
   "brave-browser",
+  "org.darktable.Darktable",
   "mousepad",
   "galculator",
   "gnome-mines",
@@ -356,6 +357,26 @@
     "components": "main"
    },
    "license": "MPL-2.0"
+  },
+  {
+   "id": "org.darktable.Darktable",
+   "name": "Darktable",
+   "summary": "Organize and develop images from digital cameras",
+   "description": "darktable manages your camera raw files and images in a database, lets you view them through lighttable mode and develop/enhance them in darkroom mode. Other modes besides lighttable and darkroom are a map for geotagging, tethering, print and a slideshow. darktable supports most modern cameras' raw formats, and does all of its processing at very high precision.",
+   "category": "graphics",
+   "source": "flathub",
+   "flatpak": "org.darktable.Darktable",
+   "packages": [],
+   "command": [
+    "hatch-flatpak-run",
+    "org.darktable.Darktable"
+   ],
+   "wine": false,
+   "license": "GPL-3.0+",
+   "iconUrl": "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/icons/128x128/org.darktable.Darktable.png",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/screenshots/image-1_1248x702@1.png"
+   ]
   }
  ]
 }

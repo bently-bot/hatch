@@ -138,8 +138,18 @@ object LinuxRuntime {
         usePty: Boolean = false,
         asUser: Boolean = false,
     ): Session? {
-        val argv = prootArgv(context, guestCommand, workingDir, waylandHostDir, asUser)
-        val env = prootEnv(context, extraEnv, asUser)
+        var argv = prootArgv(context, guestCommand, workingDir, waylandHostDir, asUser)
+        var env = prootEnv(context, extraEnv, asUser)
+        // Flathub app: run it from its spec (own root + Flatpak layout) instead of the Debian guest root.
+        if (guestCommand.firstOrNull() == FlatpakSpec.RUN && guestCommand.size >= 2) {
+            val spec = FlatpakSpec.load(rootfsDir(context), guestCommand[1]) ?: return null
+            val common = bindCandidates(context, waylandHostDir)
+            argv = (listOf(prootBinary(context).absolutePath) +
+                spec.copy(command = spec.command + guestCommand.drop(2))
+                    .prootArgs(rootfsDir(context).absolutePath, common, GuestScripts.UID, GuestScripts.HOME)).toTypedArray()
+            val base = env.associate { it.substringBefore('=') to it.substringAfter('=') }
+            env = spec.environment(base).map { "${it.key}=${it.value}" }.toTypedArray()
+        }
         val r = Native.spawn(argv[0], argv, env, context.filesDir.absolutePath, usePty) ?: return null
         return Session(r[0], r[1])
     }

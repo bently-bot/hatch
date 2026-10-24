@@ -44,6 +44,8 @@ data class StoreApp(
     val windowsPayload: WindowsPayload? = null,
     /** Per guest-arch overrides ("amd64" for x86_64 devices/emulators); [windowsPayload] is the arm64 default. */
     val payloads: Map<String, WindowsPayload> = emptyMap(),
+    /** source == "flathub": the Flathub app id (installed with flatpak, run by Hatch without bubblewrap). */
+    val flatpak: String = "",
     /** source == "vendor": the vendor's own signed apt repository (added on install), e.g. Anysphere for Cursor. */
     val vendorName: String = "",
     val repo: AptRepo? = null,
