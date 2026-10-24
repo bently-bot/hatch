@@ -1,0 +1,41 @@
+#!/bin/sh
+# Hatch guest launcher. usage: hatch-launch [--wine] [--x11] -- cmd args...
+# Expects WAYLAND_DISPLAY/XDG_RUNTIME_DIR pointing at Hatch's compositor.
+set -eu
+WINE=0; X11=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --wine) WINE=1; shift ;;
+    --x11) X11=1; shift ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+[ -x /usr/local/bin/hatch-audio-env ] && . /usr/local/bin/hatch-audio-env || true
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/hatch}"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+export NO_AT_BRIDGE=1 GTK_A11Y=none
+export GSK_RENDERER="${GSK_RENDERER:-cairo}"
+if [ "$WINE" = 1 ]; then
+  unset DISPLAY
+  export WINEPREFIX="${WINEPREFIX:-/root/.wine}"
+  export WINEDEBUG="${WINEDEBUG:--all}"
+  export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-mscoree,mshtml=}"
+  if [ ! -f "$WINEPREFIX/system.reg" ]; then
+    echo "hatch: initialising Wine prefix (first run)…"
+    # Runs with the Wayland display available so the progress dialog renders.
+    wineboot -u || wine wineboot -u
+    wine reg add 'HKCU\Software\Wine\Drivers' /v Graphics /t REG_SZ /d wayland /f >/dev/null 2>&1 || true
+  fi
+  case "${1:-}" in wine|wine64) shift ;; esac
+  exec wine "$@"
+fi
+if [ "$X11" = 1 ]; then
+  case "${1:-}" in hatch-x11) shift ;; esac
+  exec /usr/local/bin/hatch-x11 "$@"
+fi
+export GDK_BACKEND="${GDK_BACKEND:-wayland}" QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland}"
+if command -v dbus-run-session >/dev/null 2>&1 && [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+  exec dbus-run-session -- "$@"
+fi
+exec "$@"

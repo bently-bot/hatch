@@ -16,6 +16,7 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.ComponentActivity
 import dev.hatch.HatchApp
+import dev.hatch.guest.GuestScripts
 import dev.hatch.guest.AppSession
 import dev.hatch.guest.LinuxRuntime
 import dev.hatch.store.InstalledApps
@@ -93,7 +94,8 @@ class WindowActivity : ComponentActivity(), SurfaceHolder.Callback {
         val env = buildMap {
             if (rec?.wine == true) put("WINEDEBUG", "-all")
         }
-        val ok = AppSession.start(this, appId, cmd, waylandDir, extraEnv = env)
+        val argv = GuestScripts.launchArgv(cmd, wine = rec?.wine == true, x11 = rec?.x11 == true)
+        val ok = AppSession.start(this, appId, argv, waylandDir, extraEnv = env)
         Log.i(TAG, "spawn $appId ok=$ok cmd=$cmd")
     }
 

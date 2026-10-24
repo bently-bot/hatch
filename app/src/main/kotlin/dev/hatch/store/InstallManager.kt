@@ -2,6 +2,7 @@ package dev.hatch.store
 
 import android.content.Context
 import android.util.Log
+import dev.hatch.guest.GuestScripts
 import dev.hatch.guest.Apt
 import dev.hatch.guest.GuestConfig
 import dev.hatch.guest.LinuxRuntime
@@ -30,32 +31,29 @@ object InstallManager {
         withContext(Dispatchers.IO) {
             try {
                 _progress.value = Progress.Working(app.id, "Installing packages…")
-                if (!Apt.install(context, app.packages, { Log.i(TAG, it) }, waylandHostDir)) {
-                    _progress.value = Progress.Failed(app.id, "apt install failed")
+                GuestConfig.refreshDns(context)
+                GuestScripts.install(context, LinuxRuntime.rootfsDir(context))
+                LinuxRuntime.run(context, "dpkg --configure -a 2>&1", timeoutMs = 600_000, waylandHostDir = waylandHostDir)
+                val payload = app.windowsPayload
+                val cmd = GuestScripts.installCommand(
+                    packages = app.packages,
+                    wine = app.wine,
+                    payloadUrl = payload?.url,
+                    payloadSha = payload?.sha256,
+                    payloadDest = payload?.extractTo,
+                )
+                val res = LinuxRuntime.run(
+                    context, cmd, timeoutMs = 1_800_000, waylandHostDir = waylandHostDir,
+                    onLine = { line ->
+                        Log.i(TAG, line)
+                        val t = line.trim()
+                        if (t.startsWith("hatch:") || t.startsWith("Get:") || t.startsWith("Unpacking") || t.startsWith("Setting up"))
+                            _progress.value = Progress.Working(app.id, t.removePrefix("hatch: ").take(80))
+                    },
+                )
+                if (res?.ok != true) {
+                    _progress.value = Progress.Failed(app.id, "Install failed (see log)")
                     return@withContext false
-                }
-                if (app.wine) {
-                    _progress.value = Progress.Working(app.id, "Configuring Wine…")
-                    GuestConfig.configureWineWayland(context, waylandHostDir)
-                    val payload = app.windowsPayload
-                    if (payload != null && payload.kind == "zip") {
-                        _progress.value = Progress.Working(app.id, "Downloading ${app.name}…")
-                        val zip = File(context.noBackupFilesDir, "${app.id}.zip")
-                        if (payload.sha256.isNotEmpty()) {
-                            download(payload.url, zip, payload.sha256)
-                        } else {
-                            download(payload.url, zip, sha256HexAllowEmpty(zip, payload.url))
-                        }
-                        val guestZip = File(LinuxRuntime.guestTmpDir(context), "${app.id}.zip")
-                        zip.copyTo(guestZip, overwrite = true)
-                        _progress.value = Progress.Working(app.id, "Extracting…")
-                        LinuxRuntime.run(
-                            context,
-                            "mkdir -p ${payload.extractTo} && unzip -o /tmp/${app.id}.zip -d ${payload.extractTo} && rm -f /tmp/${app.id}.zip",
-                            timeoutMs = 300_000,
-                            waylandHostDir = waylandHostDir,
-                        )
-                    }
                 }
                 _progress.value = Progress.Working(app.id, "Creating launcher…")
                 val apk = StubInstaller.buildAndStage(context, app.id, app.name)
@@ -102,10 +100,4 @@ object InstallManager {
         }
     }
 
-    /** When sha is empty, download without verify (used only as last resort). */
-    private fun sha256HexAllowEmpty(dest: File, url: String): String {
-        // download() requires sha — compute after fetch by downloading to temp without check
-        // Simpler: fetch into dest ignoring verify by using a two-phase helper
-        throw IllegalStateException("sha256 required for $url")
-    }
 }

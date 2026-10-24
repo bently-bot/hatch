@@ -1,0 +1,45 @@
+#!/bin/sh
+# Hatch guest installer. Same script is used by the Android app and by CI.
+# usage: hatch-install-app [--packages "a b"] [--payload URL SHA256 DEST] [--wine]
+set -eu
+PKGS=""; URL=""; SHA=""; DEST=""; WINE=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --packages) PKGS="$2"; shift 2 ;;
+    --payload) URL="$2"; SHA="$3"; DEST="$4"; shift 4 ;;
+    --wine) WINE=1; shift ;;
+    *) echo "unknown arg $1" >&2; exit 2 ;;
+  esac
+done
+export DEBIAN_FRONTEND=noninteractive
+if [ "$WINE" = 1 ]; then PKGS="$PKGS wine wine64 libwine fonts-wine"; fi
+if [ -n "$URL" ]; then PKGS="$PKGS curl ca-certificates unzip"; fi
+PKGS=$(echo $PKGS | tr ' ' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ' ')
+if [ -n "$PKGS" ]; then
+  echo "hatch: apt install $PKGS"
+  # Refresh lists if older than a day (or missing)
+  if [ -z "$(find /var/lib/apt/lists -maxdepth 1 -name '*Packages*' -mtime -1 2>/dev/null | head -1)" ]; then
+    apt-get update
+  fi
+  # shellcheck disable=SC2086
+  apt-get install -y --no-install-recommends $PKGS || { apt-get update && apt-get install -y --no-install-recommends $PKGS; }
+fi
+if [ -n "$URL" ]; then
+  mkdir -p "$DEST"
+  TMP="/tmp/hatch-payload.$$"
+  echo "hatch: download $URL"
+  curl -fL --retry 3 -o "$TMP" "$URL"
+  if [ -n "$SHA" ]; then
+    echo "$SHA  $TMP" | sha256sum -c - >/dev/null || { echo "hatch: sha256 mismatch" >&2; rm -f "$TMP"; exit 4; }
+  fi
+  case "$URL" in
+    *.zip) unzip -qo "$TMP" -d "$DEST" ;;
+    *.tar.*|*.tgz) tar -xf "$TMP" -C "$DEST" ;;
+    *) cp "$TMP" "$DEST/" ;;
+  esac
+  rm -f "$TMP"
+fi
+if [ "$WINE" = 1 ]; then
+  echo "hatch: wine prefix will initialise on first launch"
+fi
+echo "hatch: install ok"

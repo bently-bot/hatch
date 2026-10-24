@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+/usr/local/bin/hatch-xwayland
+export DISPLAY=:1 GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb
+exec "$@"

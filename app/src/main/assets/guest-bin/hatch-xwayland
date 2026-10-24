@@ -1,0 +1,14 @@
+#!/bin/sh
+# Start a rootful Xwayland on :1 (one per guest session) as a client of Hatch's compositor.
+set -eu
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/hatch}"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+GEOM="${HATCH_X11_GEOMETRY:-1280x800}"
+if [ -S /tmp/.X11-unix/X1 ] && [ -f /tmp/.X1-lock ] && kill -0 "$(tr -d ' ' </tmp/.X1-lock)" 2>/dev/null; then
+  exit 0
+fi
+rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
+mkdir -p /tmp/.X11-unix; chmod 1777 /tmp/.X11-unix
+command -v Xwayland >/dev/null 2>&1 || { echo "hatch: Xwayland missing" >&2; exit 1; }
+nohup Xwayland :1 -geometry "$GEOM" -noreset -ac >/tmp/hatch-xwayland.log 2>&1 &
+i=0; while [ $i -lt 50 ] && [ ! -S /tmp/.X11-unix/X1 ]; do sleep 0.1; i=$((i+1)); done

@@ -14,6 +14,10 @@ fun main(args: Array<String>) {
     val png = File(args[1]); png.parentFile?.mkdirs()
     val seconds = args[2].toInt()
     val inject = args.contains("--inject")
+    fun opt(n: String) = args.firstOrNull { it.startsWith("--$n=") }?.substringAfter("=")
+    val titleFilter = opt("title")            // only capture a window whose title contains this
+    val settleMs = opt("settle")?.toLong() ?: 0L // wait after first good frame, then re-capture
+    val waitExit = args.contains("--wait-exit") // succeed when client exits 0 (e.g. wineboot)
     val dash = args.indexOf("--"); require(dash > 0); val cmd = args.drop(dash + 1)
 
     val keymap = File("app/src/main/assets/keymap.xkb").readText()
@@ -58,10 +62,28 @@ fun main(args: Array<String>) {
     val deadline = System.currentTimeMillis() + seconds * 1000L
     var captured = false
     var injected = false
+    var settled = settleMs == 0L
+    var lastTitles = ""
     while (System.currentTimeMillis() < deadline && !captured) {
         Thread.sleep(200)
-        if (!proc.isAlive) println("[host] client exited code=${proc.exitValue()}")
-        val w = synchronized(windows) { windows.firstOrNull { it.surface.store != 0L && it.surface.storeW > 8 } } ?: continue
+        if (!proc.isAlive) {
+            println("[host] client exited code=${proc.exitValue()}")
+            if (waitExit) {
+                server.stop()
+                System.exit(if (proc.exitValue() == 0) 0 else 3)
+            }
+        }
+        val titles = synchronized(windows) { windows.joinToString(" | ") { "'${it.title}'(${it.appId}) ${it.surface.storeW}x${it.surface.storeH}" } }
+        if (titles != lastTitles) { println("[host] windows: $titles"); lastTitles = titles }
+        if (waitExit) continue
+        val w = synchronized(windows) {
+            windows.lastOrNull { it.surface.store != 0L && it.surface.storeW > 8 &&
+                (titleFilter == null || it.title.contains(titleFilter, ignoreCase = true)) }
+        } ?: continue
+        if (!settled) {
+            println("[host] first frame for '${w.title}', settling ${settleMs}ms")
+            Thread.sleep(settleMs); settled = true; continue
+        }
 
         if (inject && !injected) {
             injected = true
@@ -101,7 +123,7 @@ fun main(args: Array<String>) {
             val t = Native.targetMemory(1280, 800)
             Native.targetBegin(t, 0xff2a2a2a.toInt())
             if (w.surface.store != 0L)
-                Native.targetBlit(t, w.surface.store, 0, 0, 1280, 800, 0, 0, w.surface.storeW, w.surface.storeH, w.surface.opaque)
+                Native.targetBlit(t, w.surface.store, 0, 0, w.surface.storeW, w.surface.storeH, 0, 0, w.surface.storeW, w.surface.storeH, w.surface.opaque)
             for (p in w.popups) {
                 val s = p.surface
                 if (s.store != 0L)

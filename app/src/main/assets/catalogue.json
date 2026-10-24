@@ -2,13 +2,34 @@
   "version": 2,
   "updated": "2026-10-24",
   "categories": [
-    {"id": "editors", "name": "Editors"},
-    {"id": "office", "name": "Office"},
-    {"id": "graphics", "name": "Graphics"},
-    {"id": "games", "name": "Games"},
-    {"id": "system", "name": "System"},
-    {"id": "windows", "name": "Windows"},
-    {"id": "dev", "name": "Developer"}
+    {
+      "id": "editors",
+      "name": "Editors"
+    },
+    {
+      "id": "office",
+      "name": "Office"
+    },
+    {
+      "id": "graphics",
+      "name": "Graphics"
+    },
+    {
+      "id": "games",
+      "name": "Games"
+    },
+    {
+      "id": "system",
+      "name": "System"
+    },
+    {
+      "id": "windows",
+      "name": "Windows"
+    },
+    {
+      "id": "dev",
+      "name": "Developer"
+    }
   ],
   "apps": [
     {
@@ -18,8 +39,12 @@
       "category": "editors",
       "source": "debian",
       "icon": "text",
-      "packages": ["mousepad"],
-      "command": ["mousepad"],
+      "packages": [
+        "mousepad"
+      ],
+      "command": [
+        "mousepad"
+      ],
       "wine": false
     },
     {
@@ -29,8 +54,12 @@
       "category": "editors",
       "source": "debian",
       "icon": "text",
-      "packages": ["gedit"],
-      "command": ["gedit"],
+      "packages": [
+        "gedit"
+      ],
+      "command": [
+        "gedit"
+      ],
       "wine": false
     },
     {
@@ -40,8 +69,12 @@
       "category": "office",
       "source": "debian",
       "icon": "calc",
-      "packages": ["galculator"],
-      "command": ["galculator"],
+      "packages": [
+        "galculator"
+      ],
+      "command": [
+        "galculator"
+      ],
       "wine": false
     },
     {
@@ -51,8 +84,14 @@
       "category": "office",
       "source": "debian",
       "icon": "office",
-      "packages": ["libreoffice-writer", "libreoffice-gtk3"],
-      "command": ["libreoffice", "--writer"],
+      "packages": [
+        "libreoffice-writer",
+        "libreoffice-gtk3"
+      ],
+      "command": [
+        "libreoffice",
+        "--writer"
+      ],
       "wine": false
     },
     {
@@ -62,8 +101,12 @@
       "category": "graphics",
       "source": "debian",
       "icon": "image",
-      "packages": ["gimp"],
-      "command": ["gimp"],
+      "packages": [
+        "gimp"
+      ],
+      "command": [
+        "gimp"
+      ],
       "wine": false
     },
     {
@@ -73,8 +116,12 @@
       "category": "graphics",
       "source": "debian",
       "icon": "image",
-      "packages": ["inkscape"],
-      "command": ["inkscape"],
+      "packages": [
+        "inkscape"
+      ],
+      "command": [
+        "inkscape"
+      ],
       "wine": false
     },
     {
@@ -84,8 +131,12 @@
       "category": "games",
       "source": "debian",
       "icon": "game",
-      "packages": ["gnome-mines"],
-      "command": ["gnome-mines"],
+      "packages": [
+        "gnome-mines"
+      ],
+      "command": [
+        "gnome-mines"
+      ],
       "wine": false
     },
     {
@@ -95,8 +146,12 @@
       "category": "games",
       "source": "debian",
       "icon": "game",
-      "packages": ["aisleriot"],
-      "command": ["sol"],
+      "packages": [
+        "aisleriot"
+      ],
+      "command": [
+        "sol"
+      ],
       "wine": false
     },
     {
@@ -106,8 +161,12 @@
       "category": "system",
       "source": "debian",
       "icon": "folder",
-      "packages": ["thunar"],
-      "command": ["thunar"],
+      "packages": [
+        "thunar"
+      ],
+      "command": [
+        "thunar"
+      ],
       "wine": false
     },
     {
@@ -117,8 +176,12 @@
       "category": "system",
       "source": "debian",
       "icon": "web",
-      "packages": ["firefox-esr"],
-      "command": ["firefox-esr"],
+      "packages": [
+        "firefox-esr"
+      ],
+      "command": [
+        "firefox-esr"
+      ],
       "wine": false
     },
     {
@@ -128,8 +191,12 @@
       "category": "dev",
       "source": "debian",
       "icon": "term",
-      "packages": ["weston"],
-      "command": ["weston-terminal"],
+      "packages": [
+        "weston"
+      ],
+      "command": [
+        "weston-terminal"
+      ],
       "wine": false
     },
     {
@@ -139,8 +206,14 @@
       "category": "dev",
       "source": "debian",
       "icon": "term",
-      "packages": ["xterm", "xwayland"],
-      "command": ["hatch-x11", "xterm"],
+      "packages": [
+        "xterm",
+        "xwayland"
+      ],
+      "command": [
+        "hatch-x11",
+        "xterm"
+      ],
       "wine": false,
       "x11": true
     },
@@ -151,8 +224,11 @@
       "category": "windows",
       "source": "winget",
       "icon": "text",
-      "packages": ["wine", "wine64", "libwine", "unzip", "ca-certificates", "curl"],
-      "command": ["wine64", "/opt/hatch/npp/notepad++.exe"],
+      "packages": [],
+      "command": [
+        "wine",
+        "/opt/hatch/npp/notepad++.exe"
+      ],
       "wine": true,
       "windowsPayload": {
         "url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.8.1/npp.8.9.8.1.portable.arm64.zip",
