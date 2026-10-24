@@ -45,8 +45,11 @@ fun main(args: Array<String>) {
     pb.environment()["SDL_VIDEODRIVER"] = "wayland"
     pb.environment()["NO_AT_BRIDGE"] = "1"
     pb.environment()["GTK_A11Y"] = "none"
+    pb.environment()["GSETTINGS_BACKEND"] = "memory"
+    pb.environment()["DCONF_PROFILE"] = "/dev/null"
+    pb.environment()["LC_ALL"] = "C.UTF-8"
     pb.environment().remove("DISPLAY")
-    pb.environment().remove("WAYLAND_DEBUG")
+    // Keep WAYLAND_DEBUG if caller set it
 
     pb.redirectErrorStream(true)
     val logFile = File(png.parent, "client.log")

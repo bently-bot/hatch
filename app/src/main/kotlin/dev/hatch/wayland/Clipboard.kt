@@ -67,7 +67,7 @@ class DataDeviceRes(c: Client, id: Int, val seat: SeatRes) : Res(c, id, 3) {
         }
     }
     fun selection(source: DataSourceRes?) {
-        // Offer a host-backed source when the client asks via data_offer — simplified: just clear.
+        // Nullable object: 0 clears selection. Safe anytime after get_data_device.
         event(5).obj(source?.id ?: 0).end()
     }
 }

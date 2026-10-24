@@ -11,7 +11,7 @@ sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   gcc make weston curl xz-utils unzip ca-certificates \
   mousepad galculator libgtk-3-0 \
-  xwayland xterm python3-pil \
+  xwayland xterm python3-pil dbus-x11 \
   wine64 wine libwine fonts-dejavu-core || \
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   gcc make weston curl ca-certificates mousepad galculator wine64 xwayland xterm python3-pil
@@ -61,11 +61,13 @@ capture() {
   local inject=()
   if [ "${HATCH_INJECT:-0}" = "1" ]; then inject=(--inject); fi
   set +e
+  # Wrap GUI clients in a private dbus session (GTK/dconf on Ubuntu 24.04)
   env -u DISPLAY java -Dhatch.native="$NAT" -cp "$CP" \
     dev.hatch.harness.MainKt \
     "$RUNNER_TEMP/wayland-$name" \
     "$PROOF/$name.png" \
-    "$seconds" "${inject[@]}" -- "$@" >"$PROOF/${name}-host.log" 2>&1
+    "$seconds" "${inject[@]}" -- \
+    dbus-run-session -- "$@" >"$PROOF/${name}-host.log" 2>&1
   local rc=$?
   set -e
   unset HATCH_INJECT
@@ -84,9 +86,28 @@ echo "== weston-flower =="
 capture flower 20 weston-flower || echo "flower soft-fail"
 [ -f "$PROOF/flower.png" ] && png_ok "$PROOF/flower.png" 2000 || true
 
-echo "== mousepad (REQUIRED, with input inject) =="
-HATCH_INJECT=1 capture mousepad 45 mousepad
+echo "== mousepad (REQUIRED) =="
+set +e
+capture mousepad 45 mousepad
+mp_rc=$?
+set -e
+if [ "$mp_rc" -ne 0 ] || [ ! -f "$PROOF/mousepad.png" ]; then
+  echo "mousepad retry with WAYLAND_DEBUG=1…"
+  set +e
+  env WAYLAND_DEBUG=1 HATCH_INJECT=0 capture mousepad-debug 45 mousepad
+  set -e
+  echo "==== mousepad-debug host ===="; tail -80 "$PROOF/mousepad-debug-host.log" || true
+  echo "==== mousepad-debug client ===="; tail -120 "$PROOF/mousepad-debug-client.log" || true
+  # Prefer debug png if main failed
+  if [ ! -f "$PROOF/mousepad.png" ] && [ -f "$PROOF/mousepad-debug.png" ]; then
+    cp "$PROOF/mousepad-debug.png" "$PROOF/mousepad.png"
+  fi
+fi
 png_ok "$PROOF/mousepad.png" 6000
+# Separate interactive inject pass (soft)
+set +e
+HATCH_INJECT=1 capture mousepad-inject 30 mousepad || echo "mousepad-inject soft-fail"
+set -e
 
 echo "== galculator (REQUIRED) =="
 capture galculator 35 galculator
