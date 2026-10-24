@@ -177,9 +177,9 @@ print(f"host received {len(buf)} bytes, peak={max(map(abs, a), default=0)}")
 PY
 sleep 1
 XDG_RUNTIME_DIR="$WORK/xdg-other" timeout 30 "${GU[@]}" bash -c '. /usr/local/bin/hatch-audio-env; paplay /tmp/hatch-sine.wav; echo paplay rc=$?' || true
-wait %2 2>/dev/null || sleep 8
+sleep 9
 cat "$PROOF/audio-server.log" "$PROOF/audio-host.log"
-peak=$(grep -o 'peak=[0-9]*' "$PROOF/audio-host.log" | cut -d= -f2)
+peak=$(grep -o 'peak=[0-9]*' "$PROOF/audio-host.log" | cut -d= -f2 || true)
 if [ "${peak:-0}" -gt 5000 ]; then stamp "audio OK (peak $peak)"; else FAILED+=(audio); fi
 
 stamp "done; failed: ${FAILED[*]:-none}"
