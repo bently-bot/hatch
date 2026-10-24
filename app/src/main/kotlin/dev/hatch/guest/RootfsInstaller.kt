@@ -60,8 +60,9 @@ object RootfsInstaller {
                 val xz = File(context.noBackupFilesDir, RootfsCatalog.ROOTFS_NAME)
                 if (!xz.exists()) {
                     _stage.value = Stage.Downloading("Debian ${RootfsCatalog.DEBIAN_RELEASE}", 0, 0)
-                    logLine("Downloading Debian ${RootfsCatalog.DEBIAN_CODENAME} arm64 rootfs")
-                    download(RootfsCatalog.ROOTFS_URL, xz, RootfsCatalog.ROOTFS_SHA256) { got, total ->
+                    val rf = RootfsCatalog.resolve()
+                    logLine("Downloading Debian ${RootfsCatalog.DEBIAN_CODENAME} ${RootfsCatalog.lxcArch()} rootfs (${rf.build})")
+                    download(rf.url, xz, rf.sha256) { got, total ->
                         _stage.value = Stage.Downloading("Debian ${RootfsCatalog.DEBIAN_RELEASE}", got, total)
                     }
                 }

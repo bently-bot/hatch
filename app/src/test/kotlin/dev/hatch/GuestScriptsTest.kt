@@ -23,3 +23,14 @@ class GuestScriptsTest {
         }
     }
 }
+
+class RootfsCatalogTest {
+    @Test fun picksNewestBuildAndSha() {
+        val html = """<a href="20261020_05%3A24/">20261020_05:24/</a> <a>20261022_05:24/</a> <a>20261021_06:02/</a>"""
+        assertEquals("20261022_05:24", dev.hatch.guest.RootfsCatalog.latestBuild(html))
+        val sums = "aaaa  meta.tar.xz\n" + "b".repeat(64) + "  rootfs.tar.xz\n"
+        assertEquals("b".repeat(64), dev.hatch.guest.RootfsCatalog.shaFromSums(sums))
+        assertEquals("amd64", dev.hatch.guest.RootfsCatalog.lxcArch(arrayOf("x86_64", "arm64-v8a")))
+        assertEquals("arm64", dev.hatch.guest.RootfsCatalog.lxcArch(arrayOf("arm64-v8a")))
+    }
+}
