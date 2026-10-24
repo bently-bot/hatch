@@ -17,6 +17,7 @@ object AppSession {
         command: List<String>,
         waylandHostDir: String,
         extraEnv: Map<String, String> = emptyMap(),
+        onExit: (() -> Unit)? = null,
     ): Boolean {
         stop(appId)
         Log.i(TAG, "start $appId: $command")
@@ -36,6 +37,11 @@ object AppSession {
                 val n = try { dev.hatch.wayland.Native.readSome(s.outFd, buf) } catch (_: Throwable) { -1 }
                 if (n <= 0) break
             }
+            // stdout EOF ⇒ proot (and every guest process) exited
+            if (sessions[appId] === s) sessions.remove(appId)
+            runCatching { dev.hatch.wayland.Native.waitPid(s.pid, false) }
+            Log.i(TAG, "$appId exited")
+            onExit?.invoke()
         }, "hatch-guest-$appId").apply { isDaemon = true; start() }
         return true
     }

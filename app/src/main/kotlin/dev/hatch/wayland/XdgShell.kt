@@ -126,6 +126,8 @@ class XdgToplevelRes(c: Client, id: Int, val tl: Toplevel, v: Int = 1) : Res(c, 
         client.server.host.windowChanged(tl)
     }
     override fun onDestroy() { tl.destroyWindow() }
+    /** Ask the client to close the window (it may prompt, e.g. "save changes?"). */
+    fun sendClose() { if (alive) event(1).end() }
     fun sendConfigure(w: Int, h: Int, states: IntArray) {
         event(0).int(w).int(h).intArray(states).end()
         tl.xdgSurface.sendConfigure()

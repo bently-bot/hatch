@@ -29,9 +29,11 @@ class Seat(val server: WaylandServer) {
 
     private fun enterKeyboard(s: SurfaceRes) {
         keyboardSurface = s
-        for (seat in seats) if (seat.client === s.client) seat.keyboard?.enter(s)
+        for (seat in seats) if (seat.client === s.client) { seat.keyboard?.enter(s); seat.keyboard?.modifiers() }
+        for (ti in server.textInputs) if (ti.client === s.client) ti.enter(s)
     }
     private fun leaveKeyboard(s: SurfaceRes) {
+        for (ti in server.textInputs) if (ti.client === s.client) ti.leave(s)
         for (seat in seats) if (seat.client === s.client) seat.keyboard?.leave(s)
         if (keyboardSurface === s) keyboardSurface = null
     }
@@ -76,10 +78,36 @@ class Seat(val server: WaylandServer) {
         for (seat in seats) if (seat.client === w.client) seat.pointer?.axis(dx, dy)
     }
 
+    val modState = ModState()
+
     fun key(w: Toplevel, keycode: Int, pressed: Boolean) {
         focusWindow(w)
         for (seat in seats) if (seat.client === w.client)
             seat.keyboard?.key(keycode, if (pressed) 1 else 0)
+        if (modState.update(keycode, pressed)) setMods(modState.depressed, 0, modState.locked, 0)
+    }
+
+    /**
+     * Type text. If the focused client has an enabled zwp_text_input_v3, everything except Enter/Tab goes through
+     * commit_string (keeps ordering, any Unicode). Otherwise US-layout chars become key presses (X11, Wine, Qt…).
+     */
+    fun typeText(w: Toplevel, text: String) {
+        focusWindow(w)
+        val ti = server.textInputs.firstOrNull { it.client === w.client && it.enabled }
+        val pending = StringBuilder()
+        fun flush() { if (pending.isNotEmpty()) { ti?.commitString(pending.toString()); pending.clear() } }
+        for (ch in text) {
+            if (ti != null && ch != '\n' && ch != '\t') { pending.append(ch); continue }
+            val k = KeyChars.forChar(ch)
+            if (k == null) { pending.append(ch); continue } // non-US char, no text-input: dropped by flush()
+            flush()
+            val (code, shift) = k
+            val shiftHeld = modState.depressed and 1 != 0
+            if (shift && !shiftHeld) key(w, KeyChars.SHIFT, true)
+            key(w, code, true); key(w, code, false)
+            if (shift && !shiftHeld) key(w, KeyChars.SHIFT, false)
+        }
+        flush()
     }
 
     fun setMods(depressed: Int, latched: Int, locked: Int, group: Int) {

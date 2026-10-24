@@ -14,6 +14,8 @@ interface WindowHost {
     fun windowDestroyed(w: Toplevel)
     fun clipboardChanged(text: String) {}
     fun clipboardText(): String? = null
+    /** A client enabled/disabled text input (show/hide the soft keyboard). */
+    fun textInputChanged(enabled: Boolean) {}
     fun log(msg: String) { println("[wayland] $msg") }
 }
 
@@ -38,6 +40,7 @@ class WaylandServer(val host: WindowHost, val tmpDir: String, keymapText: String
     val startNanos = System.nanoTime()
     fun timeMs(): Int = ((System.nanoTime() - startNanos) / 1_000_000).toInt()
     val windows = ArrayList<Toplevel>()
+    val textInputs = ArrayList<TextInputRes>()
     val seat = Seat(this)
     val clipboard = Clipboard(this)
     @Volatile var running = false
@@ -117,6 +120,7 @@ class WaylandServer(val host: WindowHost, val tmpDir: String, keymapText: String
         for (w in windows.filter { it.client === c }) w.destroyWindow()
         seat.clientGone(c)
         clipboard.clientGone(c)
+        textInputs.removeAll { it.client === c }
     }
 }
 

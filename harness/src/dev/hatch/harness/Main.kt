@@ -105,6 +105,7 @@ fun main(args: Array<String>) {
                     val op = step.substringBefore(':'); val arg = step.substringAfter(':')
                     when (op) {
                         "w" -> Thread.sleep(arg.toLong())
+                        "t" -> { server.call(1000) { server.seat.typeText(w, arg.replace("\\n", "\n")); true }; Thread.sleep(200) }
                         "s" -> { // intermediate snapshot
                             val px0 = IntArray(1280 * 800)
                             if (server.call(2000) { w.readPixels(px0) } == true) savePng(px0, File(png.parentFile, "${png.nameWithoutExtension}-$arg.png"))
