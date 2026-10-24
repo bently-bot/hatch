@@ -273,9 +273,16 @@ class FloatingWindow(
     fun toggleMaximise() {
         if (maximised) { restoreBounds?.let { apply(it) }; maximised = false; return }
         restoreBounds = bounds()
-        val (sw, sh) = screen()
-        val top = statusBarHeight()
-        apply(Bounds(0, top, sw, sh - top - handleH))
+        // Fill the usable area exactly: metrics bounds minus system bars/cutout, clamped to the real display size
+        // (raw bounds overshot the bottom edge by ~100px on the Fold profile, hiding the resize grips).
+        val m = wm.currentWindowMetrics
+        val ins = m.windowInsets.getInsetsIgnoringVisibility(
+            android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout())
+        val dm = ctx.resources.displayMetrics
+        val right = minOf(m.bounds.width(), dm.widthPixels) - ins.right
+        val bottom = minOf(m.bounds.height(), dm.heightPixels) - ins.bottom
+        val top = maxOf(ins.top, statusBarHeight())
+        apply(Bounds(ins.left, top, right - ins.left, bottom - top - handleH))
         maximised = true
     }
 

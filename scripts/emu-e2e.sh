@@ -326,6 +326,7 @@ tap_target "control Maximise" Mousepad || { sleep 1; adb shell input tap $(( (L 
 sleep 3; MX=$(float_frame Mousepad); read ML MT MR MB <<<"$MX"
 stamp "maximised frame: $MX (screen ${WX}x${WY})"
 [ $(( MR - ML )) -ge $(( WX * 95 / 100 )) ] || fail "maximise did not fill the width ($F → $MX)"
+[ "$MB" -le $(( WY + $(dp 12) )) ] || fail "maximised window runs off the bottom ($MX, screen height $WY)"
 shot P4a-maximised
 adb logcat -c
 adb shell input tap $(( (ML + MR) / 2 )) $(( (MT > 0 ? MT : 0) + $(dp 10) + $(dp 13) )); sleep 2
@@ -363,7 +364,12 @@ if [ "${E2E_WINE:-1}" = 1 ]; then
   adb shell monkey -p "$WSTUB" -c android.intent.category.LAUNCHER 1 >/dev/null
   for i in $(seq 1 240); do adb logcat -d -s HatchWindow | grep -q "bound target.*Notepad++" && break; sleep 3; done
   adb logcat -d -s HatchRuntime HatchWindow HatchSession > "$OUT/wine-logcat.txt" 2>&1
-  grep -q "bound target.*Notepad++" "$OUT/wine-logcat.txt" || fail "no Notepad++ window (see wine-logcat.txt)"
+  if ! grep -q "bound target.*Notepad++" "$OUT/wine-logcat.txt"; then
+    # Why did wine exit? Run it in the foreground inside the guest and keep its output.
+    guest 'command -v wine wine64; dpkg -l | grep -E "^ii +(wine|libwine)" | head; ls -la /opt/hatch/npp | head -5; ls -la /home/hatch/.wine 2>&1 | head -3; timeout 25 su hatch -s /bin/sh -c "HOME=/home/hatch XDG_RUNTIME_DIR=/run/hatch WAYLAND_DISPLAY=wayland-0 WINEDEBUG=err+all /usr/local/bin/hatch-launch --wine -- wine /opt/hatch/npp/notepad++.exe" 2>&1 | tail -40' > "$OUT/wine-guest.txt" 2>&1
+    tail -25 "$OUT/wine-guest.txt"
+    fail "no Notepad++ window (see wine-logcat.txt, wine-guest.txt)"
+  fi
   sleep 10; shot 13-notepadpp-window
   python3 - "$OUT/13-notepadpp-window.png" <<'PY' || fail "Notepad++ window looks empty"
 import sys
