@@ -81,6 +81,10 @@ object InstallManager {
             }
         }
 
+    /** Re-run install (apt refresh + stub rebuild). */
+    suspend fun update(context: Context, app: StoreApp, waylandHostDir: String?): Boolean =
+        install(context, app, waylandHostDir)
+
     suspend fun uninstall(context: Context, app: StoreApp): Boolean = withContext(Dispatchers.IO) {
         try {
             _progress.value = Progress.Working(app.id, "Removing…")

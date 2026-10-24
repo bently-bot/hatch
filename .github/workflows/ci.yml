@@ -61,6 +61,7 @@ jobs:
           path: harness-out/*.png
 
   android-assemble:
+    timeout-minutes: 35
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

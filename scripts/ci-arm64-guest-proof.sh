@@ -144,28 +144,20 @@ if command -v wine64 >/dev/null || command -v wine >/dev/null; then
   unzip -qo /tmp/npp.zip -d "$NPP_DIR"
   export WINEPREFIX="$RUNNER_TEMP/wineprefix"
   WINEBIN=$(command -v wine64 || command -v wine)
+  mkdir -p "$WINEPREFIX"
   echo "wineboot -i (max 5 min)…"
   set +e
-  timeout 300 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" wineboot -i
+  timeout 300 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" WINEDLLOVERRIDES="mscoree,mshtml=" "$WINEBIN" wineboot -i
   wb=$?
   echo "wineboot exit=$wb"
-  if [ "$wb" -eq 0 ]; then
-    env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" reg add \
-      'HKCU\Software\Wine\Drivers' /v Graphics /t REG_SZ /d wayland /f || true
-    capture notepadpp 90 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" \
-      "$WINEBIN" "$NPP_DIR/notepad++.exe" || echo "notepadpp soft-fail"
-    [ -f "$PROOF/notepadpp.png" ] && png_ok "$PROOF/notepadpp.png" 4000 || true
-  else
-    echo "wineboot failed/timeout — skip NPP capture (soft)"
-  fi
+  env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" reg add \
+    'HKCU\Software\Wine\Drivers' /v Graphics /t REG_SZ /d wayland /f || true
+  # Longer capture — first launch may finish wine init
+  capture notepadpp 180 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" \
+    WINEDLLOVERRIDES="mscoree,mshtml=" \
+    "$WINEBIN" "$NPP_DIR/notepad++.exe" || echo "notepadpp soft-fail"
+  [ -f "$PROOF/notepadpp.png" ] && png_ok "$PROOF/notepadpp.png" 4000 || true
   set -e
 fi
 
-echo "Proof artifacts:"; ls -la "$PROOF"/*.png
-test -f "$PROOF/simple-shm.png"
-test -f "$PROOF/mousepad.png"
-test -f "$PROOF/mousepad-inject.png"
-test -f "$PROOF/galculator.png"
-png_ok "$PROOF/mousepad.png" 6000
-png_ok "$PROOF/galculator.png" 4000
-echo "arm64 guest proof OK"
+

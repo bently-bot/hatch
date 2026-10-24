@@ -87,6 +87,14 @@ class MainActivity : ComponentActivity() {
                             onUninstall = { app ->
                                 scope.launch { InstallManager.uninstall(this@MainActivity, app) }
                             },
+                            onUpdate = { app ->
+                                scope.launch {
+                                    InstallManager.update(
+                                        this@MainActivity, app,
+                                        HatchApp.instance.runtime.socketDir().absolutePath,
+                                    )
+                                }
+                            },
                             onLaunch = { app -> launchApp(app) },
                             onInstallSettings = {
                                 startActivity(
@@ -169,6 +177,7 @@ private fun StoreScreen(
     progress: InstallManager.Progress,
     onInstall: (StoreApp) -> Unit,
     onUninstall: (StoreApp) -> Unit,
+    onUpdate: (StoreApp) -> Unit,
     onLaunch: (StoreApp) -> Unit,
     onInstallSettings: () -> Unit,
 ) {
@@ -295,6 +304,7 @@ private fun StoreScreen(
                         (progress as InstallManager.Progress.Working).appId == app.id,
                     onInstall = { onInstall(app) },
                     onUninstall = { onUninstall(app) },
+                    onUpdate = { onUpdate(app) },
                     onLaunch = { onLaunch(app) },
                 )
             }
@@ -310,6 +320,7 @@ private fun AppCard(
     busy: Boolean,
     onInstall: () -> Unit,
     onUninstall: () -> Unit,
+    onUpdate: () -> Unit,
     onLaunch: () -> Unit,
 ) {
     ElevatedCard(Modifier.fillMaxWidth()) {
@@ -340,6 +351,9 @@ private fun AppCard(
                     installed -> {
                         Button(onClick = onLaunch, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)) {
                             Text("Open")
+                        }
+                        TextButton(onClick = onUpdate, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+                            Text("Update")
                         }
                         TextButton(onClick = onUninstall, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
                             Text("Remove")
