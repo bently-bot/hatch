@@ -34,7 +34,10 @@ store_install() {
   local id=$1 name stub=dev.hatch.app.${1//-/_}
   name=$(python3 -c 'import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])' "$ROOT/catalogue/catalogue.json" "$id")
   adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 3
-  $UI tap 'Get apps' dev.hatch || true; sleep 1
+  # The store may resume on a detail page (no tab bar): back out to the tabs first.
+  for k in 1 2 3; do $UI has '^Get apps$' dev.hatch && break; hide_ime; adb shell input keyevent 4; sleep 2
+    adb shell dumpsys activity activities | grep -m1 topResumedActivity | grep -q dev.hatch || adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; done
+  $UI tap '^Get apps$' dev.hatch || true; sleep 1
   type_search "$id" || return 1
   hide_ime; sleep 1
   for t in 1 2 3 4; do $UI has '^Install$' dev.hatch && break; $UI tap "^$name\$" dev.hatch || true; sleep 2; done
@@ -280,7 +283,7 @@ adb logcat -c
 adb shell input tap $(( (BL + BR) / 2 )) $(( (BT + BB) / 2 )); sleep 2
 tap_target "bubble-menu Open Hatch" bubble || fail "bubble menu has no Open Hatch"
 sleep 4
-$UI has 'Search apps|Get apps' dev.hatch || fail "Open Hatch from the bubble did not show the store"
+adb shell dumpsys activity activities | grep -m1 topResumedActivity | grep -q 'dev.hatch/.ui.MainActivity' || fail "Open Hatch from the bubble did not show the store"
 float_frame Mousepad >/dev/null || fail "window closed when the store opened from the bubble"
 shot 10h-store-opened-from-bubble
 cp "$OUT/08b-floating-over-home.png" "$OUT/P1-floating-over-home.png"
