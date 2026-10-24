@@ -61,6 +61,10 @@ $UI tap '^Install$' dev.hatch || fail "no Install button"
 # PackageInstaller confirmation for the generated stub APK
 for i in $(seq 1 300); do
   adb shell pm list packages | grep -q "package:$STUB$" && break
+  if $UI has 'Install failed' dev.hatch; then
+    $UI tap '^Details$' dev.hatch || true; sleep 2; shot 05-install-failed
+    adb logcat -d -s HatchInstall > "$OUT/install-logcat.txt" 2>&1; guest_probe; fail "install failed in store"
+  fi
   if $UI has 'Do you want to install|install this app'; then shot 05-stub-prompt; $UI tap '^Install$' 'packageinstaller' || true; fi
   sleep 5
 done
