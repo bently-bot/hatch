@@ -182,6 +182,16 @@ cat "$PROOF/audio-server.log" "$PROOF/audio-host.log"
 peak=$(grep -o 'peak=[0-9]*' "$PROOF/audio-host.log" | cut -d= -f2 || true)
 if [ "${peak:-0}" -gt 5000 ]; then stamp "audio OK (peak $peak)"; else FAILED+=(audio); fi
 
+# GPU path (Turnip/KGSL): no Adreno on CI, but prove the bundled driver unpacks, its deps install and it links in the
+# real guest — the self-test must get as far as the /dev/kgsl-3d0 check (only the Fold 8 can go further).
+if [ -n "${TURNIP_TAR:-}" ] && [ -f "$TURNIP_TAR" ]; then
+  mkdir -p "$R/opt/hatch" && cp "$TURNIP_TAR" "$R/opt/hatch/turnip.tar.xz"
+  "${G[@]}" /usr/local/bin/hatch-gpu-check > "$PROOF/gpu-check.log" 2>&1 || true
+  cat "$PROOF/gpu-check.log"
+  if grep -q 'kgsl-3d0 not visible' "$R/var/lib/hatch/gpu-check" 2>/dev/null; then stamp "gpu path OK up to device (driver unpacked + linked)"
+  else stamp "gpu path FAILED: $(cat "$R/var/lib/hatch/gpu-check" 2>/dev/null)"; FAILED+=(gpu); fi
+fi
+
 stamp "done; failed: ${FAILED[*]:-none}"
 hard=()
 for f in "${FAILED[@]:-}"; do [ -n "$f" ] && [[ " $SOFT_APPS " != *" $f "* ]] && hard+=("$f"); done

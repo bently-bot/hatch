@@ -31,3 +31,4 @@ hs_err_pid*.log
 keystore.properties
 *.p12
 !app/src/main/assets/stub-keystore.p12
+app/src/main/assets/gpu/

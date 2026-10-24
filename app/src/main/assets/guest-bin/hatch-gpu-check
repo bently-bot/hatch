@@ -1,0 +1,25 @@
+#!/bin/sh
+# hatch-gpu-check (root): unpack the bundled Turnip (KGSL) driver and verify it enumerates the Adreno GPU.
+# Writes /var/lib/hatch/gpu-check: "ok <deviceName>" or "fail <reason>". Hatch uses the GPU only after "ok".
+set -u
+OUT=/var/lib/hatch/gpu-check; T=/opt/hatch/turnip
+mkdir -p /var/lib/hatch "$T"
+res() { echo "$*" > "$OUT"; echo "hatch: gpu-check: $*"; }
+if [ -f /opt/hatch/turnip.tar.xz ]; then tar -xJf /opt/hatch/turnip.tar.xz -C "$T" && rm -f /opt/hatch/turnip.tar.xz; fi
+[ -f "$T/libvulkan_freedreno.so" ] || { res "fail driver not bundled"; exit 1; }
+printf '{"file_format_version":"1.0.0","ICD":{"library_path":"%s/libvulkan_freedreno.so","api_version":"1.4.0"}}\n' "$T" > "$T/freedreno_icd.json"
+# Runtime deps of the driver + Zink (in Debian's gallium) + vulkaninfo for the probe.
+need=""
+for p in libvulkan1 vulkan-tools libgl1-mesa-dri libegl-mesa0 libdrm2 libwayland-client0 libx11-xcb1 libxcb-dri3-0 libxcb-present0 libxshmfence1 libzstd1; do
+  dpkg -s "$p" >/dev/null 2>&1 || need="$need $p"
+done
+[ -z "$need" ] || apt-get install -y --no-install-recommends $need >/dev/null 2>&1 || { res "fail could not install:$need"; exit 1; }
+missing=$(ldd "$T/libvulkan_freedreno.so" | grep 'not found' | awk '{print $1}' | tr '\n' ' ')
+[ -z "$missing" ] || { res "fail missing libs: $missing"; exit 1; }
+[ -c /dev/kgsl-3d0 ] || { res "fail /dev/kgsl-3d0 not visible"; exit 1; }
+R=$(VK_ICD_FILENAMES="$T/freedreno_icd.json" VK_DRIVER_FILES="$T/freedreno_icd.json" TU_DEBUG=noconform timeout 40 vulkaninfo --summary 2>&1)
+NAME=$(printf '%s\n' "$R" | sed -n 's/^[[:space:]]*deviceName[[:space:]]*=[[:space:]]*//p' | head -1)
+case "$NAME" in
+  *Adreno*|*Turnip*|*FD[0-9]*) res "ok $NAME" ;;
+  *) res "fail $(printf '%s\n' "$R" | grep -m1 -iE 'error|fail|cannot' | cut -c1-120)"; exit 1 ;;
+esac

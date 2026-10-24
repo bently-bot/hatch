@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
                             onStart = { RootfsInstaller.start(this@MainActivity) },
                         )
                     } else {
+                        LaunchedEffect(ready) { dev.hatch.gpu.Gpu.ensureChecked(this@MainActivity) }
                         StoreScreen(
                             apps = catalogue.apps,
                             categories = catalogue.categories,
@@ -103,6 +104,14 @@ class MainActivity : ComponentActivity() {
                                         Uri.parse("package:$packageName"),
                                     )
                                 )
+                            },
+                            gpuStatus = {
+                                val g = dev.hatch.gpu.Gpu
+                                g.describe(g.mode(this@MainActivity), g.info(this@MainActivity, LinuxRuntime.rootfsDir(this@MainActivity)))
+                            },
+                            gpuEnabled = { dev.hatch.gpu.Gpu.mode(this@MainActivity) == dev.hatch.gpu.Gpu.Mode.AUTO },
+                            setGpuEnabled = { on ->
+                                dev.hatch.gpu.Gpu.setMode(this@MainActivity, if (on) dev.hatch.gpu.Gpu.Mode.AUTO else dev.hatch.gpu.Gpu.Mode.SOFTWARE)
                             }),
                         )
                     }

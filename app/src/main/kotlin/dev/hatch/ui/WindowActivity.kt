@@ -163,7 +163,9 @@ class WindowActivity : ComponentActivity(), SurfaceHolder.Callback, HatchRuntime
         val waylandDir = rt.ensureAppSocket(appId).absolutePath
         val argv = GuestScripts.launchArgv(cmd, wine = rec?.wine == true, x11 = rec?.x11 == true)
         if (rec?.wine == true) overlayText?.text = "Starting $label…\n(first launch prepares Windows support — this can take a minute)"
-        val ok = AppSession.start(this, appId, argv, waylandDir, onExit = { rt.guestExited(appId) })
+        val gpu = dev.hatch.gpu.Gpu.run { useGpu(mode(this@WindowActivity), info(this@WindowActivity, LinuxRuntime.rootfsDir(this@WindowActivity))) }
+        val ok = AppSession.start(this, appId, argv, waylandDir, extraEnv = dev.hatch.gpu.Gpu.env(gpu), onExit = { rt.guestExited(appId) })
+        Log.i(TAG, "rendering for $appId: ${if (gpu) "GPU (Turnip/KGSL + Zink)" else "software"}")
         Log.i(TAG, "spawn $appId ok=$ok argv=$argv")
         if (!ok) overlayText?.text = "Couldn't start $label."
     }

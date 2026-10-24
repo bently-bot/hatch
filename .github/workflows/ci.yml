@@ -47,8 +47,13 @@ jobs:
     # catalogue.json, rendered through Hatch's compositor. Wine = Debian's wine 10 arm64 + winewayland.drv.
     timeout-minutes: 60
     runs-on: ubuntu-24.04-arm
+    needs: [turnip-kgsl]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: turnip-kgsl
+          path: ${{ runner.temp }}/turnip
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -61,6 +66,7 @@ jobs:
         env:
           PROOF_DIR: harness-out
           APPS: mousepad galculator gnome-mines xterm featherpad gnome-chess notepadpp
+          TURNIP_TAR: ${{ runner.temp }}/turnip/turnip.tar.xz
         run: bash scripts/ci-guest-proof.sh
       - uses: actions/upload-artifact@v4
         if: always()
@@ -70,11 +76,37 @@ jobs:
             harness-out/*.png
             harness-out/*.log
 
+  turnip-kgsl:
+    # Mesa Turnip (Vulkan, Adreno) with the KGSL kernel backend for Qualcomm Android, built in Debian 13 arm64.
+    # Bundled in the APK (assets/gpu); used only after the on-device self-test (hatch-gpu-check) passes.
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04-arm
+    container: debian:trixie
+    steps:
+      - uses: actions/checkout@v4
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: out/turnip.tar.xz
+          key: turnip-kgsl-arm64-${{ hashFiles('scripts/build-turnip.sh') }}
+      - name: Build Turnip (KGSL)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sh scripts/build-turnip.sh "$PWD/out"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: turnip-kgsl
+          path: out/turnip.tar.xz
+
   android-assemble:
+    needs: [turnip-kgsl]
     timeout-minutes: 35
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: turnip-kgsl
+          path: app/src/main/assets/gpu
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

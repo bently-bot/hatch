@@ -95,7 +95,38 @@ data class StoreActions(
     val update: (StoreApp) -> Unit,
     val launch: (StoreApp) -> Unit,
     val installSettings: () -> Unit,
+    /** Graphics status line for the settings sheet (see Gpu.describe). */
+    val gpuStatus: () -> String = { "Software rendering" },
+    val gpuEnabled: () -> Boolean = { false },
+    val setGpuEnabled: (Boolean) -> Unit = {},
 )
+
+@Composable
+private fun SettingsDialog(actions: StoreActions, onDismiss: () -> Unit) {
+    var gpuOn by remember { mutableStateOf(actions.gpuEnabled()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        title = { Text("Settings") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Graphics", fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Use the GPU when available", Modifier.weight(1f))
+                    Switch(checked = gpuOn, onCheckedChange = { gpuOn = it; actions.setGpuEnabled(it) })
+                }
+                Text(actions.gpuStatus(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Applies to apps opened after the change.", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline)
+                HorizontalDivider()
+                Text("App installs", fontWeight = FontWeight.SemiBold)
+                Text("Hatch adds each app to your launcher as its own icon. Android asks once for permission to do this.",
+                    style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = actions.installSettings) { Text("Install permission") }
+            }
+        },
+    )
+}
 
 @Composable
 fun StoreScreen(
@@ -137,7 +168,9 @@ fun StoreScreen(
                     Text("${apps.size} Linux & Windows apps · each in its own window",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = actions.installSettings) { Text("Permissions") }
+                var showSettings by remember { mutableStateOf(false) }
+                TextButton(onClick = { showSettings = true }) { Text("Settings") }
+                if (showSettings) SettingsDialog(actions) { showSettings = false }
             }
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(
