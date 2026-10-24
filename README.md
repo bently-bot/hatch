@@ -6,7 +6,13 @@ Hatch is being built for arm64 Android (minSdk 29, targetSdk 35), developed agai
 
 ## Status
 
-Pre-release. The Wayland compositor core and the per-app stub-APK installer are proven on the box; the Android shell, Debian bootstrap, Wine path and CI are in progress.
+Pre-release vertical slice in flight.
+
+- Own Wayland compositor proven (host harness + CI → `simple-shm.png`).
+- Debug APK assembles (CI + local); Fold/freeform `WindowActivity` + runtime FGS scaffolded.
+- Stub template trampoline ships in assets; StubFactory ready.
+- Still to wire: proot/Debian bootstrap, real install→launch, Wine on device.
+- Target device: Samsung Galaxy Z Fold 8 (4K pages).
 
 ## Architecture (short)
 
