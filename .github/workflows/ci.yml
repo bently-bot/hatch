@@ -142,6 +142,10 @@ jobs:
         with:
           name: hatch-apks
           path: apks
+      - name: Free disk space (emulator userdata needs room)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules /usr/share/swift || true
+          df -h /
       - name: Python deps
         run: python3 -m pip install --quiet pillow || sudo apt-get install -y -qq python3-pil
       - name: Enable KVM
@@ -155,9 +159,9 @@ jobs:
           target: google_apis
           arch: x86_64
           force-avd-creation: true
-          disk-size: 8G
+          disk-size: 6G
           ram-size: 4096M
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-options: -no-metrics -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
             APK=$(find apks -name 'app-debug.apk' | head -1)
