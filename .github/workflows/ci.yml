@@ -192,12 +192,22 @@ jobs:
             yes | "$SDKM" --install emulator 'system-images;android-34;google_apis;x86_64' platform-tools > /tmp/sdk.log 2>&1 && break
             tail -3 /tmp/sdk.log; echo "retry $i"; sleep 20
           done
+          # Newer cmdline-tools know the foldable/tablet device profiles (pixel_fold ≈ the Fold's 7.6" inner screen).
+          C="$ANDROID_HOME/cmdline-tools"
+          for i in 1 2 3; do yes | "$SDKM" --install 'cmdline-tools;latest' > /tmp/ct.log 2>&1 && break; sleep 15; done
+          N=$(ls -d "$C"/latest-* 2>/dev/null | sort -V | tail -1)
+          if [ -n "$N" ]; then sudo rm -rf "$C/latest" && sudo mv "$N" "$C/latest"; fi
+          P=pixel_6
+          for d in pixel_fold pixel_tablet pixel_c; do
+            "$C/latest/bin/avdmanager" list device -c 2>/dev/null | grep -qx "$d" && { P=$d; break; }
+          done
+          echo "EMU_PROFILE=$P" >> "$GITHUB_ENV"; echo "emulator profile: $P"
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
           target: google_apis
           arch: x86_64
-          profile: pixel_fold
+          profile: ${{ env.EMU_PROFILE }}
           force-avd-creation: true
           disk-size: 6G
           ram-size: 4096M
