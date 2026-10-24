@@ -23,7 +23,7 @@ object AppIcons {
         if (f.exists() && f.length() > 0) return f.readBytes()
         if (app.iconUrl.isBlank()) return null
         return runCatching {
-            val c = URL(app.iconUrl).openConnection() as HttpURLConnection
+            val c = URL(CatalogueCodec.resolveIcon(RemoteCatalogue.url(context), app.iconUrl)).openConnection() as HttpURLConnection
             c.connectTimeout = 10_000; c.readTimeout = 15_000
             c.setRequestProperty("User-Agent", "Hatch")
             val bytes = c.inputStream.use { it.readBytes() }

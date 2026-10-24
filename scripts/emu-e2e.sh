@@ -106,6 +106,8 @@ adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null
 $UI wait 'Download & set up' 60 || fail "no setup screen"
 shot 01-first-run
 $UI tap 'Download & set up' || fail "tap setup"
+# A tap during cold start can be dropped (button still showing, nothing started): re-tap a few times.
+for k in 1 2 3; do sleep 10; $UI has '^Download & set up$' dev.hatch || break; stamp "setup tap not taken, re-tapping ($k)"; $UI tap '^Download & set up$' dev.hatch || true; done
 sleep 20; shot 02-setup-progress
 # First run: download rootfs + apt; log what the setup screen says every minute so a slow/failed step is visible.
 ok=0; retried=0

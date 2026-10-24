@@ -93,4 +93,19 @@ class CatalogueCodecTest {
         val f = CatalogueCodec.parse(java.io.File("src/main/assets/catalogue.json").readText())!!
         assertTrue(f.apps.size > 1000)
     }
+
+    /** A fixture signed by the real catalogue key with hatch-catalogue/scripts/sign.sh (openssl) verifies in-app. */
+    @Test fun publishedFormatVerifiesWithBakedKey() {
+        val d = java.io.File("src/test/resources/signed/catalogue.json").readBytes()
+        val s = java.io.File("src/test/resources/signed/catalogue.json.sig").readBytes()
+        assertTrue(CatalogueCodec.verify(d, s, BuildConfig.CATALOGUE_PUBKEY))
+        assertFalse(CatalogueCodec.verify(d + ' '.code.toByte(), s, BuildConfig.CATALOGUE_PUBKEY))
+    }
+
+    @Test fun relativeIconsResolve() {
+        val rel = "https://github.com/o/r/releases/latest/download/catalogue.json.gz"
+        assertEquals("https://github.com/o/r/releases/latest/download/x.png", CatalogueCodec.resolveIcon(rel, "icons/x.png"))
+        assertEquals("https://raw.example/o/r/main/dist/icons/x.png", CatalogueCodec.resolveIcon("https://raw.example/o/r/main/dist/catalogue.json", "icons/x.png"))
+        assertEquals("https://a/b.png", CatalogueCodec.resolveIcon(rel, "https://a/b.png"))
+    }
 }

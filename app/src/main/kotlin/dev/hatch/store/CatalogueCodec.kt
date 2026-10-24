@@ -73,6 +73,16 @@ object CatalogueCodec {
         return if (c.updated >= b.updated) c else b
     }
 
+    /**
+     * Catalogue-relative icon paths ("icons/<id>.png") resolve against the catalogue URL's directory; GitHub release
+     * assets are flat, so for ".../releases/.../download/catalogue.json.gz" only the file name is kept.
+     */
+    fun resolveIcon(catalogueUrl: String, iconUrl: String): String {
+        if (iconUrl.startsWith("http://") || iconUrl.startsWith("https://")) return iconUrl
+        val base = catalogueUrl.substringBeforeLast('/') + "/"
+        return if ("/releases/" in catalogueUrl) base + iconUrl.substringAfterLast('/') else base + iconUrl.removePrefix("/")
+    }
+
     /** Signature URL for a catalogue URL: ".../catalogue.json(.gz)" → ".../catalogue.json.sig". */
     fun sigUrl(url: String): String = url.removeSuffix(".gz") + ".sig"
 }

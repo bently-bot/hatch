@@ -1,417 +1,420 @@
 {
- "version": 2,
- "note": "Hand-curated entries. build-catalogue.py merges these (featured, in this order) with every desktop app in Debian 13's AppStream (DEP-11) metadata.",
- "featured": [
-  "cursor",
-  "code",
-  "brave-browser",
-  "org.darktable.Darktable",
-  "mousepad",
-  "galculator",
-  "gnome-mines",
-  "notepadpp",
-  "firefox-esr",
-  "libreoffice-writer",
-  "gimp",
-  "inkscape",
-  "thunar",
-  "xterm",
-  "vlc",
-  "audacity",
-  "krita",
-  "geany",
-  "aisleriot",
-  "gedit",
-  "evince",
-  "ristretto",
-  "keepassxc",
-  "transmission-gtk",
-  "filezilla",
-  "thunderbird",
-  "gnome-chess",
-  "gnome-sudoku",
-  "supertux",
-  "wesnoth",
-  "scummvm",
-  "dosbox",
-  "luanti",
-  "codeblocks",
-  "blender",
-  "libreoffice-calc",
-  "libreoffice-impress",
-  "shotwell",
-  "kdenlive",
-  "weston-terminal",
-  "hdrview"
- ],
- "verified": [
-  "mousepad",
-  "galculator",
-  "gnome-mines",
-  "xterm",
-  "notepadpp",
-  "gedit",
-  "thunar",
-  "blender"
- ],
- "apps": [
-  {
-   "id": "mousepad",
-   "name": "Mousepad",
-   "summary": "Fast plain-text editor",
-   "category": "editors",
-   "source": "debian",
-   "icon": "text",
-   "packages": [
-    "mousepad"
-   ],
-   "command": [
-    "mousepad"
-   ],
-   "wine": false
-  },
-  {
-   "id": "gedit",
-   "name": "Text Editor",
-   "summary": "GNOME text editor",
-   "category": "editors",
-   "source": "debian",
-   "icon": "text",
-   "packages": [
-    "gedit"
-   ],
-   "command": [
-    "gedit"
-   ],
-   "wine": false
-  },
-  {
-   "id": "galculator",
-   "name": "Calculator",
-   "summary": "GTK algebraic calculator",
-   "category": "office",
-   "source": "debian",
-   "icon": "calc",
-   "packages": [
-    "galculator"
-   ],
-   "command": [
-    "galculator"
-   ],
-   "wine": false
-  },
-  {
-   "id": "libreoffice-writer",
-   "name": "LibreOffice Writer",
-   "summary": "Word processor",
-   "category": "office",
-   "source": "debian",
-   "icon": "office",
-   "packages": [
-    "libreoffice-writer",
-    "libreoffice-gtk3"
-   ],
-   "command": [
-    "libreoffice",
-    "--writer"
-   ],
-   "wine": false
-  },
-  {
-   "id": "gimp",
-   "name": "GIMP",
-   "summary": "Image editor (CPU path first)",
-   "category": "graphics",
-   "source": "debian",
-   "icon": "image",
-   "packages": [
-    "gimp"
-   ],
-   "command": [
-    "gimp"
-   ],
-   "wine": false
-  },
-  {
-   "id": "inkscape",
-   "name": "Inkscape",
-   "summary": "Vector graphics",
-   "category": "graphics",
-   "source": "debian",
-   "icon": "image",
-   "packages": [
-    "inkscape"
-   ],
-   "command": [
-    "inkscape"
-   ],
-   "wine": false
-  },
-  {
-   "id": "gnome-mines",
-   "name": "Mines",
-   "summary": "Minesweeper",
-   "category": "games",
-   "source": "debian",
-   "icon": "game",
-   "packages": [
-    "gnome-mines"
-   ],
-   "command": [
-    "gnome-mines"
-   ],
-   "wine": false
-  },
-  {
-   "id": "aisleriot",
-   "name": "Solitaire",
-   "summary": "Aisleriot card games",
-   "category": "games",
-   "source": "debian",
-   "icon": "game",
-   "packages": [
-    "aisleriot"
-   ],
-   "command": [
-    "sol"
-   ],
-   "wine": false
-  },
-  {
-   "id": "thunar",
-   "name": "Thunar",
-   "summary": "File manager",
-   "category": "system",
-   "source": "debian",
-   "icon": "folder",
-   "packages": [
-    "thunar"
-   ],
-   "command": [
-    "thunar"
-   ],
-   "wine": false
-  },
-  {
-   "id": "firefox-esr",
-   "name": "Firefox ESR",
-   "summary": "Web browser",
-   "category": "system",
-   "source": "debian",
-   "icon": "web",
-   "packages": [
-    "firefox-esr"
-   ],
-   "command": [
-    "firefox-esr"
-   ],
-   "wine": false
-  },
-  {
-   "id": "weston-terminal",
-   "name": "Weston Terminal",
-   "summary": "Wayland terminal (smoke)",
-   "category": "dev",
-   "source": "debian",
-   "icon": "term",
-   "packages": [
-    "weston"
-   ],
-   "command": [
-    "weston-terminal"
-   ],
-   "wine": false
-  },
-  {
-   "id": "xterm",
-   "name": "XTerm",
-   "summary": "X11 terminal via Xwayland",
-   "category": "dev",
-   "source": "debian",
-   "icon": "term",
-   "packages": [
-    "xterm",
-    "xwayland"
-   ],
-   "command": [
-    "hatch-x11",
-    "xterm"
-   ],
-   "wine": false,
-   "x11": true
-  },
-  {
-   "id": "notepadpp",
-   "name": "Notepad++",
-   "summary": "Windows text editor (runs via Wine)",
-   "category": "windows",
-   "source": "winget",
-   "icon": "text",
-   "packages": [],
-   "command": [
-    "wine",
-    "/opt/hatch/npp/notepad++.exe"
-   ],
-   "wine": true,
-   "windowsPayload": {
-    "url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.8.1/npp.8.9.8.1.portable.arm64.zip",
-    "sha256": "43bf78c7569fd43b03d4f86a1073ac4306b31099e4487bdbf536c42d16d03f48",
-    "extractTo": "/opt/hatch/npp"
-   },
-   "payloads": {
-    "amd64": {
-     "url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.8.1/npp.8.9.8.1.portable.x64.zip",
-     "sha256": "beddf5548e75c97930d1575ba1c7d113e6e2b33d0a200310e734ca08e225f414",
-     "extractTo": "/opt/hatch/npp"
-    }
-   }
-  },
-  {
-   "id": "blender",
-   "name": "Blender",
-   "summary": "3D modeling, animation, rendering and post-production",
-   "category": "graphics",
-   "source": "debian",
-   "packages": [
-    "blender",
-    "xwayland"
-   ],
-   "command": [
-    "hatch-x11",
-    "blender"
-   ],
-   "x11": true,
-   "wine": false
-  },
-  {
-   "id": "cursor",
-   "name": "Cursor",
-   "summary": "The AI code editor",
-   "description": "Cursor is an AI-first code editor built on VS Code: agents, tab completion and chat that understands your codebase. Installed from Anysphere's own signed apt repository (native arm64 build) and updated with Update all.",
-   "category": "dev",
-   "source": "vendor",
-   "vendorName": "Anysphere",
-   "packages": [
-    "cursor"
-   ],
-   "command": [
-    "/usr/share/cursor/cursor",
-    "--no-sandbox"
-   ],
-   "wine": false,
-   "repo": {
-    "id": "cursor",
-    "keyUrl": "https://downloads.cursor.com/keys/anysphere.asc",
-    "uris": "https://downloads.cursor.com/aptrepo",
-    "suites": "stable",
-    "components": "main"
-   },
-   "license": "Proprietary"
-  },
-  {
-   "id": "code",
-   "name": "Visual Studio Code",
-   "summary": "Code editing. Redefined.",
-   "description": "Visual Studio Code is a lightweight but powerful source code editor with support for debugging, Git, extensions and many languages. Installed from Microsoft's own signed apt repository (native arm64 build).",
-   "category": "dev",
-   "source": "vendor",
-   "vendorName": "Microsoft",
-   "packages": [
-    "code"
-   ],
-   "command": [
-    "/usr/share/code/code",
-    "--no-sandbox"
-   ],
-   "wine": false,
-   "repo": {
-    "id": "vscode",
-    "keyUrl": "https://packages.microsoft.com/keys/microsoft.asc",
-    "uris": "https://packages.microsoft.com/repos/code",
-    "suites": "stable",
-    "components": "main"
-   },
-   "license": "Proprietary"
-  },
-  {
-   "id": "brave-browser",
-   "name": "Brave",
-   "summary": "Fast, private web browser",
-   "description": "Brave is a Chromium-based web browser that blocks ads and trackers by default. Installed from Brave's own signed apt repository (native arm64 build).",
-   "category": "internet",
-   "source": "vendor",
-   "vendorName": "Brave",
-   "packages": [
-    "brave-browser"
-   ],
-   "command": [
+  "version": 2,
+  "note": "Hand-curated entries. build-catalogue.py merges these (featured, in this order) with every desktop app in Debian 13's AppStream (DEP-11) metadata.",
+  "featured": [
+    "cursor",
+    "code",
     "brave-browser",
-    "--no-sandbox",
-    "--test-type"
-   ],
-   "wine": false,
-   "repo": {
-    "id": "brave",
-    "keyUrl": "https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg",
-    "uris": "https://brave-browser-apt-release.s3.brave.com/",
-    "suites": "stable",
-    "components": "main"
-   },
-   "license": "MPL-2.0"
-  },
-  {
-   "id": "org.darktable.Darktable",
-   "name": "Darktable",
-   "summary": "Organize and develop images from digital cameras",
-   "description": "darktable manages your camera raw files and images in a database, lets you view them through lighttable mode and develop/enhance them in darkroom mode. Other modes besides lighttable and darkroom are a map for geotagging, tethering, print and a slideshow. darktable supports most modern cameras' raw formats, and does all of its processing at very high precision.",
-   "category": "graphics",
-   "source": "flathub",
-   "flatpak": "org.darktable.Darktable",
-   "packages": [],
-   "command": [
-    "hatch-flatpak-run",
-    "org.darktable.Darktable"
-   ],
-   "wine": false,
-   "license": "GPL-3.0+",
-   "iconUrl": "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/icons/128x128/org.darktable.Darktable.png",
-   "screenshots": [
-    "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/screenshots/image-1_1248x702@1.png"
-   ]
-  },
-  {
-   "id": "hdrview",
-   "name": "HDRView",
-   "summary": "Examine and compare high-dynamic range images",
-   "description": "A simple research-oriented image viewer with an emphasis on examining and comparing high-dynamic range (HDR) images: exposure, gamma, channels, pixel statistics and side-by-side comparison. Installed from the developer's own GitHub release (AppImage).",
-   "category": "graphics",
-   "source": "release",
-   "packages": [
-    "libgl1",
-    "libegl1",
-    "libgl1-mesa-dri",
-    "libwayland-egl1",
-    "libxkbcommon0"
-   ],
-   "command": [
-    "/opt/hatch/hdrview/app/AppRun"
-   ],
-   "wine": false,
-   "license": "BSD-3-Clause",
-   "windowsPayload": {
-    "url": "https://github.com/wkjarosz/hdrview/releases/download/v3.0.2/HDRView-3.0.2-aarch64.appimage",
-    "sha256": "1fb14e6bbc101e6dfae8a1eff2cfb9d22fdb98497b7451467740e02c76294b14",
-    "extractTo": "/opt/hatch/hdrview",
-    "kind": "appimage"
-   },
-   "payloads": {
-    "amd64": {
-     "url": "https://github.com/wkjarosz/hdrview/releases/download/v3.0.2/HDRView-3.0.2-x86_64.appimage",
-     "sha256": "3393b2161a152dc303bdd3ac5e04f7595eb4eebadea8f2018cfaf15ae005a55c",
-     "extractTo": "/opt/hatch/hdrview",
-     "kind": "appimage"
+    "org.darktable.Darktable",
+    "mousepad",
+    "galculator",
+    "gnome-mines",
+    "notepadpp",
+    "firefox-esr",
+    "libreoffice-writer",
+    "gimp",
+    "inkscape",
+    "thunar",
+    "xterm",
+    "vlc",
+    "audacity",
+    "krita",
+    "geany",
+    "aisleriot",
+    "gedit",
+    "evince",
+    "ristretto",
+    "keepassxc",
+    "transmission-gtk",
+    "filezilla",
+    "thunderbird",
+    "gnome-chess",
+    "gnome-sudoku",
+    "supertux",
+    "wesnoth",
+    "scummvm",
+    "dosbox",
+    "luanti",
+    "codeblocks",
+    "blender",
+    "libreoffice-calc",
+    "libreoffice-impress",
+    "shotwell",
+    "kdenlive",
+    "weston-terminal",
+    "hdrview"
+  ],
+  "verified": [
+    "mousepad",
+    "galculator",
+    "gnome-mines",
+    "xterm",
+    "notepadpp",
+    "gedit",
+    "thunar",
+    "blender"
+  ],
+  "apps": [
+    {
+      "id": "mousepad",
+      "name": "Mousepad",
+      "summary": "Fast plain-text editor",
+      "category": "editors",
+      "source": "debian",
+      "icon": "text",
+      "packages": [
+        "mousepad"
+      ],
+      "command": [
+        "mousepad"
+      ],
+      "wine": false
+    },
+    {
+      "id": "gedit",
+      "name": "Text Editor",
+      "summary": "GNOME text editor",
+      "category": "editors",
+      "source": "debian",
+      "icon": "text",
+      "packages": [
+        "gedit"
+      ],
+      "command": [
+        "gedit"
+      ],
+      "wine": false
+    },
+    {
+      "id": "galculator",
+      "name": "Calculator",
+      "summary": "GTK algebraic calculator",
+      "category": "office",
+      "source": "debian",
+      "icon": "calc",
+      "packages": [
+        "galculator"
+      ],
+      "command": [
+        "galculator"
+      ],
+      "wine": false
+    },
+    {
+      "id": "libreoffice-writer",
+      "name": "LibreOffice Writer",
+      "summary": "Word processor",
+      "category": "office",
+      "source": "debian",
+      "icon": "office",
+      "packages": [
+        "libreoffice-writer",
+        "libreoffice-gtk3"
+      ],
+      "command": [
+        "libreoffice",
+        "--writer"
+      ],
+      "wine": false
+    },
+    {
+      "id": "gimp",
+      "name": "GIMP",
+      "summary": "Image editor (CPU path first)",
+      "category": "graphics",
+      "source": "debian",
+      "icon": "image",
+      "packages": [
+        "gimp"
+      ],
+      "command": [
+        "gimp"
+      ],
+      "wine": false
+    },
+    {
+      "id": "inkscape",
+      "name": "Inkscape",
+      "summary": "Vector graphics",
+      "category": "graphics",
+      "source": "debian",
+      "icon": "image",
+      "packages": [
+        "inkscape"
+      ],
+      "command": [
+        "inkscape"
+      ],
+      "wine": false
+    },
+    {
+      "id": "gnome-mines",
+      "name": "Mines",
+      "summary": "Minesweeper",
+      "category": "games",
+      "source": "debian",
+      "icon": "game",
+      "packages": [
+        "gnome-mines"
+      ],
+      "command": [
+        "gnome-mines"
+      ],
+      "wine": false
+    },
+    {
+      "id": "aisleriot",
+      "name": "Solitaire",
+      "summary": "Aisleriot card games",
+      "category": "games",
+      "source": "debian",
+      "icon": "game",
+      "packages": [
+        "aisleriot"
+      ],
+      "command": [
+        "sol"
+      ],
+      "wine": false
+    },
+    {
+      "id": "thunar",
+      "name": "Thunar",
+      "summary": "File manager",
+      "category": "system",
+      "source": "debian",
+      "icon": "folder",
+      "packages": [
+        "thunar"
+      ],
+      "command": [
+        "thunar"
+      ],
+      "wine": false
+    },
+    {
+      "id": "firefox-esr",
+      "name": "Firefox ESR",
+      "summary": "Web browser",
+      "category": "system",
+      "source": "debian",
+      "icon": "web",
+      "packages": [
+        "firefox-esr"
+      ],
+      "command": [
+        "firefox-esr"
+      ],
+      "wine": false
+    },
+    {
+      "id": "weston-terminal",
+      "name": "Weston Terminal",
+      "summary": "Wayland terminal (smoke)",
+      "category": "dev",
+      "source": "debian",
+      "icon": "term",
+      "packages": [
+        "weston"
+      ],
+      "command": [
+        "weston-terminal"
+      ],
+      "wine": false
+    },
+    {
+      "id": "xterm",
+      "name": "XTerm",
+      "summary": "X11 terminal via Xwayland",
+      "category": "dev",
+      "source": "debian",
+      "icon": "term",
+      "packages": [
+        "xterm",
+        "xwayland"
+      ],
+      "command": [
+        "hatch-x11",
+        "xterm"
+      ],
+      "wine": false,
+      "x11": true
+    },
+    {
+      "id": "notepadpp",
+      "name": "Notepad++",
+      "summary": "Windows text editor (runs via Wine)",
+      "category": "windows",
+      "source": "winget",
+      "icon": "text",
+      "packages": [],
+      "command": [
+        "wine",
+        "/opt/hatch/npp/notepad++.exe"
+      ],
+      "wine": true,
+      "windowsPayload": {
+        "url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.8.1/npp.8.9.8.1.portable.arm64.zip",
+        "sha256": "43bf78c7569fd43b03d4f86a1073ac4306b31099e4487bdbf536c42d16d03f48",
+        "extractTo": "/opt/hatch/npp"
+      },
+      "payloads": {
+        "amd64": {
+          "url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.8.1/npp.8.9.8.1.portable.x64.zip",
+          "sha256": "beddf5548e75c97930d1575ba1c7d113e6e2b33d0a200310e734ca08e225f414",
+          "extractTo": "/opt/hatch/npp"
+        }
+      }
+    },
+    {
+      "id": "blender",
+      "name": "Blender",
+      "summary": "3D modeling, animation, rendering and post-production",
+      "category": "graphics",
+      "source": "debian",
+      "packages": [
+        "blender",
+        "xwayland"
+      ],
+      "command": [
+        "hatch-x11",
+        "blender"
+      ],
+      "x11": true,
+      "wine": false
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "summary": "The AI code editor",
+      "description": "Cursor is an AI-first code editor built on VS Code: agents, tab completion and chat that understands your codebase. Installed from Anysphere's own signed apt repository (native arm64 build) and updated with Update all.",
+      "category": "dev",
+      "source": "vendor",
+      "vendorName": "Anysphere",
+      "packages": [
+        "cursor"
+      ],
+      "command": [
+        "/usr/share/cursor/cursor",
+        "--no-sandbox"
+      ],
+      "wine": false,
+      "repo": {
+        "id": "cursor",
+        "keyUrl": "https://downloads.cursor.com/keys/anysphere.asc",
+        "uris": "https://downloads.cursor.com/aptrepo",
+        "suites": "stable",
+        "components": "main"
+      },
+      "license": "Proprietary"
+    },
+    {
+      "id": "code",
+      "name": "Visual Studio Code",
+      "summary": "Code editing. Redefined.",
+      "description": "Visual Studio Code is a lightweight but powerful source code editor with support for debugging, Git, extensions and many languages. Installed from Microsoft's own signed apt repository (native arm64 build).",
+      "category": "dev",
+      "source": "vendor",
+      "vendorName": "Microsoft",
+      "packages": [
+        "code"
+      ],
+      "command": [
+        "/usr/share/code/code",
+        "--no-sandbox"
+      ],
+      "wine": false,
+      "repo": {
+        "id": "vscode",
+        "keyUrl": "https://packages.microsoft.com/keys/microsoft.asc",
+        "uris": "https://packages.microsoft.com/repos/code",
+        "suites": "stable",
+        "components": "main"
+      },
+      "license": "Proprietary"
+    },
+    {
+      "id": "brave-browser",
+      "name": "Brave",
+      "summary": "Fast, private web browser",
+      "description": "Brave is a Chromium-based web browser that blocks ads and trackers by default. Installed from Brave's own signed apt repository (native arm64 build).",
+      "category": "internet",
+      "source": "vendor",
+      "vendorName": "Brave",
+      "packages": [
+        "brave-browser"
+      ],
+      "command": [
+        "brave-browser",
+        "--no-sandbox",
+        "--test-type"
+      ],
+      "wine": false,
+      "repo": {
+        "id": "brave",
+        "keyUrl": "https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg",
+        "uris": "https://brave-browser-apt-release.s3.brave.com/",
+        "suites": "stable",
+        "components": "main"
+      },
+      "license": "MPL-2.0"
+    },
+    {
+      "id": "org.darktable.Darktable",
+      "name": "Darktable",
+      "summary": "Organize and develop images from digital cameras",
+      "description": "darktable manages your camera raw files and images in a database, lets you view them through lighttable mode and develop/enhance them in darkroom mode. Other modes besides lighttable and darkroom are a map for geotagging, tethering, print and a slideshow. darktable supports most modern cameras' raw formats, and does all of its processing at very high precision.",
+      "category": "graphics",
+      "source": "flathub",
+      "flatpak": "org.darktable.Darktable",
+      "packages": [],
+      "command": [
+        "hatch-flatpak-run",
+        "org.darktable.Darktable"
+      ],
+      "wine": false,
+      "license": "GPL-3.0+",
+      "iconUrl": "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/icons/128x128/org.darktable.Darktable.png",
+      "screenshots": [
+        "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/screenshots/image-1_1248x702@1.png"
+      ]
+    },
+    {
+      "id": "hdrview",
+      "name": "HDRView",
+      "summary": "Examine and compare high-dynamic range images",
+      "description": "A simple research-oriented image viewer with an emphasis on examining and comparing high-dynamic range (HDR) images: exposure, gamma, channels, pixel statistics and side-by-side comparison. Installed from the developer's own GitHub release (AppImage).",
+      "category": "graphics",
+      "source": "release",
+      "packages": [
+        "libgl1",
+        "libegl1",
+        "libgl1-mesa-dri",
+        "libwayland-egl1",
+        "libxkbcommon0",
+        "libgpg-error0",
+        "libstdc++6",
+        "zlib1g"
+      ],
+      "command": [
+        "/opt/hatch/hdrview/app/AppRun"
+      ],
+      "wine": false,
+      "license": "BSD-3-Clause",
+      "windowsPayload": {
+        "url": "https://github.com/wkjarosz/hdrview/releases/download/v3.0.2/HDRView-3.0.2-aarch64.appimage",
+        "sha256": "1fb14e6bbc101e6dfae8a1eff2cfb9d22fdb98497b7451467740e02c76294b14",
+        "extractTo": "/opt/hatch/hdrview",
+        "kind": "appimage"
+      },
+      "payloads": {
+        "amd64": {
+          "url": "https://github.com/wkjarosz/hdrview/releases/download/v3.0.2/HDRView-3.0.2-x86_64.appimage",
+          "sha256": "3393b2161a152dc303bdd3ac5e04f7595eb4eebadea8f2018cfaf15ae005a55c",
+          "extractTo": "/opt/hatch/hdrview",
+          "kind": "appimage"
+        }
+      }
     }
-   }
-  }
- ]
+  ]
 }
