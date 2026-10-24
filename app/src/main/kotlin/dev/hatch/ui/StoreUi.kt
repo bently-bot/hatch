@@ -1,0 +1,299 @@
+package dev.hatch.ui
+
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.hatch.store.AppIcons
+import dev.hatch.store.CatalogueCategory
+import dev.hatch.store.InstallManager
+import dev.hatch.store.StoreApp
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+private val Accent = Color(0xFFFF7A3D)
+
+@Composable
+fun AppIconImage(app: StoreApp, size: Int = 52) {
+    val ctx = LocalContext.current
+    val bmp by produceState<Bitmap?>(AppIcons.cached(app.id), app.id) {
+        if (value == null) value = withContext(Dispatchers.IO) { AppIcons.bitmap(ctx, app) }
+    }
+    Box(
+        Modifier.size(size.dp).clip(RoundedCornerShape((size / 4).dp))
+            .background(if (bmp != null) Color(0xFFF1F1F4) else categoryColour(app)),
+        contentAlignment = Alignment.Center,
+    ) {
+        val b = bmp
+        if (b != null) Image(b.asImageBitmap(), contentDescription = null, modifier = Modifier.padding((size / 8).dp).fillMaxSize())
+        else Text(app.name.take(1).uppercase(), color = Color.White, fontSize = (size / 2.6).sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+private fun categoryColour(app: StoreApp) = when (app.category) {
+    "editors" -> Color(0xFF3B82F6); "office" -> Color(0xFF10B981); "graphics" -> Color(0xFFF59E0B)
+    "games" -> Color(0xFFEF4444); "system" -> Color(0xFF8B5CF6); "internet" -> Color(0xFF06B6D4)
+    "dev" -> Color(0xFF64748B); "windows" -> Color(0xFF6366F1); "media" -> Color(0xFFEC4899)
+    else -> Color(0xFF475569)
+}
+
+@Composable
+private fun RemoteImage(url: String, modifier: Modifier) {
+    val ctx = LocalContext.current
+    val bmp by produceState<Bitmap?>(null, url) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val f = File(ctx.cacheDir, "shots/" + url.hashCode().toUInt().toString(16))
+                if (!f.exists()) {
+                    val c = URL(url).openConnection() as HttpURLConnection
+                    c.connectTimeout = 10_000; c.readTimeout = 20_000
+                    val bytes = c.inputStream.use { it.readBytes() }
+                    f.parentFile?.mkdirs(); f.writeBytes(bytes)
+                }
+                BitmapFactory.decodeFile(f.absolutePath)
+            }.getOrNull()
+        }
+    }
+    Box(modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFF26262B)), contentAlignment = Alignment.Center) {
+        val b = bmp
+        if (b != null) Image(b.asImageBitmap(), null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+        else CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+    }
+}
+
+data class StoreActions(
+    val install: (StoreApp) -> Unit,
+    val uninstall: (StoreApp) -> Unit,
+    val update: (StoreApp) -> Unit,
+    val launch: (StoreApp) -> Unit,
+    val installSettings: () -> Unit,
+)
+
+@Composable
+fun StoreScreen(
+    apps: List<StoreApp>,
+    categories: List<CatalogueCategory>,
+    installed: Set<String>,
+    progress: InstallManager.Progress,
+    actions: StoreActions,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var category by rememberSaveable { mutableStateOf<String?>(null) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    val busyId = (progress as? InstallManager.Progress.Working)?.appId
+
+    val detail = detailId?.let { id -> apps.firstOrNull { it.id == id } }
+    if (detail != null) {
+        BackHandler { detailId = null }
+        AppDetail(detail, detail.id in installed, busyId, progress, actions) { detailId = null }
+        return
+    }
+
+    val q = query.trim().lowercase()
+    val filtered = remember(apps, q, category, tab, installed) {
+        apps.filter { a ->
+            (tab == 0 || a.id in installed) &&
+                (category == null || a.category == category) &&
+                (q.isEmpty() || a.name.lowercase().contains(q) || a.summary.lowercase().contains(q) ||
+                    a.id.contains(q) || a.packages.any { it.contains(q) })
+        }.let { list -> if (q.isEmpty()) list else list.sortedBy { if (it.name.lowercase().startsWith(q)) 0 else 1 } }
+    }
+    val showFeatured = tab == 0 && q.isEmpty() && category == null
+
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) {
+                    Text("Hatch", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text("${apps.size} Linux & Windows apps · each in its own window",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = actions.installSettings) { Text("Permissions") }
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                placeholder = { Text("Search apps") }, shape = RoundedCornerShape(16.dp),
+                trailingIcon = { if (query.isNotEmpty()) TextButton(onClick = { query = "" }) { Text("Clear") } },
+            )
+            Spacer(Modifier.height(6.dp))
+            TabRow(selectedTabIndex = tab) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Discover") })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Library (${installed.size})") })
+            }
+        }
+        ProgressBanner(progress, apps)
+        LazyColumn(
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item { FilterChip(selected = category == null, onClick = { category = null }, label = { Text("All") }) }
+                    items(categories, key = { it.id }) { c ->
+                        FilterChip(selected = category == c.id, onClick = { category = if (category == c.id) null else c.id },
+                            label = { Text(c.name) })
+                    }
+                }
+            }
+            if (showFeatured) {
+                item { SectionTitle("Featured") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(apps.filter { it.featured }, key = { "f-" + it.id }) { a ->
+                            FeaturedCard(a, a.id in installed) { detailId = a.id }
+                        }
+                    }
+                }
+                item { SectionTitle("All apps") }
+            }
+            if (filtered.isEmpty()) item {
+                Text(if (tab == 1) "Nothing installed yet — find something in Discover." else "No matches.",
+                    Modifier.padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            items(filtered, key = { it.id }) { a ->
+                AppRow(a, a.id in installed, busyId, onClick = { detailId = a.id }, actions = actions)
+            }
+        }
+    }
+}
+
+@Composable private fun SectionTitle(t: String) =
+    Text(t, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
+
+@Composable
+private fun ProgressBanner(progress: InstallManager.Progress, apps: List<StoreApp>) {
+    when (progress) {
+        is InstallManager.Progress.Working -> Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+            val name = apps.firstOrNull { it.id == progress.appId }?.name ?: progress.appId
+            LinearProgressIndicator(Modifier.fillMaxWidth(), color = Accent)
+            Text("$name — ${progress.message}", style = MaterialTheme.typography.bodySmall, color = Accent, maxLines = 1,
+                overflow = TextOverflow.Ellipsis)
+        }
+        is InstallManager.Progress.Failed -> Text(
+            "${apps.firstOrNull { it.id == progress.appId }?.name ?: progress.appId}: ${progress.message}",
+            color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+        else -> {}
+    }
+}
+
+@Composable
+private fun FeaturedCard(app: StoreApp, installed: Boolean, onClick: () -> Unit) {
+    ElevatedCard(Modifier.width(150.dp).clickable(onClick = onClick)) {
+        Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            AppIconImage(app, 64)
+            Spacer(Modifier.height(8.dp))
+            Text(app.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(if (installed) "Installed" else badge(app), style = MaterialTheme.typography.labelSmall,
+                color = if (installed) Accent else MaterialTheme.colorScheme.outline, maxLines = 1)
+        }
+    }
+}
+
+private fun badge(app: StoreApp) = buildString {
+    append(if (app.wine) "Windows" else "Linux")
+    if (app.verified) append(" · ✓ tested")
+}
+
+@Composable
+private fun AppRow(app: StoreApp, installed: Boolean, busyId: String?, onClick: () -> Unit, actions: StoreActions) {
+    Card(Modifier.fillMaxWidth().clickable(onClick = onClick).semantics { contentDescription = "app-${app.id}" }) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AppIconImage(app)
+            Column(Modifier.weight(1f)) {
+                Text(app.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(app.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(badge(app), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            }
+            ActionButton(app, installed, busyId, actions, compact = true)
+        }
+    }
+}
+
+@Composable
+private fun ActionButton(app: StoreApp, installed: Boolean, busyId: String?, actions: StoreActions, compact: Boolean) {
+    when {
+        busyId == app.id -> CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp, color = Accent)
+        installed -> Button(onClick = { actions.launch(app) }, colors = ButtonDefaults.buttonColors(containerColor = Accent)) { Text("Open") }
+        else -> Button(onClick = { actions.install(app) }, enabled = busyId == null) { Text(if (compact) "Install" else "Install") }
+    }
+}
+
+@Composable
+private fun AppDetail(
+    app: StoreApp, installed: Boolean, busyId: String?, progress: InstallManager.Progress,
+    actions: StoreActions, onBack: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+        TextButton(onClick = onBack) { Text("‹ Back") }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            AppIconImage(app, 84)
+            Column(Modifier.weight(1f)) {
+                Text(app.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(app.summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(badge(app) + (if (app.license.isNotEmpty()) " · ${app.license}" else ""),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            ActionButton(app, installed, busyId, actions, compact = false)
+            if (installed && busyId == null) {
+                OutlinedButton(onClick = { actions.update(app) }) { Text("Update") }
+                OutlinedButton(onClick = { actions.uninstall(app) }) { Text("Remove") }
+            }
+        }
+        if (progress is InstallManager.Progress.Working && progress.appId == app.id) {
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(Modifier.fillMaxWidth(), color = Accent)
+            Text(progress.message, style = MaterialTheme.typography.bodySmall, color = Accent)
+        }
+        if (app.screenshots.isNotEmpty()) {
+            Spacer(Modifier.height(18.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(app.screenshots) { url -> RemoteImage(url, Modifier.height(220.dp).width(320.dp)) }
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        Text(app.description.ifBlank { app.summary }, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(12.dp))
+        Text(
+            buildString {
+                append(if (app.wine) "Runs with Wine (ARM64) · " else "Debian 13 · ")
+                if (app.packages.isNotEmpty()) append("package: ${app.packages.joinToString()}")
+            },
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline,
+        )
+    }
+}

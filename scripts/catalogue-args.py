@@ -9,6 +9,7 @@ if mode == "install":
     argv = ["/usr/local/bin/hatch-install-app"]
     if a.get("packages"): argv += ["--packages", " ".join(a["packages"])]
     if a.get("wine"): argv.append("--wine")
+    if a.get("desktopId"): argv += ["--desktop", a["desktopId"]]
     p = a.get("windowsPayload")
     if p: argv += ["--payload", p["url"], p.get("sha256", ""), p["extractTo"]]
 else:

@@ -1,0 +1,32 @@
+#!/bin/sh
+# Launch a freedesktop .desktop entry (by desktop-id) the way a desktop would, picking Wayland or X11 per toolkit.
+# usage: hatch-desktop org.xfce.mousepad.desktop [files...]
+set -eu
+ID="$1"; shift || true
+F=""
+for d in /usr/share/applications /usr/local/share/applications /var/lib/flatpak/exports/share/applications; do
+  [ -f "$d/$ID" ] && F="$d/$ID" && break
+done
+[ -n "$F" ] || { echo "hatch: $ID not found" >&2; exit 127; }
+# Exec= from the [Desktop Entry] group only; drop field codes (%f %U …)
+EXEC=$(awk '/^\[/{g=($0=="[Desktop Entry]")} g&&/^Exec=/{sub(/^Exec=/,"");print;exit}' "$F" | sed -E 's/ ?%[fFuUdDnNickvm]//g; s/%%/%/g')
+TERM_APP=$(awk '/^\[/{g=($0=="[Desktop Entry]")} g&&/^Terminal=/{sub(/^Terminal=/,"");print;exit}' "$F")
+[ -n "$EXEC" ] || { echo "hatch: no Exec in $F" >&2; exit 1; }
+eval "set -- $EXEC \"\$@\""
+BIN=$(command -v "$1" 2>/dev/null || echo "$1")
+if [ "$TERM_APP" = "true" ]; then
+  exec /usr/local/bin/hatch-x11 xterm -fa Monospace -fs 11 -e "$@"
+fi
+# Native Wayland toolkits → straight to the compositor; everything else (GTK2, Tk, Motif, Java, SDL1, wx-gtk2…) → Xwayland
+case "${HATCH_FORCE_BACKEND:-}" in
+  x11) exec /usr/local/bin/hatch-x11 "$@" ;;
+  wayland) exec "$@" ;;
+esac
+if [ -f "$BIN" ] && head -c 4 "$BIN" 2>/dev/null | grep -q 'ELF'; then
+  if ldd "$BIN" 2>/dev/null | grep -Eq 'libgtk-3|libgtk-4|libQt5Gui|libQt6Gui|libSDL2|libSDL3|libwayland-client|libKF[56]|libelementary|libefl'; then
+    exec "$@"
+  fi
+  exec /usr/local/bin/hatch-x11 "$@"
+fi
+# Scripts (python/perl wrappers) — try Wayland first; GTK/Qt via Python bindings speak Wayland.
+exec "$@"

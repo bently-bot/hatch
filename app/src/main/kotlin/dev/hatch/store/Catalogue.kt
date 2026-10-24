@@ -31,6 +31,14 @@ data class StoreApp(
     val wine: Boolean = false,
     val x11: Boolean = false,
     val windowsPayload: WindowsPayload? = null,
+    val description: String = "",
+    val desktopId: String = "",
+    val iconUrl: String = "",
+    val screenshots: List<String> = emptyList(),
+    val license: String = "",
+    val featured: Boolean = false,
+    /** Exercised end-to-end in CI (arm64 runner screenshots). */
+    val verified: Boolean = false,
 )
 
 @Serializable
@@ -42,9 +50,12 @@ data class CatalogueFile(
 )
 
 object Catalogue {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+    @Volatile private var memo: CatalogueFile? = null
 
-    fun loadFile(context: Context): CatalogueFile {
+    fun loadFile(context: Context): CatalogueFile = memo ?: loadUncached(context).also { memo = it }
+
+    private fun loadUncached(context: Context): CatalogueFile {
         val cached = File(context.filesDir, "catalogue.json")
         val text = when {
             cached.exists() -> cached.readText()
@@ -66,6 +77,7 @@ object Catalogue {
             val body = r.readText()
             json.decodeFromString<CatalogueFile>(body)
             File(context.filesDir, "catalogue.json").writeText(body)
+            memo = null
         }
         true
     }.getOrDefault(false)

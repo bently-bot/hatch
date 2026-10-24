@@ -41,10 +41,12 @@ object GuestScripts {
         payloadUrl: String? = null,
         payloadSha: String? = null,
         payloadDest: String? = null,
+        desktopId: String? = null,
     ): String = buildList {
         add("$BIN/hatch-install-app")
         if (packages.isNotEmpty()) { add("--packages"); add(sq(packages.joinToString(" "))) }
         if (wine) add("--wine")
+        if (!desktopId.isNullOrEmpty()) { add("--desktop"); add(sq(desktopId)) }
         if (!payloadUrl.isNullOrEmpty() && !payloadDest.isNullOrEmpty()) {
             add("--payload"); add(sq(payloadUrl)); add(sq(payloadSha ?: "")); add(sq(payloadDest))
         }

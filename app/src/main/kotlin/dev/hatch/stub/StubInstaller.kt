@@ -43,7 +43,7 @@ object StubInstaller {
         return ks
     }
 
-    fun buildAndStage(context: Context, appId: String, label: String): File {
+    fun buildAndStage(context: Context, appId: String, label: String, iconSource: ByteArray? = null): File {
         val template = File(context.cacheDir, "stub-template.apk")
         if (!template.exists()) {
             context.assets.open("stub-template.apk").use { inn ->
@@ -52,7 +52,7 @@ object StubInstaller {
         }
         val ks = ensureKeystore(context)
         val out = File(context.cacheDir, "stub-$appId.apk")
-        val icon = makeIconPng(label)
+        val icon = makeIconPng(label, iconSource?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) })
         StubFactory.build(
             context = context,
             template = template,
@@ -98,10 +98,20 @@ object StubInstaller {
         pi.uninstall(stubPackage, callback.intentSender)
     }
 
-    private fun makeIconPng(label: String): ByteArray {
+    /** 192px launcher icon: the app's real icon on a rounded light tile (or a letter tile as fallback). */
+    private fun makeIconPng(label: String, src: Bitmap?): ByteArray {
         val size = 192
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
+        if (src != null) {
+            val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F4F4F6") }
+            c.drawRoundRect(android.graphics.RectF(0f, 0f, size.toFloat(), size.toFloat()), 44f, 44f, bg)
+            val pad = 28
+            c.drawBitmap(src, null, android.graphics.Rect(pad, pad, size - pad, size - pad), Paint(Paint.FILTER_BITMAP_FLAG))
+            val os = ByteArrayOutputStream()
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, os); bmp.recycle()
+            return os.toByteArray()
+        }
         c.drawColor(Color.parseColor("#1A1A1A"))
         val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#FF6B2C")

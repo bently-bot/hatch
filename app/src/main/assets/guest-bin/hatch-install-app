@@ -2,12 +2,13 @@
 # Hatch guest installer. Same script is used by the Android app and by CI.
 # usage: hatch-install-app [--packages "a b"] [--payload URL SHA256 DEST] [--wine]
 set -eu
-PKGS=""; URL=""; SHA=""; DEST=""; WINE=0
+PKGS=""; URL=""; SHA=""; DEST=""; WINE=0; DESKTOP=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --packages) PKGS="$2"; shift 2 ;;
     --payload) URL="$2"; SHA="$3"; DEST="$4"; shift 4 ;;
     --wine) WINE=1; shift ;;
+    --desktop) DESKTOP="$2"; shift 2 ;;
     *) echo "unknown arg $1" >&2; exit 2 ;;
   esac
 done
@@ -43,6 +44,17 @@ if [ -n "$URL" ]; then
     *) cp "$TMP" "$DEST/" ;;
   esac
   rm -f "$TMP"
+fi
+if [ -n "$DESKTOP" ]; then
+  # X11-only toolkits need the Xwayland stack; native Wayland apps don't.
+  F=/usr/share/applications/$DESKTOP
+  BIN=$(awk '/^\[/{g=($0=="[Desktop Entry]")} g&&/^Exec=/{sub(/^Exec=/,"");print $1;exit}' "$F" 2>/dev/null || true)
+  BIN=$(command -v "$BIN" 2>/dev/null || true)
+  if [ -n "$BIN" ] && head -c 4 "$BIN" | grep -q ELF && \
+     ! ldd "$BIN" 2>/dev/null | grep -Eq 'libgtk-3|libgtk-4|libQt5Gui|libQt6Gui|libSDL2|libSDL3|libwayland-client|libKF[56]'; then
+    echo "hatch: $DESKTOP is X11-only → installing Xwayland"
+    apt-get install -y --no-install-recommends xwayland libegl1 libgl1-mesa-dri xfonts-base matchbox-window-manager xterm
+  fi
 fi
 if [ "$WINE" = 1 ]; then
   echo "hatch: wine prefix will initialise on first launch"

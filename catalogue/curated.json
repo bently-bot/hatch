@@ -1,0 +1,257 @@
+{
+  "version": 2,
+  "note": "Hand-curated entries. build-catalogue.py merges these (featured, in this order) with every desktop app in Debian 13's AppStream (DEP-11) metadata.",
+  "featured": [
+    "mousepad",
+    "galculator",
+    "gnome-mines",
+    "notepadpp",
+    "firefox-esr",
+    "libreoffice-writer",
+    "gimp",
+    "inkscape",
+    "thunar",
+    "xterm",
+    "vlc",
+    "audacity",
+    "krita",
+    "geany",
+    "aisleriot",
+    "gedit",
+    "evince",
+    "ristretto",
+    "keepassxc",
+    "transmission-gtk",
+    "filezilla",
+    "thunderbird",
+    "gnome-chess",
+    "gnome-sudoku",
+    "supertux",
+    "wesnoth",
+    "scummvm",
+    "dosbox",
+    "luanti",
+    "codeblocks",
+    "blender",
+    "libreoffice-calc",
+    "libreoffice-impress",
+    "shotwell",
+    "kdenlive",
+    "weston-terminal"
+  ],
+  "verified": [
+    "mousepad",
+    "galculator",
+    "gnome-mines",
+    "xterm",
+    "notepadpp",
+    "gedit",
+    "thunar"
+  ],
+  "apps": [
+    {
+      "id": "mousepad",
+      "name": "Mousepad",
+      "summary": "Fast plain-text editor",
+      "category": "editors",
+      "source": "debian",
+      "icon": "text",
+      "packages": [
+        "mousepad"
+      ],
+      "command": [
+        "mousepad"
+      ],
+      "wine": false
+    },
+    {
+      "id": "gedit",
+      "name": "Text Editor",
+      "summary": "GNOME text editor",
+      "category": "editors",
+      "source": "debian",
+      "icon": "text",
+      "packages": [
+        "gedit"
+      ],
+      "command": [
+        "gedit"
+      ],
+      "wine": false
+    },
+    {
+      "id": "galculator",
+      "name": "Calculator",
+      "summary": "GTK algebraic calculator",
+      "category": "office",
+      "source": "debian",
+      "icon": "calc",
+      "packages": [
+        "galculator"
+      ],
+      "command": [
+        "galculator"
+      ],
+      "wine": false
+    },
+    {
+      "id": "libreoffice-writer",
+      "name": "LibreOffice Writer",
+      "summary": "Word processor",
+      "category": "office",
+      "source": "debian",
+      "icon": "office",
+      "packages": [
+        "libreoffice-writer",
+        "libreoffice-gtk3"
+      ],
+      "command": [
+        "libreoffice",
+        "--writer"
+      ],
+      "wine": false
+    },
+    {
+      "id": "gimp",
+      "name": "GIMP",
+      "summary": "Image editor (CPU path first)",
+      "category": "graphics",
+      "source": "debian",
+      "icon": "image",
+      "packages": [
+        "gimp"
+      ],
+      "command": [
+        "gimp"
+      ],
+      "wine": false
+    },
+    {
+      "id": "inkscape",
+      "name": "Inkscape",
+      "summary": "Vector graphics",
+      "category": "graphics",
+      "source": "debian",
+      "icon": "image",
+      "packages": [
+        "inkscape"
+      ],
+      "command": [
+        "inkscape"
+      ],
+      "wine": false
+    },
+    {
+      "id": "gnome-mines",
+      "name": "Mines",
+      "summary": "Minesweeper",
+      "category": "games",
+      "source": "debian",
+      "icon": "game",
+      "packages": [
+        "gnome-mines"
+      ],
+      "command": [
+        "gnome-mines"
+      ],
+      "wine": false
+    },
+    {
+      "id": "aisleriot",
+      "name": "Solitaire",
+      "summary": "Aisleriot card games",
+      "category": "games",
+      "source": "debian",
+      "icon": "game",
+      "packages": [
+        "aisleriot"
+      ],
+      "command": [
+        "sol"
+      ],
+      "wine": false
+    },
+    {
+      "id": "thunar",
+      "name": "Thunar",
+      "summary": "File manager",
+      "category": "system",
+      "source": "debian",
+      "icon": "folder",
+      "packages": [
+        "thunar"
+      ],
+      "command": [
+        "thunar"
+      ],
+      "wine": false
+    },
+    {
+      "id": "firefox-esr",
+      "name": "Firefox ESR",
+      "summary": "Web browser",
+      "category": "system",
+      "source": "debian",
+      "icon": "web",
+      "packages": [
+        "firefox-esr"
+      ],
+      "command": [
+        "firefox-esr"
+      ],
+      "wine": false
+    },
+    {
+      "id": "weston-terminal",
+      "name": "Weston Terminal",
+      "summary": "Wayland terminal (smoke)",
+      "category": "dev",
+      "source": "debian",
+      "icon": "term",
+      "packages": [
+        "weston"
+      ],
+      "command": [
+        "weston-terminal"
+      ],
+      "wine": false
+    },
+    {
+      "id": "xterm",
+      "name": "XTerm",
+      "summary": "X11 terminal via Xwayland",
+      "category": "dev",
+      "source": "debian",
+      "icon": "term",
+      "packages": [
+        "xterm",
+        "xwayland"
+      ],
+      "command": [
+        "hatch-x11",
+        "xterm"
+      ],
+      "wine": false,
+      "x11": true
+    },
+    {
+      "id": "notepadpp",
+      "name": "Notepad++",
+      "summary": "Windows text editor (ARM64 Wine)",
+      "category": "windows",
+      "source": "winget",
+      "icon": "text",
+      "packages": [],
+      "command": [
+        "wine",
+        "/opt/hatch/npp/notepad++.exe"
+      ],
+      "wine": true,
+      "windowsPayload": {
+        "url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.8.1/npp.8.9.8.1.portable.arm64.zip",
+        "sha256": "43bf78c7569fd43b03d4f86a1073ac4306b31099e4487bdbf536c42d16d03f48",
+        "extractTo": "/opt/hatch/npp"
+      }
+    }
+  ]
+}

@@ -41,6 +41,7 @@ object InstallManager {
                     payloadUrl = payload?.url,
                     payloadSha = payload?.sha256,
                     payloadDest = payload?.extractTo,
+                    desktopId = app.desktopId,
                 )
                 val res = LinuxRuntime.run(
                     context, cmd, timeoutMs = 1_800_000, waylandHostDir = waylandHostDir,
@@ -56,7 +57,7 @@ object InstallManager {
                     return@withContext false
                 }
                 _progress.value = Progress.Working(app.id, "Creating launcher…")
-                val apk = StubInstaller.buildAndStage(context, app.id, app.name)
+                val apk = StubInstaller.buildAndStage(context, app.id, app.name, AppIcons.png(context, app))
                 StubInstaller.install(context, apk)
                 InstalledApps.put(
                     context,

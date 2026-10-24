@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
                             categories = catalogue.categories,
                             installed = installed,
                             progress = installProg,
-                            onInstall = { app ->
+                            actions = StoreActions(install = { app ->
                                 scope.launch {
                                     InstallManager.install(
                                         this@MainActivity, app,
@@ -84,10 +84,10 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             },
-                            onUninstall = { app ->
+                            uninstall = { app ->
                                 scope.launch { InstallManager.uninstall(this@MainActivity, app) }
                             },
-                            onUpdate = { app ->
+                            update = { app ->
                                 scope.launch {
                                     InstallManager.update(
                                         this@MainActivity, app,
@@ -95,15 +95,15 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             },
-                            onLaunch = { app -> launchApp(app) },
-                            onInstallSettings = {
+                            launch = { app -> launchApp(app) },
+                            installSettings = {
                                 startActivity(
                                     Intent(
                                         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                                         Uri.parse("package:$packageName"),
                                     )
                                 )
-                            },
+                            }),
                         )
                     }
                 }
@@ -169,226 +169,3 @@ private fun SetupScreen(stage: RootfsInstaller.Stage, log: List<String>, onStart
     }
 }
 
-@Composable
-private fun StoreScreen(
-    apps: List<StoreApp>,
-    categories: List<CatalogueCategory>,
-    installed: Set<String>,
-    progress: InstallManager.Progress,
-    onInstall: (StoreApp) -> Unit,
-    onUninstall: (StoreApp) -> Unit,
-    onUpdate: (StoreApp) -> Unit,
-    onLaunch: (StoreApp) -> Unit,
-    onInstallSettings: () -> Unit,
-) {
-    var query by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
-    var tab by remember { mutableIntStateOf(0) } // 0=Store 1=Library
-
-    val cats = remember(categories, apps) {
-        if (categories.isNotEmpty()) categories
-        else apps.map { it.category }.distinct().sorted().map { CatalogueCategory(it, it.replaceFirstChar { c -> c.uppercase() }) }
-    }
-
-    val filtered = remember(apps, query, selectedCategory, tab, installed) {
-        apps.filter { app ->
-            val inTab = when (tab) {
-                1 -> app.id in installed
-                else -> true
-            }
-            val inCat = selectedCategory == null || app.category == selectedCategory
-            val q = query.trim().lowercase()
-            val inSearch = q.isEmpty() ||
-                app.name.lowercase().contains(q) ||
-                app.summary.lowercase().contains(q) ||
-                app.id.lowercase().contains(q)
-            inTab && inCat && inSearch
-        }
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        // Top bar
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1f)) {
-                    Text("Hatch", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Linux + Windows apps · real windows",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(onClick = onInstallSettings) { Text("Stub installs") }
-            }
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text("Search apps") },
-                shape = RoundedCornerShape(16.dp),
-            )
-            Spacer(Modifier.height(8.dp))
-            TabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Store") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Library (${installed.size})") })
-            }
-        }
-
-        when (progress) {
-            is InstallManager.Progress.Working -> {
-                Column(Modifier.padding(horizontal = 20.dp)) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text(
-                        "${progress.appId}: ${progress.message}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                }
-            }
-            is InstallManager.Progress.Failed -> {
-                Text(
-                    progress.message,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            else -> {}
-        }
-
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                FilterChip(
-                    selected = selectedCategory == null,
-                    onClick = { selectedCategory = null },
-                    label = { Text("All") },
-                )
-            }
-            items(cats) { cat ->
-                FilterChip(
-                    selected = selectedCategory == cat.id,
-                    onClick = { selectedCategory = if (selectedCategory == cat.id) null else cat.id },
-                    label = { Text(cat.name) },
-                )
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            if (filtered.isEmpty()) {
-                item {
-                    Text(
-                        if (tab == 1) "No apps installed yet — switch to Store."
-                        else "No matches.",
-                        modifier = Modifier.padding(24.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            items(filtered, key = { it.id }) { app ->
-                AppCard(
-                    app = app,
-                    installed = app.id in installed,
-                    busy = progress is InstallManager.Progress.Working &&
-                        (progress as InstallManager.Progress.Working).appId == app.id,
-                    onInstall = { onInstall(app) },
-                    onUninstall = { onUninstall(app) },
-                    onUpdate = { onUpdate(app) },
-                    onLaunch = { onLaunch(app) },
-                )
-            }
-            item { Spacer(Modifier.height(24.dp)) }
-        }
-    }
-}
-
-@Composable
-private fun AppCard(
-    app: StoreApp,
-    installed: Boolean,
-    busy: Boolean,
-    onInstall: () -> Unit,
-    onUninstall: () -> Unit,
-    onUpdate: () -> Unit,
-    onLaunch: () -> Unit,
-) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            AppIcon(app.icon, app.category)
-            Column(Modifier.weight(1f)) {
-                Text(app.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(app.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    buildString {
-                        append(app.category)
-                        if (app.wine) append(" · Wine")
-                        if (app.x11) append(" · X11")
-                        append(" · "); append(app.source)
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                when {
-                    busy -> CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
-                    installed -> {
-                        Button(onClick = onLaunch, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)) {
-                            Text("Open")
-                        }
-                        TextButton(onClick = onUpdate, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
-                            Text("Update")
-                        }
-                        TextButton(onClick = onUninstall, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
-                            Text("Remove")
-                        }
-                    }
-                    else -> Button(onClick = onInstall, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)) {
-                        Text("Install")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppIcon(icon: String, category: String) {
-    val (bg, glyph) = when (icon.ifEmpty { category }) {
-        "text", "editors" -> Color(0xFF3B82F6) to "Aa"
-        "calc", "office" -> Color(0xFF10B981) to "∑"
-        "image", "graphics" -> Color(0xFFF59E0B) to "◈"
-        "game", "games" -> Color(0xFFEF4444) to "▶"
-        "folder", "system" -> Color(0xFF8B5CF6) to "▣"
-        "web" -> Color(0xFF06B6D4) to "◉"
-        "term", "dev" -> Color(0xFF64748B) to ">_"
-        "windows" -> Color(0xFF6366F1) to "W"
-        "test" -> Color(0xFF94A3B8) to "·"
-        else -> Color(0xFF475569) to "◆"
-    }
-    Box(
-        Modifier
-            .size(52.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(bg),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(glyph, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-    }
-}
