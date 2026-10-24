@@ -64,6 +64,9 @@ object Gpu {
             "VK_DRIVER_FILES" to ICD,
             "TU_DEBUG" to "noconform",
             "MESA_VK_WSI_DEBUG" to "sw",
+            // X11 apps (e.g. Blender) run on Xwayland, which has no DRI3 here; this lets GLX use Zink via drisw/kopper
+            // (software present through Vulkan's X11 WSI) instead of aborting with "DRI3 not available".
+            "LIBGL_KOPPER_DRI2" to "1",
             "HATCH_GPU" to "1",
         )
 

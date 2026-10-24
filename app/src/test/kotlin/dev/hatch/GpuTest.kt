@@ -22,6 +22,7 @@ class GpuTest {
         assertEquals("zink", g["MESA_LOADER_DRIVER_OVERRIDE"])
         assertEquals(Gpu.ICD, g["VK_ICD_FILENAMES"])
         assertEquals("sw", g["MESA_VK_WSI_DEBUG"])   // wl_shm-only compositor: Mesa's software WSI copy path
+        assertEquals("1", g["LIBGL_KOPPER_DRI2"])  // Xwayland has no DRI3: GLX → drisw + Zink (kopper)
         assertEquals("0", g["LIBGL_ALWAYS_SOFTWARE"])
     }
 
