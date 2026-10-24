@@ -106,6 +106,12 @@ fun main(args: Array<String>) {
                     when (op) {
                         "w" -> Thread.sleep(arg.toLong())
                         "t" -> { server.call(1000) { server.seat.typeText(w, arg.replace("\\n", "\n")); true }; Thread.sleep(200) }
+                        // chord, e.g. kc:29+30 = Ctrl+A (press in order, release in reverse)
+                        "kc" -> { val ks = arg.split('+').map { it.trim().toInt() }
+                            server.call(1000) { ks.forEach { server.seat.key(w, it, true) }; ks.reversed().forEach { server.seat.key(w, it, false) }; true }
+                            Thread.sleep(250) }
+                        "p" -> { server.call(1000) { server.clipboard.setFromHost(arg); true }; Thread.sleep(200) } // Android → guest
+                        "g" -> println("[host] clipboard[$arg]: ${server.call(1000) { server.clipboard.text } ?: "<none>"}")
                         "s" -> { // intermediate snapshot
                             val px0 = IntArray(1280 * 800)
                             if (server.call(2000) { w.readPixels(px0) } == true) savePng(px0, File(png.parentFile, "${png.nameWithoutExtension}-$arg.png"))

@@ -121,6 +121,17 @@ class HatchRuntime(private val app: Context) : WindowHost {
 
     override fun textInputChanged(enabled: Boolean) { focusedSlot?.textInput(enabled) }
 
+    /** Guest copied text → Android clipboard (so it pastes into any Android app, and back). */
+    override fun clipboardChanged(text: String) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            runCatching {
+                val cm = app.getSystemService(android.content.ClipboardManager::class.java) ?: return@runCatching
+                val cur = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+                if (cur != text) cm.setPrimaryClip(android.content.ClipData.newPlainText("Hatch", text))
+            }.onFailure { Log.w(TAG, "clipboard: ${it.message}") }
+        }
+    }
+
     override fun windowDestroyed(w: Toplevel) {
         log("windowDestroyed '${w.title}'")
         unclaimed[w.client.appTag]?.remove(w)

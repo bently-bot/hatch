@@ -1,48 +1,101 @@
 package dev.hatch.wayland
 
+/**
+ * Selection (copy/paste) between guest apps and Android.
+ * Current selection is either a guest wl_data_source or host (Android) text; every data device gets a fresh
+ * wl_data_offer for it. Guest text is mirrored to Android via [WindowHost.clipboardChanged].
+ */
 class Clipboard(val server: WaylandServer) {
-    var text: String? = null
+    @Volatile var text: String? = null
+        private set
     private var source: DataSourceRes? = null
-    fun clientGone(c: Client) { if (source?.client === c) source = null }
-    fun setFromClient(s: DataSourceRes) {
-        source = s
-        // Prefer text/plain
-        val mime = s.mimes.firstOrNull { it.startsWith("text/plain") } ?: s.mimes.firstOrNull() ?: return
+    private var hostText: String? = null
+    private val devices = ArrayList<DataDeviceRes>()
+
+    fun clientGone(c: Client) {
+        devices.removeAll { it.client === c }
+        if (source?.client === c) { source = null; broadcast() }
+    }
+
+    fun addDevice(d: DataDeviceRes) { devices.add(d); offerTo(d) }
+    fun removeDevice(d: DataDeviceRes) { devices.remove(d) }
+
+    fun mimes(): List<String> = source?.mimes?.toList()
+        ?: if (hostText != null) TEXT_MIMES else emptyList()
+
+    fun setFromClient(s: DataSourceRes?) {
+        val old = source
+        if (old != null && old !== s && old.alive) old.sendCancelled()
+        source = s; hostText = null
+        broadcast()
+        if (s == null) return
+        // Mirror text to Android (read on a worker thread; never block the compositor thread).
+        val mime = s.mimes.firstOrNull { it.startsWith("text/plain;charset=utf-8") }
+            ?: s.mimes.firstOrNull { it == "UTF8_STRING" || it.startsWith("text/plain") } ?: return
         val pipe = Native.pipe() ?: return
-        s.send(mime, pipe[1]); Native.close(pipe[1])
-        // Read asynchronously by posting a task that blocks briefly — fine for small clipboard.
-        server.post {
-            val bytes = Native.readAll(pipe[0], 1 shl 20)
-            Native.close(pipe[0])
-            text = bytes.toString(Charsets.UTF_8)
-            server.host.clipboardChanged(text!!)
-            for (seat in server.seat.seats) seat.dataDevice?.selection(s)
-        }
+        s.send(mime, pipe[1]) // flush() closes our copy of pipe[1]
+        Thread({
+            val bytes = Native.readAll(pipe[0], 1 shl 20); Native.close(pipe[0])
+            val t = bytes.toString(Charsets.UTF_8)
+            server.post { if (source === s) { text = t; server.host.clipboardChanged(t) } }
+        }, "hatch-clip-read").apply { isDaemon = true; start() }
     }
+
+    fun sourceDestroyed(s: DataSourceRes) { if (source === s) { source = null; broadcast() } }
+
+    /** Android → guest. */
     fun setFromHost(t: String) {
-        text = t; source = null
-        // Clear client selection; host text remains in [text] for Android→guest paste bridge
-        // (full wl_data_offer from host needs a synthetic DataSource — next pass).
-        for (seat in server.seat.seats) seat.dataDevice?.selection(null)
+        if (t == text && source == null) return
+        source?.let { if (it.alive) it.sendCancelled() }
+        source = null; hostText = t; text = t
+        broadcast()
     }
+
     fun hostText(): String? = text
+
+    /** Serve a paste request from an offer. Takes ownership of [fd]. */
+    fun receive(mime: String, fd: Int) {
+        val s = source
+        if (s != null && s.alive) { s.send(mime, fd); return }
+        val t = hostText
+        if (t == null) { Native.close(fd); return }
+        Thread({ Native.writeAll(fd, t.toByteArray(Charsets.UTF_8)); Native.close(fd) }, "hatch-clip-write")
+            .apply { isDaemon = true; start() }
+    }
+
+    private fun broadcast() { for (d in devices.toList()) if (d.alive) offerTo(d) }
+
+    private fun offerTo(d: DataDeviceRes) {
+        val m = mimes()
+        if (m.isEmpty()) { d.selection(0); return }
+        val offer = DataOfferRes(d.client, d.client.newServerId(), d.version)
+        d.client.register(offer)
+        d.event(0).int(offer.id).end()                  // wl_data_device.data_offer(new_id)
+        for (mime in m) offer.event(0).string(mime).end() // wl_data_offer.offer
+        d.selection(offer.id)
+    }
+
+    companion object {
+        val TEXT_MIMES = listOf("text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "TEXT", "STRING")
+    }
 }
 
 class DataDeviceManagerRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
     override val iface = "wl_data_device_manager"
     override fun request(op: Int, a: Args) {
         when (op) {
-            0 -> client.register(DataSourceRes(client, a.newId()))
+            0 -> client.register(DataSourceRes(client, a.newId(), version))
             1 -> {
                 val nid = a.newId(); val seat = client.get<SeatRes>(a.obj())!!
-                val d = DataDeviceRes(client, nid, seat); client.register(d); seat.dataDevice = d
+                val d = DataDeviceRes(client, nid, seat, version); client.register(d); seat.dataDevice = d
+                client.server.clipboard.addDevice(d)
             }
             else -> super.request(op, a)
         }
     }
 }
 
-class DataSourceRes(c: Client, id: Int) : Res(c, id, 3) {
+class DataSourceRes(c: Client, id: Int, v: Int = 3) : Res(c, id, v) {
     override val iface = "wl_data_source"
     val mimes = ArrayList<String>()
     override fun request(op: Int, a: Args) {
@@ -53,26 +106,41 @@ class DataSourceRes(c: Client, id: Int) : Res(c, id, 3) {
             else -> super.request(op, a)
         }
     }
-    fun send(mime: String, fd: Int) { event(0).string(mime).fd(fd).end() }
+    /** wl_data_source.send(mime, fd) — the fd is closed by flush() after it is passed on. */
+    fun send(mime: String, fd: Int) { event(1).string(mime).fd(fd).end() }
+    fun sendCancelled() { event(2).end() }
+    override fun onDestroy() { client.server.clipboard.sourceDestroyed(this) }
 }
 
-class DataDeviceRes(c: Client, id: Int, val seat: SeatRes) : Res(c, id, 3) {
+class DataOfferRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
+    override val iface = "wl_data_offer"
+    override fun request(op: Int, a: Args) {
+        when (op) {
+            0 -> { a.uint(); a.string() }                         // accept
+            1 -> { val mime = a.string() ?: ""; val fd = a.fd(); client.server.clipboard.receive(mime, fd) } // receive
+            2 -> destroy()
+            3 -> {}                                               // finish
+            4 -> { a.uint(); a.uint() }                           // set_actions
+            else -> super.request(op, a)
+        }
+    }
+}
+
+class DataDeviceRes(c: Client, id: Int, val seat: SeatRes, v: Int = 3) : Res(c, id, v) {
     override val iface = "wl_data_device"
     override fun request(op: Int, a: Args) {
         when (op) {
             0 -> { /* start_drag */ a.obj(); a.obj(); a.obj(); a.uint() }
-            1 -> { // set_selection
+            1 -> { // set_selection(source, serial)
                 val source = client.get<DataSourceRes>(a.obj()); a.uint()
-                if (source != null) client.server.clipboard.setFromClient(source)
+                client.server.clipboard.setFromClient(source)
             }
             2 -> destroy()
             else -> super.request(op, a)
         }
     }
-    fun selection(source: DataSourceRes?) {
-        // Nullable object: 0 clears selection. Safe anytime after get_data_device.
-        event(5).obj(source?.id ?: 0).end()
-    }
+    fun selection(offerId: Int) { event(5).obj(offerId).end() }
+    override fun onDestroy() { client.server.clipboard.removeDevice(this) }
 }
 
 class TextInputManagerRes(c: Client, id: Int, v: Int) : Res(c, id, v) {

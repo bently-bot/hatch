@@ -146,6 +146,15 @@ PY
   then stamp "menu OK"; else FAILED+=(mousepad-menu); fi
 fi
 
+if [[ " $APPS " == *" mousepad "* ]]; then
+  stamp "== clipboard: guest copy → host, host (Android) → guest paste, round-trip =="
+  if JAVA_TOOL_OPTIONS="-Dhatch.inject=script -Dhatch.script=c:640,400;t:CopyMe123;kc:29+30;kc:29+46;w:1500;g:after-copy;p:FromAndroid;c:640,400;kc:29+30;kc:29+47;w:1500;s:pasted;kc:29+30;kc:29+46;w:1500;g:roundtrip" \
+     capture clipboard 90 --title=Mousepad --settle=2000 --inject -- "${GU[@]}" bash -c "$(python3 scripts/catalogue-args.py launch mousepad)" \
+     && grep -q 'clipboard\[after-copy\]: CopyMe123' "$PROOF/clipboard-host.log" && grep -q 'clipboard\[roundtrip\]: FromAndroid' "$PROOF/clipboard-host.log"; then
+    grep 'clipboard\[' "$PROOF/clipboard-host.log"; stamp "clipboard OK"
+  else grep 'clipboard\[' "$PROOF/clipboard-host.log" || true; FAILED+=(clipboard); fi
+fi
+
 stamp "done; failed: ${FAILED[*]:-none}"
 hard=()
 for f in "${FAILED[@]:-}"; do [ -n "$f" ] && [[ " $SOFT_APPS " != *" $f "* ]] && hard+=("$f"); done
