@@ -1,0 +1,95 @@
+#!/bin/sh
+# Flathub apps without bubblewrap (Android has no user namespaces): flatpak only downloads/deploys, and Hatch runs the
+# app with proot using Flatpak's own layout (runtime → /usr, app → /app, GL extension → /usr/lib/<triplet>/GL/default).
+# usage: hatch-flatpak install <app-id>   (fake root; writes /var/lib/hatch/flatpak/<app-id>.spec)
+#        hatch-flatpak spec <app-id>      (rewrite the spec only)
+#        hatch-flatpak uninstall <app-id>
+# Spec lines (read by the Android launcher and scripts/guest-run.sh): root <dir> | bind <guest-src>:<dst> | env K=V | cmd <argv0> [args]
+set -eu
+ACT=${1:?action}; ID=${2:?app id}
+case "$ID" in *[!A-Za-z0-9._-]*) echo "hatch: bad flatpak id" >&2; exit 2 ;; esac
+FP=/var/lib/flatpak; H=/var/lib/hatch/flatpak; SPEC=$H/$ID.spec; SK=$H/$ID.root
+export DEBIAN_FRONTEND=noninteractive
+# INI value (keys may be written "k=v" or "k = v")
+meta() { awk -v s="[$2]" -v k="$3" '$0==s{g=1;next} /^\[/{g=0} g{n=$0; sub(/[ \t]*=.*/,"",n); if(n==k){sub(/^[^=]*=[ \t]*/,""); print; exit}}' "$1"; }
+section() { awk -v s="[$2]" '$0==s{g=1;next} /^\[/{g=0} g&&/=/{k=$0; sub(/[ \t]*=.*/,"",k); v=$0; sub(/^[^=]*=[ \t]*/,"",v); print k"="v}' "$1"; }
+
+write_spec() {
+  A=$FP/app/$ID/current/active; [ -d "$A/files" ] || A=$(ls -d $FP/app/$ID/*/*/active 2>/dev/null | head -1)
+  [ -n "$A" ] && [ -d "$A/files" ] || { echo "hatch: $ID is not deployed" >&2; exit 4; }
+  RTREF=$(meta "$A/metadata" Application runtime)            # e.g. org.gnome.Platform/aarch64/51
+  CMD=$(meta "$A/metadata" Application command)
+  RT=$FP/runtime/$RTREF/active/files
+  [ -d "$RT" ] || { echo "hatch: runtime $RTREF missing" >&2; exit 4; }
+  RTMETA=$FP/runtime/$RTREF/active/metadata
+  GLDIR=$(meta "$RTMETA" "Extension org.freedesktop.Platform.GL" directory)   # lib/<triplet>/GL
+  ARCH=$(echo "$RTREF" | cut -d/ -f2)
+  GLVER=""; GL=""
+  for v in $(meta "$RTMETA" "Extension org.freedesktop.Platform.GL" versions | tr ';' ' ') $(meta "$RTMETA" "Extension org.freedesktop.Platform.GL" version); do
+    case "$v" in *-extra) continue ;; esac
+    if [ -d "$FP/runtime/org.freedesktop.Platform.GL.default/$ARCH/$v/active/files" ]; then GLVER=$v; GL=$FP/runtime/org.freedesktop.Platform.GL.default/$ARCH/$v/active/files; break; fi
+  done
+  TRIPLET=$(basename "$(dirname "${GLDIR:-lib/x/GL}")")
+  # Skeleton root: /etc entries point into the runtime's /usr/etc like Flatpak does; account/net files come from the guest.
+  rm -rf "$SK"; mkdir -p "$SK/usr" "$SK/app" "$SK/etc" "$SK/tmp" "$SK/var/tmp" "$SK/home" "$SK/run/hatch" "$SK/dev" "$SK/proc" "$SK/sys"
+  for l in bin lib lib32 lib64 sbin; do [ -e "$RT/$l" ] && ln -s "usr/$l" "$SK/$l"; done
+  for e in $(ls "$RT/etc"); do ln -s "/usr/etc/$e" "$SK/etc/$e"; done
+  for e in passwd group hosts resolv.conf machine-id localtime; do rm -f "$SK/etc/$e"; : > "$SK/etc/$e"; done
+  # Apps/libraries that probe bubblewrap themselves (glycin image loaders, WebKit) must fail fast, not hang under
+  # proot: a stub that reports the error they recognise makes them fall back to running unsandboxed.
+  mkdir -p "$SK/.hatch/bin"
+  printf '#!/bin/sh\necho "bwrap: Creating new namespace failed: Operation not permitted" >&2\nexit 1\n' > "$SK/.hatch/bin/bwrap"
+  chmod 755 "$SK/.hatch/bin/bwrap"
+  {
+    echo "root $SK"
+    echo "bind $RT:/usr"
+    echo "bind $RT/etc:/usr/etc"
+    echo "bind $A/files:/app"
+    [ -d "$GL" ] && [ -n "$GLDIR" ] && echo "bind $GL:/usr/$GLDIR/default"
+    for e in passwd group hosts resolv.conf machine-id; do echo "bind /etc/$e:/etc/$e"; done
+    echo "bind /home:/home"
+    section "$RTMETA" Environment | sed 's/^/env /'
+    section "$A/metadata" Environment | sed 's/^/env /'
+    echo "env PATH=/.hatch/bin:/app/bin:/usr/bin"
+    echo "env FLATPAK_ID=$ID"
+    echo "env XDG_DATA_DIRS=/app/share:/usr/share:/usr/share/runtime/share"
+    echo "env XDG_CONFIG_DIRS=/app/etc/xdg:/etc/xdg"
+    echo "env XDG_CONFIG_HOME=/home/hatch/.var/app/$ID/config"
+    echo "env XDG_DATA_HOME=/home/hatch/.var/app/$ID/data"
+    echo "env XDG_CACHE_HOME=/home/hatch/.var/app/$ID/cache"
+    echo "env XDG_STATE_HOME=/home/hatch/.var/app/$ID/.local/state"
+    echo "env LD_LIBRARY_PATH=/app/lib:/usr/$GLDIR/default/lib"
+    echo "env LIBGL_DRIVERS_PATH=/usr/$GLDIR/default/lib/dri"
+    echo "env __EGL_VENDOR_LIBRARY_DIRS=/usr/$GLDIR/default/share/glvnd/egl_vendor.d:/usr/share/glvnd/egl_vendor.d"
+    echo "env GSK_RENDERER=cairo"
+    # GNOME 49+ image loading (glycin) sandboxes loaders with bwrap; proot is the sandbox here.
+    echo "env GLYCIN_DISABLE_SANDBOX=1"
+    echo "cmd $CMD"
+  } > "$SPEC.tmp"
+  mv "$SPEC.tmp" "$SPEC"
+  mkdir -p "/home/hatch/.var/app/$ID/config" "/home/hatch/.var/app/$ID/data" "/home/hatch/.var/app/$ID/cache"
+  chown -R 1000:1000 "/home/hatch/.var" 2>/dev/null || true
+  echo "hatch: flatpak $ID ready ($RTREF${TRIPLET:+, GL $GLVER})"
+}
+
+case "$ACT" in
+  install)
+    if ! command -v flatpak >/dev/null 2>&1; then
+      echo "hatch: installing flatpak"
+      apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 flatpak ca-certificates \
+        || { apt-get update && apt-get install -y --no-install-recommends flatpak ca-certificates; }
+    fi
+    flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+    # Only English locale extensions (the full GNOME locale pack is ~1 GB).
+    flatpak config --system --set languages en >/dev/null 2>&1 || true
+    echo "hatch: adding Flathub's $ID"
+    # bwrap can't create namespaces here: its export/trigger steps print errors but the deploy itself succeeds.
+    flatpak install --system -y --noninteractive flathub "$ID" 2>&1 | grep -v 'bwrap: Creating new namespace failed' || true
+    write_spec ;;
+  spec) write_spec ;;
+  uninstall)
+    flatpak uninstall --system -y --noninteractive "$ID" 2>&1 | grep -v bwrap || true
+    flatpak uninstall --system -y --noninteractive --unused 2>&1 | grep -v bwrap || true
+    rm -rf "$SPEC" "$SK" ;;
+  *) echo "usage: hatch-flatpak install|spec|uninstall <app-id>" >&2; exit 2 ;;
+esac

@@ -55,13 +55,21 @@ shot 01-first-run
 $UI tap 'Download & set up' || fail "tap setup"
 sleep 20; shot 02-setup-progress
 # First run: download rootfs + apt; log what the setup screen says every minute so a slow/failed step is visible.
-ok=0
+ok=0; retried=0
 for i in $(seq 1 25); do
   if $UI wait 'Search apps' 60 >/dev/null 2>&1; then ok=1; break; fi
-  stamp "setup still running ($i min): $($UI dump 2>/dev/null | grep dev.hatch | cut -d: -f2- | tr '\n' '|' | cut -c1-300)"
+  screen=$($UI dump 2>/dev/null | grep dev.hatch | cut -d: -f2- | tr '\n' '|')
+  stamp "setup still running ($i min): $(echo "$screen" | cut -c1-300)"
   [ $((i % 5)) -eq 0 ] && shot "02-setup-${i}min"
+  if echo "$screen" | grep -q "'Failed: "; then
+    shot "02-setup-failed-$retried"
+    stamp "setup reported: $(echo "$screen" | grep -o "'Failed: [^']*'")"
+    # A user would tap Retry: do that once (proves the retry path), then give up.
+    [ $retried = 0 ] || break
+    retried=1; $UI tap '^Retry$' || break
+  fi
 done
-adb logcat -d -s HatchSetup HatchGuest > "$OUT/setup-logcat.txt" 2>&1 || true
+adb logcat -d -s HatchSetup HatchGuest HatchRootfs > "$OUT/setup-logcat.txt" 2>&1 || true
 stamp "setup log: $(grep -c . "$OUT/setup-logcat.txt") lines; $(grep -cE 'Temporary failure|Could not resolve' "$OUT/setup-logcat.txt") DNS errors"
 guest_probe
 [ $ok = 1 ] || fail "setup did not reach store"

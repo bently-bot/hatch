@@ -68,7 +68,7 @@ object RootfsInstaller {
                     }
                 }
                 _stage.value = Stage.Working("Decompressing")
-                logLine("Decompressing xz → tar")
+                logLine("Decompressing rootfs → tar")
                 val tar = File(context.noBackupFilesDir, "debian-rootfs.tar")
                 if (!tar.exists() || tar.length() < 1_000_000) decompressXz(xz, tar)
                 _stage.value = Stage.Working("Unpacking")
@@ -108,7 +108,8 @@ object RootfsInstaller {
         tar.parentFile?.mkdirs()
         val part = File(tar.path + ".part")
         BufferedInputStream(FileInputStream(xz)).use { raw ->
-            XZInputStream(raw).use { inn ->
+            raw.mark(4); val gz = raw.read() == 0x1f && raw.read() == 0x8b; raw.reset()
+            (if (gz) java.util.zip.GZIPInputStream(raw, 64 * 1024) else XZInputStream(raw)).use { inn ->
                 BufferedOutputStream(FileOutputStream(part)).use { out ->
                     inn.copyTo(out, 64 * 1024)
                 }
