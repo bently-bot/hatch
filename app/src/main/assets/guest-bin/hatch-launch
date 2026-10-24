@@ -19,6 +19,9 @@ export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
 export XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-wayland}" ELECTRON_OZONE_PLATFORM_HINT="${ELECTRON_OZONE_PLATFORM_HINT:-auto}"
 export NO_AT_BRIDGE=1 GTK_A11Y=none
 export GSK_RENDERER="${GSK_RENDERER:-cairo}"
+# XDG base dirs must exist: under proot, stat() on a child of a missing dir can fail with ENOSYS instead of ENOENT
+# (std::filesystem::status → "Function not implemented", e.g. HDRView as the first app on a fresh home).
+mkdir -p "${HOME:-/home/hatch}/.config" "${HOME:-/home/hatch}/.local/share" "${HOME:-/home/hatch}/.local/state" "${HOME:-/home/hatch}/.cache" 2>/dev/null || true
 if [ "$WINE" = 1 ]; then
   unset DISPLAY
   # Debian wine 10 bug: server_tmpdir.h free()s secure_getenv("TMPDIR") → "free(): invalid pointer" abort.
