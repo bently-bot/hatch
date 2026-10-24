@@ -26,7 +26,8 @@ if [ -z "${PROOT:-}" ]; then
     rm -rf "$WORK/proot-src"; git init -q "$WORK/proot-src"
     git -C "$WORK/proot-src" fetch -q --depth 1 https://github.com/termux/proot "$PROOT_SHA"
     git -C "$WORK/proot-src" checkout -q FETCH_HEAD
-    make -C "$WORK/proot-src/src" -j"$(nproc)" proot >/dev/null 2>&1 || make -C "$WORK/proot-src/src" proot
+    # No 32-bit guest loader on CI (arm64 runner has no -m32 / armhf cross compiler)
+    make -C "$WORK/proot-src/src" -j"$(nproc)" HAS_LOADER_32BIT= proot >/dev/null 2>&1 || make -C "$WORK/proot-src/src" HAS_LOADER_32BIT= proot
   fi
   export PROOT="$WORK/proot-src/src/proot"
 fi
