@@ -104,11 +104,17 @@ wine_diag() { # Wine arm64 diagnostics: proot variants vs a real (sudo) chroot o
     set -- $variant; echo "### proot $1"
     env "$2" timeout 120 "${G[@]}" bash -c "$W rm -rf /tmp/pfx-$1; WINEPREFIX=/tmp/pfx-$1 wine cmd /c echo HATCH-WINE-OK 2>&1 | tail -25" || echo "rc=$?"
   done
+  echo "### proot +all tail"
+  timeout 120 "${G[@]}" bash -c "unset DISPLAY; rm -rf /root/pfx-a; WINEPREFIX=/root/pfx-a WINEDEBUG=+all wine cmd /c echo HATCH-WINE-OK 2>&1 | tail -60" || true
   echo "### sudo chroot (no proot)"
   for d in proc sys dev dev/pts; do sudo mount --bind /$d "$HATCH_ROOTFS/$d" || true; done
-  sudo timeout 180 chroot "$HATCH_ROOTFS" /usr/bin/env -i HOME=/root PATH=/usr/local/bin:/usr/bin:/bin bash -c "$W rm -rf /tmp/pfx-c; WINEPREFIX=/tmp/pfx-c wine cmd /c echo HATCH-WINE-OK 2>&1 | tail -25" || echo "rc=$?"
+  sudo chmod 1777 "$HATCH_ROOTFS/tmp"
+  CH=(sudo timeout 180 chroot "$HATCH_ROOTFS" /usr/bin/env -i HOME=/root USER=root PATH=/usr/local/bin:/usr/bin:/bin)
+  "${CH[@]}" bash -c "chown -R root:root /root; $W rm -rf /root/pfx-c; WINEPREFIX=/root/pfx-c wine cmd /c echo HATCH-WINE-OK 2>&1 | tail -25" || echo "rc=$?"
   echo "### gdb in chroot"
-  sudo timeout 180 chroot "$HATCH_ROOTFS" /usr/bin/env -i HOME=/root PATH=/usr/local/bin:/usr/bin:/bin bash -c "rm -rf /tmp/pfx-g; WINEPREFIX=/tmp/pfx-g gdb -q -batch -ex 'set follow-fork-mode child' -ex run -ex bt --args /usr/lib/wine/wine cmd /c echo hi 2>&1 | tail -40" || true
+  "${CH[@]}" bash -c "rm -rf /root/pfx-g; WINEPREFIX=/root/pfx-g gdb -q -batch -ex 'set follow-fork-mode child' -ex 'set detach-on-fork on' -ex run -ex bt -ex 'info proc mappings' --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | tail -80" || true
+  echo "### gdb under proot (ptrace may be unavailable)"
+  timeout 180 "${G[@]}" bash -c "rm -rf /root/pfx-h; WINEPREFIX=/root/pfx-h gdb -q -batch -ex run -ex bt --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | tail -40" || true
   for d in dev/pts dev sys proc; do sudo umount "$HATCH_ROOTFS/$d" 2>/dev/null || true; done
 }
 
