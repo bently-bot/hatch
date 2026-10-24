@@ -12,6 +12,39 @@ t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; stamp "screenshot $1 ($(stat -c%s "$OUT/$1.png") bytes)"; }
 fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s HatchRuntime HatchSetup HatchInstall HatchStub HatchWindow HatchSession HatchGuest HatchAudio AndroidRuntime:E > "$OUT/logcat.txt" 2>&1; tail -60 "$OUT/logcat.txt"; exit 1; }
 
+# Install a catalogue app through the store UI (search → result → detail → Install → stub prompt). $1 = app id.
+store_install() {
+  local id=$1 name stub=dev.hatch.app.${1//-/_}
+  name=$(python3 -c 'import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])' "$ROOT/catalogue/catalogue.json" "$id")
+  adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 3
+  $UI tap 'Get apps' dev.hatch || true; sleep 1
+  $UI tap 'Search apps' dev.hatch || $UI tap 'Search' dev.hatch || return 1
+  adb shell input text "$id"; sleep 2; adb shell input keyevent 4 || true; sleep 1
+  for t in 1 2 3 4; do $UI has '^Install$' dev.hatch && break; $UI tap "^$name\$" dev.hatch || true; sleep 2; done
+  $UI tap '^Install$' dev.hatch || return 1
+  for i in $(seq 1 240); do
+    adb shell pm list packages | grep -q "package:$stub$" && return 0
+    $UI has 'Install failed' dev.hatch && return 1
+    if $UI has 'Do you want to install|install this app'; then $UI tap '^Install$' 'packageinstaller' || true; fi
+    sleep 5
+  done
+  return 1
+}
+# Frame of any window by exact title, e.g. "Hatch bubble".
+win_frame() {
+  adb shell dumpsys window windows | python3 -c '
+import re,sys
+t=sys.stdin.read(); m=re.search(r"Window\{[0-9a-f]+ u\d+ "+re.escape(sys.argv[1])+r"\}", t)
+if not m: sys.exit(1)
+f=re.search(r"frame=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]", t[m.end():m.end()+6000])
+if not f: sys.exit(1)
+print(*f.groups())' "$1"
+}
+# Centre of a logged tap target (FloatingWindow.logTargets), e.g. tap_target "control Minimise" Mousepad
+tap_target() {
+  local xy; xy=$(adb logcat -d -s HatchFloat | grep -F "$1 at" | grep -F "for '$2'" | tail -1 | sed -E 's/.* at ([0-9]+) ([0-9]+) for.*/\1 \2/')
+  [ -n "$xy" ] || return 1; adb shell input tap $xy
+}
 # Frame of a floating overlay window ("Hatch: <label>") as "l t r b", from WindowManager.
 float_frame() {
   adb shell dumpsys window windows | python3 -c '
@@ -107,7 +140,8 @@ shot 06-store-installed
 
 stamp "app drawer"
 adb shell input keyevent 3; sleep 2
-adb shell input swipe 540 1900 540 300 300; sleep 3
+SZ=$(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1); SX=${SZ%x*}; SY=${SZ#*x}
+adb shell input swipe $((SX / 2)) $((SY * 85 / 100)) $((SX / 2)) $((SY / 6)) 300; sleep 3
 shot 07-app-drawer
 $UI has "$(python3 - "$ROOT/catalogue/catalogue.json" "$APP" <<'PY'
 import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])
@@ -177,6 +211,86 @@ adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 4
 float_frame Mousepad >/dev/null || fail "floating window closed when the store opened"
 sleep 3; float_frame Mousepad >/dev/null || fail "program exited after the store opened"
 shot 10b-store-with-floating-app
+
+stamp "floating over another Android app (Settings)"
+adb shell am start -W -a android.settings.SETTINGS >/dev/null; sleep 4
+float_frame Mousepad >/dev/null || fail "floating window hidden by another app"
+shot 10c-floating-over-settings-app
+
+stamp "minimise to the edge bubble, restore from it"
+F=$(float_frame Mousepad); read L T R B <<<"$F"
+adb logcat -c
+adb shell input tap $(( (L + R) / 2 )) $(( T + $(dp 10) + $(dp 13) )); sleep 2   # tap the pill handle → window controls
+shot 10d-window-controls
+tap_target "control Minimise" Mousepad || fail "window controls did not appear on handle tap"
+sleep 2
+float_frame Mousepad >/dev/null && fail "window still on screen after Minimise"
+BF=$(win_frame "Hatch bubble") || fail "no edge bubble after minimising"
+stamp "bubble frame: $BF"; read BL BT BR BB <<<"$BF"
+shot 10e-minimised-to-bubble
+adb logcat -c
+adb shell input tap $(( (BL + BR) / 2 )) $(( (BT + BB) / 2 )); sleep 2
+shot 10f-bubble-menu
+tap_target "bubble-menu ▢  Mousepad" bubble || fail "bubble menu did not list the minimised window"
+sleep 2
+float_frame Mousepad >/dev/null || fail "window not restored from the bubble"
+shot 10g-restored-from-bubble
+AS=$(adb shell pidof dev.hatch | tr -d '\r'); [ "$AS" = "$PID_AFTER" ] || fail "process restarted during minimise/restore"
+
+stamp "bubble → Open Hatch (store) while the window floats"
+adb shell input keyevent 3; sleep 2
+adb logcat -c
+adb shell input tap $(( (BL + BR) / 2 )) $(( (BT + BB) / 2 )); sleep 2
+tap_target "bubble-menu Open Hatch" bubble || fail "bubble menu has no Open Hatch"
+sleep 4
+$UI has 'Search apps|Get apps' dev.hatch || fail "Open Hatch from the bubble did not show the store"
+float_frame Mousepad >/dev/null || fail "window closed when the store opened from the bubble"
+shot 10h-store-opened-from-bubble
+cp "$OUT/08b-floating-over-home.png" "$OUT/P1-floating-over-home.png"
+
+stamp "P2: second app (galculator) installed from the store; two windows floating over another Android app"
+# Park Mousepad in the bubble so the overlay doesn't cover the store while installing, then restore it.
+read L T R B <<<"$(float_frame Mousepad)"; adb logcat -c
+adb shell input tap $(( (L + R) / 2 )) $(( T + $(dp 10) + $(dp 13) )); sleep 2
+tap_target "control Minimise" Mousepad || fail "no Minimise control before second install"; sleep 2
+store_install galculator || { shot P2-install-failed; fail "galculator install from the store failed"; }
+read BL BT BR BB <<<"$(win_frame 'Hatch bubble')" || fail "bubble missing"
+adb logcat -c; adb shell input tap $(( (BL + BR) / 2 )) $(( (BT + BB) / 2 )); sleep 2
+tap_target "bubble-menu ▢  Mousepad" bubble || fail "bubble menu has no Mousepad"; sleep 2
+float_frame Mousepad >/dev/null || fail "Mousepad not restored from bubble"
+adb shell am start -W -a android.settings.SETTINGS >/dev/null; sleep 3
+adb logcat -c
+adb shell monkey -p dev.hatch.app.galculator -c android.intent.category.LAUNCHER 1 >/dev/null
+for i in $(seq 1 60); do float_frame Calculator >/dev/null && break; sleep 2; done
+float_frame Calculator >/dev/null || fail "Calculator (galculator) did not open as a floating window"
+sleep 6
+GF=$(float_frame Calculator); MF=$(float_frame Mousepad) || fail "mousepad window gone when galculator opened"
+stamp "two floating windows: Mousepad [$MF] Galculator [$GF]"
+[ "$GF" != "$MF" ] || fail "windows not cascaded"
+adb shell dumpsys activity activities | grep -m1 -E 'topResumedActivity' | grep -q settings && stamp "Settings is the resumed app underneath" || stamp "WARN: Settings not on top underneath"
+shot P2-two-windows-over-settings
+
+stamp "P3: store opened while both windows float"
+adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 4
+float_frame Mousepad >/dev/null && float_frame Calculator >/dev/null || fail "a window closed when the store opened"
+shot P3-store-with-two-floating-windows
+
+stamp "P4: maximise then restore (Mousepad)"
+adb shell input keyevent 3; sleep 2
+F=$(float_frame Mousepad); read L T R B <<<"$F"
+adb logcat -c
+adb shell input tap $(( (L + R) / 2 )) $(( T + $(dp 10) + $(dp 13) )); sleep 2
+tap_target "control Maximise" Mousepad || fail "no Maximise control"
+sleep 3; MX=$(float_frame Mousepad); read ML MT MR MB <<<"$MX"
+stamp "maximised frame: $MX (screen ${WX}x${WY})"
+[ $(( MR - ML )) -ge $(( WX * 95 / 100 )) ] || fail "maximise did not fill the width ($F → $MX)"
+shot P4a-maximised
+adb logcat -c
+adb shell input tap $(( (ML + MR) / 2 )) $(( (MT > 0 ? MT : 0) + $(dp 10) + $(dp 13) )); sleep 2
+tap_target "control Maximise" Mousepad || fail "no Maximise control on the maximised window"
+sleep 3; RF=$(float_frame Mousepad); stamp "restored frame: $RF (was $F)"
+[ "$RF" = "$F" ] || fail "restore did not return to the floating bounds ($F → $RF)"
+shot P4b-restored
 adb logcat -d -s HatchRuntime HatchWindow HatchSession > "$OUT/logcat.txt" 2>&1
 stamp "mousepad leg OK"
 

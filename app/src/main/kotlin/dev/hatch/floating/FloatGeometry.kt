@@ -33,10 +33,11 @@ object FloatGeometry {
     /** Initial placement: 88% wide (phone) / 70% (unfolded), 62% tall, cascaded by 6% per open window. */
     fun initial(screenW: Int, screenH: Int, cascade: Int): Bounds {
         val wide = screenW > screenH * 0.8f
+        // ~70% of a tablet/unfolded screen (88% wide on a portrait phone), centred, each new window cascaded down-right.
         val w = (screenW * if (wide) 0.70f else 0.88f).roundToInt()
-        val h = (screenH * 0.62f).roundToInt()
-        val step = (min(screenW, screenH) * 0.06f).roundToInt() * (cascade % 5)
-        return Bounds((screenW - w) / 2 + step - (step / 2), (screenH - h) / 3 + step, w, h)
+        val h = (screenH * if (wide) 0.70f else 0.60f).roundToInt()
+        val step = (min(screenW, screenH) * 0.05f).roundToInt() * (cascade % 5)
+        return Bounds((screenW - w) / 2 + step, (screenH - h) / 2 + step, w, h)
     }
 
     /** Bubble snaps to the nearest vertical screen edge. */

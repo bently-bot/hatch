@@ -91,6 +91,11 @@ class MainActivity : ComponentActivity() {
                                     dev.hatch.gpu.Gpu.setMode(this@MainActivity, if (on) dev.hatch.gpu.Gpu.Mode.AUTO else dev.hatch.gpu.Gpu.Mode.SOFTWARE)
                                 },
                                 floatingEnabled = { dev.hatch.floating.FloatingWindows.enabled(this@MainActivity) },
+                                overlayMissing = {
+                                    val fw = dev.hatch.floating.FloatingWindows
+                                    fw.mode(this@MainActivity) == fw.MODE_FLOATING && !fw.canOverlay(this@MainActivity)
+                                },
+                                grantOverlay = { startActivity(dev.hatch.floating.FloatingWindows.overlayPermissionIntent(this@MainActivity)) },
                                 setFloatingEnabled = { on ->
                                     val fw = dev.hatch.floating.FloatingWindows
                                     fw.setMode(this@MainActivity, if (on) fw.MODE_FLOATING else fw.MODE_TASKS)

@@ -141,5 +141,6 @@ object Bubble {
         }
         col.setOnTouchListener { _, e -> if (e.actionMasked == MotionEvent.ACTION_OUTSIDE) closeMenu(ctx); false }
         wm.addView(col, mp); menu = col
+        col.post { FloatingWindow.logTargets(col, "bubble-menu", "bubble") }
     }
 }

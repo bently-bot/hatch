@@ -167,12 +167,24 @@ fun HatchHome(state: HatchUiState, actions: StoreActions) {
             }
         },
     ) { pad ->
-        Box(Modifier.padding(pad).fillMaxSize()) {
+        // Re-checked whenever Hatch comes back to the front (e.g. returning from the permission screen).
+        var overlayMissing by remember { mutableStateOf(actions.overlayMissing()) }
+        val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        androidx.compose.runtime.DisposableEffect(owner) {
+            val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+                if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) overlayMissing = actions.overlayMissing()
+            }
+            owner.lifecycle.addObserver(obs); onDispose { owner.lifecycle.removeObserver(obs) }
+        }
+        Column(Modifier.padding(pad).fillMaxSize()) {
+        if (overlayMissing) OverlayBanner(actions.grantOverlay)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 0 -> AppsTab(state, actions, onDetail = { detailId = it })
                 1 -> GetAppsTab(state, actions, onDetail = { detailId = it })
                 else -> SettingsTab(actions)
             }
+        }
         }
     }
 }
@@ -382,6 +394,20 @@ private fun UpdatesPane(state: HatchUiState, actions: StoreActions, onDetail: (S
         }
         if (checking) SquigglyProgress(null)
         LazyColumn { items(apps, key = { it.id }) { a -> ResultRow(a, true, state, onDetail) } }
+    }
+}
+
+@Composable
+private fun OverlayBanner(onAllow: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(12.dp, 8.dp).clip(RoundedCornerShape(16.dp)).background(HatchPurpleContainer).padding(14.dp, 10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Floating windows", fontWeight = FontWeight.SemiBold, color = Color(0xFFEADDFF))
+            Text("Allow \u201cDisplay over other apps\u201d so programs open as movable windows over your home screen and other apps.",
+                style = MaterialTheme.typography.bodySmall, color = Color(0xFFEADDFF))
+        }
+        Spacer(Modifier.width(8.dp))
+        Button(onClick = onAllow, colors = ButtonDefaults.buttonColors(containerColor = HatchBlue, contentColor = HatchOnBlue)) { Text("Allow") }
     }
 }
 

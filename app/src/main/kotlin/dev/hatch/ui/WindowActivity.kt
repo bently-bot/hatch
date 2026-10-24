@@ -73,6 +73,18 @@ class WindowActivity : ComponentActivity(), HatchRuntime.WindowSlot {
             return
         }
 
+        // Floating is the default, but the overlay grant is missing: ask for it rather than silently opening full screen.
+        val fw = dev.hatch.floating.FloatingWindows
+        if (!secondary && fw.mode(this) == fw.MODE_FLOATING && !fw.canOverlay(this) &&
+            !getSharedPreferences("hatch", MODE_PRIVATE).getBoolean("overlay_asked", false)) {
+            getSharedPreferences("hatch", MODE_PRIVATE).edit().putBoolean("overlay_asked", true).apply()
+            android.widget.Toast.makeText(this, "Allow Hatch to display over other apps, then open $label again: it will float in its own window.",
+                android.widget.Toast.LENGTH_LONG).show()
+            startActivity(fw.overlayPermissionIntent(this))
+            finishAndRemoveTask(); overridePendingTransition(0, 0)
+            return
+        }
+
         // Tapping the icon of an app that's already running brings its window back instead of starting a 2nd copy.
         if (!secondary && AppSession.isRunning(appId)) {
             val existing = primaryTasks[appId]

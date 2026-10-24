@@ -186,8 +186,10 @@ class FloatingWindow(
                         apply(Bounds(start.x + dx, start.y + dy, start.w, start.h))
                     }
                 }
-                MotionEvent.ACTION_UP -> if (!moved && !pinching)
+                MotionEvent.ACTION_UP -> if (!moved && !pinching) {
                     controls.visibility = if (controls.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                    if (controls.visibility == View.VISIBLE) controls.post { logTargets(controls, "control", label) }
+                }
             }
             true
         }
@@ -297,5 +299,17 @@ class FloatingWindow(
 
     override fun textInput(enabled: Boolean) { if (enabled) main.post { takeFocus(); sv.showKeyboard() } }
 
-    companion object { private const val TAG = "HatchFloat" }
+    companion object {
+        private const val TAG = "HatchFloat"
+        /** Logs the on-screen centre of each child ("control Minimise at 540 812 for 'Mousepad'"): overlay windows are
+         *  invisible to uiautomator, so the emulator E2E taps these like a user would. */
+        fun logTargets(group: ViewGroup, kind: String, owner: String) {
+            val xy = IntArray(2)
+            for (i in 0 until group.childCount) {
+                val c = group.getChildAt(i); c.getLocationOnScreen(xy)
+                val name = c.contentDescription ?: (c as? android.widget.TextView)?.text ?: continue
+                Log.i(TAG, "$kind $name at ${xy[0] + c.width / 2} ${xy[1] + c.height / 2} for '$owner'")
+            }
+        }
+    }
 }

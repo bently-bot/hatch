@@ -100,6 +100,9 @@ data class StoreActions(
     val gpuEnabled: () -> Boolean = { false },
     val setGpuEnabled: (Boolean) -> Unit = {},
     val floatingEnabled: () -> Boolean = { false },
+    /** Floating mode is selected but "Display over other apps" isn't granted yet (programs would open full screen). */
+    val overlayMissing: () -> Boolean = { false },
+    val grantOverlay: () -> Unit = {},
     /** Returns false when the overlay permission must be granted first (the permission screen was opened). */
     val setFloatingEnabled: (Boolean) -> Boolean = { true },
     val cancel: () -> Unit = {},
