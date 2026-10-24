@@ -10,7 +10,7 @@ OUT="${PROOF_DIR:-$ROOT/harness-out/emu}"; mkdir -p "$OUT"
 UI="python3 $ROOT/scripts/ui.py"
 t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; stamp "screenshot $1 ($(stat -c%s "$OUT/$1.png") bytes)"; }
-fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s HatchRuntime HatchSetup HatchInstall HatchStub HatchWindow HatchSession AndroidRuntime:E > "$OUT/logcat.txt" 2>&1; tail -60 "$OUT/logcat.txt"; exit 1; }
+fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s HatchRuntime HatchSetup HatchInstall HatchStub HatchWindow HatchSession HatchGuest HatchAudio AndroidRuntime:E > "$OUT/logcat.txt" 2>&1; tail -60 "$OUT/logcat.txt"; exit 1; }
 
 # Run a shell snippet inside the app's guest (debug APK → run-as), mirroring LinuxRuntime's proot argv/env.
 guest() {
