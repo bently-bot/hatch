@@ -69,6 +69,7 @@ object InstallManager {
                         stubPackage = StubInstaller.stubPackageFor(app.id),
                         command = app.command,
                         wine = app.wine,
+                        x11 = app.x11,
                     ),
                 )
                 _progress.value = Progress.Done(app.id)

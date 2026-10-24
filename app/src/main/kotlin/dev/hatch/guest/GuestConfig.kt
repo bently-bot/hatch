@@ -65,6 +65,9 @@ object GuestConfig {
         File(root, "run/hatch").mkdirs()
         File(root, "tmp").mkdirs()
         File(root, "root").mkdirs()
+
+        installX11Helpers(root)
+        installAudioHelpers(root)
     }
 
     /** Configure Wine to use winewayland.drv for Hatch's compositor. */
@@ -82,6 +85,65 @@ object GuestConfig {
             timeoutMs = 180_000,
             waylandHostDir = waylandHostDir,
         )
+    }
+
+
+    private fun installX11Helpers(root: File) {
+        val bin = File(root, "usr/local/bin")
+        bin.mkdirs()
+        val d = "${'$'}"
+        write(
+            File(bin, "hatch-xwayland"),
+            """
+            #!/bin/sh
+            set -eu
+            export XDG_RUNTIME_DIR="${d}{XDG_RUNTIME_DIR:-/tmp}"
+            export WAYLAND_DISPLAY="${d}{WAYLAND_DISPLAY:-wayland-0}"
+            LOCK=/tmp/.X1-lock
+            if [ -f "${d}LOCK" ] && kill -0 "${d}(cat "${d}LOCK" 2>/dev/null)" 2>/dev/null; then
+              exit 0
+            fi
+            rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
+            mkdir -p /tmp/.X11-unix
+            chmod 1777 /tmp/.X11-unix
+            if command -v Xwayland >/dev/null 2>&1; then
+              nohup Xwayland :1 -geometry 1280x800 -noreset -ac >/tmp/hatch-xwayland.log 2>&1 &
+              sleep 0.4
+            fi
+            """.trimIndent() + "\n",
+        )
+        write(
+            File(bin, "hatch-x11"),
+            """
+            #!/bin/sh
+            set -eu
+            /usr/local/bin/hatch-xwayland || true
+            export DISPLAY=:1
+            unset GDK_BACKEND
+            export GDK_BACKEND=x11
+            exec "${d}@"
+            """.trimIndent() + "\n",
+        )
+        File(bin, "hatch-xwayland").setExecutable(true)
+        File(bin, "hatch-x11").setExecutable(true)
+    }
+
+    private fun installAudioHelpers(root: File) {
+        val bin = File(root, "usr/local/bin")
+        bin.mkdirs()
+        val d = "${'$'}"
+        write(
+            File(bin, "hatch-audio-env"),
+            """
+            #!/bin/sh
+            if [ -S "${d}{XDG_RUNTIME_DIR:-/tmp}/pulse/native" ]; then
+              export PULSE_SERVER="unix:${d}{XDG_RUNTIME_DIR}/pulse/native"
+            elif [ -n "${d}{HATCH_PULSE_HOST:-}" ]; then
+              export PULSE_SERVER="${d}HATCH_PULSE_HOST"
+            fi
+            """.trimIndent() + "\n",
+        )
+        File(bin, "hatch-audio-env").setExecutable(true)
     }
 
     private fun write(file: File, text: String) {

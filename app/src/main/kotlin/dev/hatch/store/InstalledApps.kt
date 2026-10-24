@@ -14,6 +14,7 @@ data class InstalledRecord(
     val stubPackage: String,
     val command: List<String>,
     val wine: Boolean = false,
+    val x11: Boolean = false,
 )
 
 object InstalledApps {

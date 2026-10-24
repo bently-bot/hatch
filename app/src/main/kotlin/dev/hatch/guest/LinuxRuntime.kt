@@ -71,8 +71,20 @@ object LinuxRuntime {
             "QT_QPA_PLATFORM" to "wayland",
             "SDL_VIDEODRIVER" to "wayland",
             "WINEPREFIX" to "/root/.wine",
+            // Default: LLVMpipe/softpipe (correct). Set HATCH_GPU=1 after /dev/kgsl-3d0 verified on device
+            // to prefer Turnip (venus/kgsl) + Zink for GLES→Vulkan.
+            "LIBGL_ALWAYS_SOFTWARE" to "1",
+            "GALLIUM_DRIVER" to "llvmpipe",
+            "MESA_LOADER_DRIVER_OVERRIDE" to "llvmpipe",
         )
         base.putAll(extra)
+        if (extra["HATCH_GPU"] == "1" || System.getenv("HATCH_GPU") == "1") {
+            base["LIBGL_ALWAYS_SOFTWARE"] = "0"
+            base.remove("GALLIUM_DRIVER")
+            base["MESA_LOADER_DRIVER_OVERRIDE"] = "zink"
+            base["MESA_VK_DEVICE_SELECT"] = "turnip"
+            base["TU_DEBUG"] = "noconform"
+        }
         return base.map { "${it.key}=${it.value}" }.toTypedArray()
     }
 
