@@ -26,6 +26,9 @@ type_search() {
   done
   return 1
 }
+# Another ordinary Android app to float over. Not Settings: it sets HIDE_NON_SYSTEM_OVERLAY_WINDOWS, so Android
+# hides every third-party overlay above it by design.
+other_app() { adb shell am start -W -a android.intent.action.DIAL >/dev/null 2>&1 || adb shell am start -W -a android.intent.action.VIEW -d https://example.org >/dev/null; }
 # Install a catalogue app through the store UI (search → result → detail → Install → stub prompt). $1 = app id.
 store_install() {
   local id=$1 name stub=dev.hatch.app.${1//-/_}
@@ -230,6 +233,7 @@ a = Image.open(sys.argv[1]).convert("RGB"); b = Image.open(sys.argv[2]).convert(
 bbox = ImageChops.difference(a, b).getbbox(); print("diff bbox", bbox); sys.exit(0 if bbox else 1)
 PY
 
+hide_ime; sleep 1   # done typing: the keyboard shouldn't cover the next proofs
 stamp "fold-like resize (config change must not kill the session)"
 PID_BEFORE=$(adb shell pidof dev.hatch | tr -d '\r')
 adb shell wm size 1812x2176; sleep 6; shot 10-unfolded
@@ -245,10 +249,10 @@ float_frame Mousepad >/dev/null || fail "floating window closed when the store o
 sleep 3; float_frame Mousepad >/dev/null || fail "program exited after the store opened"
 shot 10b-store-with-floating-app
 
-stamp "floating over another Android app (Settings)"
-adb shell am start -W -a android.settings.SETTINGS >/dev/null; sleep 4
+stamp "floating over another Android app (Phone dialer)"
+other_app; sleep 4
 float_frame Mousepad >/dev/null || fail "floating window hidden by another app"
-shot 10c-floating-over-settings-app
+shot 10c-floating-over-another-app
 
 stamp "minimise to the edge bubble, restore from it"
 F=$(float_frame Mousepad); read L T R B <<<"$F"
@@ -291,7 +295,7 @@ read BL BT BR BB <<<"$(win_frame 'Hatch bubble')" || fail "bubble missing"
 adb logcat -c; adb shell input tap $(( (BL + BR) / 2 )) $(( (BT + BB) / 2 )); sleep 2
 tap_target "bubble-menu ▢  Mousepad" bubble || fail "bubble menu has no Mousepad"; sleep 2
 float_frame Mousepad >/dev/null || fail "Mousepad not restored from bubble"
-adb shell am start -W -a android.settings.SETTINGS >/dev/null; sleep 3
+other_app; sleep 3
 adb logcat -c
 adb shell monkey -p dev.hatch.app.galculator -c android.intent.category.LAUNCHER 1 >/dev/null
 for i in $(seq 1 60); do float_frame Calculator >/dev/null && break; sleep 2; done
@@ -300,8 +304,8 @@ sleep 6
 GF=$(float_frame Calculator); MF=$(float_frame Mousepad) || fail "mousepad window gone when galculator opened"
 stamp "two floating windows: Mousepad [$MF] Galculator [$GF]"
 [ "$GF" != "$MF" ] || fail "windows not cascaded"
-adb shell dumpsys activity activities | grep -m1 -E 'topResumedActivity' | grep -q settings && stamp "Settings is the resumed app underneath" || stamp "WARN: Settings not on top underneath"
-shot P2-two-windows-over-settings
+adb shell dumpsys activity activities | grep -m1 -E 'topResumedActivity' | grep -qiE 'dialer|contacts|phone' && stamp "Phone app is the resumed app underneath" || stamp "WARN: Phone app not on top underneath"
+shot P2-two-windows-over-another-app
 
 stamp "P3: store opened while both windows float"
 adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 4
