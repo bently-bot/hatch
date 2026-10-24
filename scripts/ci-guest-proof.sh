@@ -102,17 +102,10 @@ capture() { # name seconds harness-opts... -- cmd...
 }
 title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm) echo "Xwayland";; *) echo "";; esac; }
 
-wine_diag() { # Wine arm64: works in a real chroot, aborts under proot → symbolised backtrace + other proot builds
+wine_diag() { # Wine arm64: works in a real chroot, aborts under proot → symbolised backtrace
   "${G[@]}" bash -c "/usr/local/bin/hatch-install-app --wine >/tmp/wd.log 2>&1; tail -2 /tmp/wd.log; apt-get install -y -qq gdb debuginfod libc6-dbg >/dev/null 2>&1; true"
-  echo "### gdb + debuginfod bt under proot"
-  timeout 600 "${G[@]}" bash -c "export DEBUGINFOD_URLS=https://debuginfod.debian.net; P=/root/pfx-g\$RANDOM; WINEPREFIX=\$P gdb -q -batch -ex 'set debuginfod enabled on' -ex 'set pagination off' -ex run -ex 'bt 30' -ex 'frame 4' -ex 'info locals' --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | grep -v '^\[\|Download' | tail -60" || true
-  echo "### MALLOC_CHECK_ via libc_malloc_debug"
-  timeout 120 "${G[@]}" bash -c "P=/root/pfx-m\$RANDOM; WINEPREFIX=\$P LD_PRELOAD=libc_malloc_debug.so.0 MALLOC_CHECK_=3 /usr/lib/wine/wine64 cmd /c echo MALLOCDBG-OK 2>&1 | tail -5" || true
-  for v in v5.4.0 v5.3.0; do
-    echo "### upstream proot $v static"
-    curl -fsSL -o "$WORK/proot-$v" "https://github.com/proot-me/proot/releases/download/$v/proot-$v-aarch64-static" && chmod +x "$WORK/proot-$v" || { echo "no download"; continue; }
-    PROOT="$WORK/proot-$v" HATCH_L2S=0 timeout 180 bash "$ROOT/scripts/guest-run.sh" bash -c "unset DISPLAY; P=/root/pfx-u\$RANDOM; WINEPREFIX=\$P WINEDEBUG=-all wine cmd /c echo UPSTREAM-OK 2>&1 | tail -4" || echo "rc=$?"
-  done
+  echo "### gdb (rootfs bound at its host path so gdb can read symbols) bt under proot"
+  HATCH_EXTRA_BINDS="$HATCH_ROOTFS:$HATCH_ROOTFS" timeout 900 "${G[@]}" bash -c "export DEBUGINFOD_URLS=https://debuginfod.debian.net; P=/root/pfx-g\$RANDOM; WINEPREFIX=\$P gdb -q -batch -iex 'set debuginfod enabled on' -ex 'set pagination off' -ex run -ex 'bt 40' -ex 'frame function free' -ex 'up' -ex 'info locals' -ex 'up' -ex 'info locals' --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | grep -v '^\[\|Download\|^$' | tail -90" || true
 }
 
 FAILED=()

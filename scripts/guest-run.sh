@@ -8,6 +8,7 @@ L2S="$R/.l2s"; mkdir -p "$L2S" "${HATCH_PTMP:=/tmp/hatch-ptmp}"
 binds=(-b /dev -b /proc -b /sys -b "$L2S:$L2S")
 [ -d /dev/pts ] && binds+=(-b /dev/pts)
 if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR" ]; then binds+=(-b "$XDG_RUNTIME_DIR:/run/hatch"); fi
+for b in ${HATCH_EXTRA_BINDS:-}; do binds+=(-b "$b"); done
 export PROOT_TMP_DIR="$HATCH_PTMP" PROOT_L2S_DIR="$L2S"
 # The app's bundled (Termux) proot needs -l (+PROOT_L2S_DIR) because Android forbids hard links in app data.
 # Stock distro proot's link2symlink ignores PROOT_L2S_DIR and corrupts dpkg's status on re-link, and
