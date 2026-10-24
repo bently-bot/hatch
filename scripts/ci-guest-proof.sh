@@ -102,15 +102,8 @@ capture() { # name seconds harness-opts... -- cmd...
 }
 title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm) echo "Xwayland";; *) echo "";; esac; }
 
-wine_diag() { # Wine arm64: works in a real chroot, aborts under proot → symbolised backtrace
-  "${G[@]}" bash -c "/usr/local/bin/hatch-install-app --wine >/tmp/wd.log 2>&1; tail -2 /tmp/wd.log; apt-get install -y -qq gdb debuginfod libc6-dbg >/dev/null 2>&1; true"
-  echo "### gdb (rootfs bound at its host path so gdb can read symbols) bt under proot"
-  HATCH_EXTRA_BINDS="$HATCH_ROOTFS:$HATCH_ROOTFS" timeout 900 "${G[@]}" bash -c "export DEBUGINFOD_URLS=https://debuginfod.debian.net; P=/root/pfx-g\$RANDOM; WINEPREFIX=\$P gdb -q -batch -iex 'set debuginfod enabled on' -ex 'set pagination off' -ex run -ex 'bt 40' -ex 'frame function free' -ex 'up' -ex 'info locals' -ex 'up' -ex 'info locals' --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | grep -v '^\[\|Download\|^$' | tail -90" || true
-}
-
 FAILED=()
 for app in $APPS; do
-  if [ "$app" = winediag ]; then wine_diag; continue; fi
   stamp "== install $app =="
   if ! "${G[@]}" bash -c "$(python3 scripts/catalogue-args.py install "$app") > /tmp/hatch-install-$app.log 2>&1; rc=\$?; tail -5 /tmp/hatch-install-$app.log; exit \$rc"; then
     echo "install $app FAILED"; FAILED+=("$app"); continue

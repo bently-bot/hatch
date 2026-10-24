@@ -70,24 +70,6 @@ jobs:
             harness-out/*.png
             harness-out/*.log
 
-  wine-arm64-diag:
-    timeout-minutes: 30
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/rootfs.tar.xz
-          key: rootfs-${{ hashFiles('app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt') }}
-      - name: Wine arm64 diagnostics
-        env:
-          APPS: winediag
-        run: bash scripts/ci-guest-proof.sh
-
   android-assemble:
     timeout-minutes: 35
     runs-on: ubuntu-latest

@@ -65,7 +65,7 @@ object LinuxRuntime {
             "LOGNAME" to user,
             "LANG" to "C.UTF-8",
             "PATH" to "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games",
-            "TMPDIR" to "/tmp",
+            // No TMPDIR: /tmp is the default anyway, and Debian's wine 10 crashes (frees getenv("TMPDIR")) when it is set.
             "DEBIAN_FRONTEND" to "noninteractive",
             "XDG_RUNTIME_DIR" to "/run/hatch",
             "WAYLAND_DISPLAY" to "wayland-0",

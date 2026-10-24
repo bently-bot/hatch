@@ -18,7 +18,7 @@ l2s=(); [ "${HATCH_L2S:-0}" = 1 ] && l2s=(-l)
 if [ "${HATCH_AS_USER:-0}" = 1 ]; then id=(-i 1000:1000); H=/home/hatch; U=hatch; else id=(-0); H=/root; U=root; fi
 exec "$PROOT" "${id[@]}" "${l2s[@]}" -r "$R" "${binds[@]}" -w "$H" \
   /usr/bin/env -i \
-  HOME=$H USER=$U LOGNAME=$U LANG=C.UTF-8 TERM=xterm-256color TMPDIR=/tmp \
+  HOME=$H USER=$U LOGNAME=$U LANG=C.UTF-8 TERM=xterm-256color \
   PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games \
   DEBIAN_FRONTEND=noninteractive \
   XDG_RUNTIME_DIR=/run/hatch WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
