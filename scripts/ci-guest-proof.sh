@@ -121,6 +121,9 @@ for app in $APPS; do
   else
     FAILED+=("$app")
   fi
+  # Runner disk is small: drop downloaded .debs between apps (Electron apps are ~150 MB each).
+  "${G[@]}" bash -c 'apt-get clean >/dev/null 2>&1; rm -rf /var/cache/apt/archives/partial/* /tmp/hatch-dl-* 2>/dev/null; true' || true
+  df -h / | tail -1 | awk '{print "disk free: "$4}'
 done
 
 if [[ " $APPS " == *" mousepad "* ]]; then
