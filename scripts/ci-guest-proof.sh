@@ -95,8 +95,26 @@ capture() { # name seconds harness-opts... -- cmd...
 }
 title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm) echo "Xwayland";; *) echo "";; esac; }
 
+wine_diag() { # Wine arm64 diagnostics: proot variants vs a real (sudo) chroot of the same rootfs
+  "${G[@]}" bash -c "/usr/local/bin/hatch-install-app --wine >/tmp/wd.log 2>&1; tail -3 /tmp/wd.log; apt-get install -y -qq gdb file >/dev/null 2>&1; true"
+  local W='export WINEDEBUG=err+all,warn+module WINEDLLOVERRIDES="mscoree,mshtml="; unset DISPLAY; '
+  local T='ls -la /usr/lib/wine /usr/lib/aarch64-linux-gnu/wine 2>&1 | head -20; file -L /usr/bin/wine /usr/lib/wine/wine* 2>&1 | head; getconf PAGESIZE; uname -a'
+  echo "### info"; "${G[@]}" bash -c "$T" || true
+  for variant in "l2s HATCH_L2S=1" "nol2s HATCH_L2S=0" "noseccomp PROOT_NO_SECCOMP=1"; do
+    set -- $variant; echo "### proot $1"
+    env "$2" timeout 120 "${G[@]}" bash -c "$W rm -rf /tmp/pfx-$1; WINEPREFIX=/tmp/pfx-$1 wine cmd /c echo HATCH-WINE-OK 2>&1 | tail -25" || echo "rc=$?"
+  done
+  echo "### sudo chroot (no proot)"
+  for d in proc sys dev dev/pts; do sudo mount --bind /$d "$HATCH_ROOTFS/$d" || true; done
+  sudo timeout 180 chroot "$HATCH_ROOTFS" /usr/bin/env -i HOME=/root PATH=/usr/local/bin:/usr/bin:/bin bash -c "$W rm -rf /tmp/pfx-c; WINEPREFIX=/tmp/pfx-c wine cmd /c echo HATCH-WINE-OK 2>&1 | tail -25" || echo "rc=$?"
+  echo "### gdb in chroot"
+  sudo timeout 180 chroot "$HATCH_ROOTFS" /usr/bin/env -i HOME=/root PATH=/usr/local/bin:/usr/bin:/bin bash -c "rm -rf /tmp/pfx-g; WINEPREFIX=/tmp/pfx-g gdb -q -batch -ex 'set follow-fork-mode child' -ex run -ex bt --args /usr/lib/wine/wine cmd /c echo hi 2>&1 | tail -40" || true
+  for d in dev/pts dev sys proc; do sudo umount "$HATCH_ROOTFS/$d" 2>/dev/null || true; done
+}
+
 FAILED=()
 for app in $APPS; do
+  if [ "$app" = winediag ]; then wine_diag; continue; fi
   stamp "== install $app =="
   if ! "${G[@]}" bash -c "$(python3 scripts/catalogue-args.py install "$app") > /tmp/hatch-install-$app.log 2>&1; rc=\$?; tail -5 /tmp/hatch-install-$app.log; exit \$rc"; then
     echo "install $app FAILED"; FAILED+=("$app"); continue
@@ -105,7 +123,8 @@ for app in $APPS; do
   LAUNCH=$(python3 scripts/catalogue-args.py launch "$app")
   T=$(title_for "$app"); topt=(); [ -n "$T" ] && topt=(--title="$T")
   secs=90; [ "$app" = notepadpp ] && secs=420
-  if capture "$app" "$secs" "${topt[@]}" --settle=3000 -- "${G[@]}" bash -c "$LAUNCH" && png_ok "$PROOF/$app.png"; then
+  minu=12; [ "$app" = xterm ] && minu=2   # xterm's core bitmap font really is 2 colours
+  if capture "$app" "$secs" "${topt[@]}" --settle=3000 -- "${G[@]}" bash -c "$LAUNCH" && png_ok "$PROOF/$app.png" "$minu"; then
     stamp "$app OK"
   else
     FAILED+=("$app")
