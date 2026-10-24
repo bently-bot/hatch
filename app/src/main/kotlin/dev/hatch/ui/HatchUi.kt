@@ -83,7 +83,11 @@ fun sourceOf(app: StoreApp): SourceInfo = when (app.source) {
     "vendor" -> SourceInfo("Vendor", Color(0xFF6FD6C2), app.vendorName.ifEmpty { "Vendor repository" },
         "${app.vendorName.ifEmpty { "Vendor" }} repository",
         "Native $deviceArch build from ${app.vendorName.ifEmpty { "the vendor" }}'s signed repository: the vendor's own build, which updates with Update all.")
-    "winget", "release" -> SourceInfo("Release", Color(0xFFFFB68A), "Windows · Wine", "Official release",
+    "release" -> if (app.wine) SourceInfo("Release", Color(0xFFFFB68A), "Windows · Wine", "Official release",
+        "The developer's own $deviceArch Windows release, run with Wine. Updates with Update all.")
+        else SourceInfo("Release", Color(0xFFFFB68A), "GitHub release", "Developer's release",
+        "Native $deviceArch build from the developer's GitHub release (AppImage, verified by checksum).")
+    "winget" -> SourceInfo("Release", Color(0xFFFFB68A), "Windows · Wine", "Official release",
         "The developer's own $deviceArch Windows release, run with Wine. Updates with Update all.")
     else -> SourceInfo("Debian", HatchPurple, "Debian 13", "Debian 13",
         "Native $deviceArch build from Debian's signed archive. Updates with Update all.")

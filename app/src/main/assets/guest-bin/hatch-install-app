@@ -82,6 +82,11 @@ if [ -n "$URL" ]; then
   fi
   case "$URL" in
     *.zip) unzip -qo "$TMP" -d "$DEST" ;;
+    *.appimage|*.AppImage)
+      # No FUSE on Android: unpack the AppImage once (its own runtime does this) and run AppRun from the tree.
+      chmod +x "$TMP"; rm -rf "$DEST/app" "$DEST/squashfs-root"
+      ( cd "$DEST" && "$TMP" --appimage-extract >/dev/null ) || { echo "hatch: could not unpack the AppImage" >&2; rm -f "$TMP"; exit 4; }
+      mv "$DEST/squashfs-root" "$DEST/app"; chmod -R a+rX "$DEST/app" ;;
     *.tar.*|*.tgz) tar -xf "$TMP" -C "$DEST" ;;
     *) cp "$TMP" "$DEST/" ;;
   esac
