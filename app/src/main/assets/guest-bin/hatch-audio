@@ -1,0 +1,20 @@
+#!/bin/sh
+# Shared guest sound server (foreground). Apps → PulseAudio null sink "hatch" → its monitor streamed as raw
+# s16le/48 kHz/stereo on 127.0.0.1:$HATCH_AUDIO_PORT → Hatch's Android AudioTrack bridge.
+# Apps reach it over tcp:127.0.0.1:47141 (every app's proot shares the app's network; /run/hatch is per app).
+command -v pulseaudio >/dev/null 2>&1 || { echo "hatch-audio: pulseaudio not installed"; exit 0; }
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/hatch}"
+PORT="${HATCH_AUDIO_PORT:-47140}"; NPORT="${HATCH_PULSE_PORT:-47141}"
+mkdir -p "$XDG_RUNTIME_DIR/pulse" "$HOME/.config/pulse"
+if PULSE_SERVER="tcp:127.0.0.1:$NPORT" pactl info >/dev/null 2>&1; then echo "hatch-audio: already running"; exit 0; fi
+rm -f "$XDG_RUNTIME_DIR/pulse/native" "$XDG_RUNTIME_DIR/pulse/pid"
+CFG=/tmp/hatch-pulse-$(id -u).pa
+cat > "$CFG" <<PA
+load-module module-native-protocol-unix auth-anonymous=1 socket=$XDG_RUNTIME_DIR/pulse/native
+load-module module-native-protocol-tcp auth-anonymous=1 listen=127.0.0.1 port=$NPORT
+load-module module-null-sink sink_name=hatch rate=48000 channels=2 sink_properties=device.description=Hatch
+set-default-sink hatch
+load-module module-simple-protocol-tcp source=hatch.monitor record=true playback=false port=$PORT listen=127.0.0.1 rate=48000 format=s16le channels=2
+PA
+echo "hatch-audio: starting pulseaudio (tcp 127.0.0.1:$PORT)"
+exec pulseaudio --daemonize=no --exit-idle-time=-1 -n -F "$CFG" --disable-shm=yes --realtime=no --high-priority=no --log-target=stderr --log-level=error

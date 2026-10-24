@@ -15,6 +15,9 @@ done
 export DEBIAN_FRONTEND=noninteractive
 if [ "$WINE" = 1 ]; then PKGS="$PKGS wine wine64 libwine fonts-wine"; fi
 if [ -n "$URL" ]; then PKGS="$PKGS curl ca-certificates unzip"; fi
+# Sound: one shared PulseAudio (hatch-audio) for every app; ALSA-only apps go through the pulse plugin.
+command -v pulseaudio >/dev/null 2>&1 || PKGS="$PKGS pulseaudio pulseaudio-utils libasound2-plugins"
+[ -f /etc/asound.conf ] || printf 'pcm.!default { type pulse }\nctl.!default { type pulse }\n' > /etc/asound.conf
 # Xwayland aborts without libEGL (it probes glamor even when it falls back to shm)
 case " $PKGS " in *" xwayland "*) PKGS="$PKGS libegl1 libgl1-mesa-dri xfonts-base matchbox-window-manager" ;; esac
 PKGS=$(echo $PKGS | tr ' ' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ' ')

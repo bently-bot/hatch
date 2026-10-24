@@ -1,6 +1,3 @@
 #!/bin/sh
-if [ -S "${XDG_RUNTIME_DIR:-/tmp}/pulse/native" ]; then
-  export PULSE_SERVER="unix:${XDG_RUNTIME_DIR}/pulse/native"
-elif [ -n "${HATCH_PULSE_HOST:-}" ]; then
-  export PULSE_SERVER="$HATCH_PULSE_HOST"
-fi
+# Sourced by hatch-launch: point PulseAudio (and ALSA-via-pulse) clients at the shared hatch-audio server.
+export PULSE_SERVER="${HATCH_PULSE_HOST:-tcp:127.0.0.1:47141}"

@@ -21,6 +21,7 @@ object AppSession {
     ): Boolean {
         stop(appId)
         Log.i(TAG, "start $appId: $command")
+        runCatching { dev.hatch.audio.AudioBridge.ensure(context, waylandHostDir) }.onFailure { Log.w(TAG, "audio: ${it.message}") }
         val s = LinuxRuntime.spawn(
             context,
             command,

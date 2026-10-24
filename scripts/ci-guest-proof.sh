@@ -155,6 +155,33 @@ if [[ " $APPS " == *" mousepad "* ]]; then
   else grep 'clipboard\[' "$PROOF/clipboard-host.log" || true; FAILED+=(clipboard); fi
 fi
 
+stamp "== audio: guest app → shared PulseAudio → raw PCM on 127.0.0.1:47140 (what AudioBridge plays) =="
+python3 - "$R/tmp/hatch-sine.wav" <<'PY'
+import sys, wave, math, struct
+w = wave.open(sys.argv[1], "wb"); w.setnchannels(2); w.setsampwidth(2); w.setframerate(48000)
+w.writeframes(b"".join(struct.pack("<hh", v, v) for v in (int(12000 * math.sin(2 * math.pi * 440 * i / 48000)) for i in range(96000))))
+PY
+mkdir -p "$WORK/xdg-audio" "$WORK/xdg-other"
+XDG_RUNTIME_DIR="$WORK/xdg-audio" timeout 60 "${GU[@]}" /usr/local/bin/hatch-audio > "$PROOF/audio-server.log" 2>&1 &
+sleep 5
+python3 - > "$PROOF/audio-host.log" 2>&1 <<'PY' &
+import socket, time, array
+s = socket.create_connection(("127.0.0.1", 47140), timeout=20); buf = b""; t = time.time()
+while time.time() - t < 8:
+    try: d = s.recv(65536)
+    except socket.timeout: break
+    if not d: break
+    buf += d
+a = array.array("h"); a.frombytes(buf[:len(buf) // 2 * 2])
+print(f"host received {len(buf)} bytes, peak={max(map(abs, a), default=0)}")
+PY
+sleep 1
+XDG_RUNTIME_DIR="$WORK/xdg-other" timeout 30 "${GU[@]}" bash -c '. /usr/local/bin/hatch-audio-env; paplay /tmp/hatch-sine.wav; echo paplay rc=$?' || true
+wait %2 2>/dev/null || sleep 8
+cat "$PROOF/audio-server.log" "$PROOF/audio-host.log"
+peak=$(grep -o 'peak=[0-9]*' "$PROOF/audio-host.log" | cut -d= -f2)
+if [ "${peak:-0}" -gt 5000 ]; then stamp "audio OK (peak $peak)"; else FAILED+=(audio); fi
+
 stamp "done; failed: ${FAILED[*]:-none}"
 hard=()
 for f in "${FAILED[@]:-}"; do [ -n "$f" ] && [[ " $SOFT_APPS " != *" $f "* ]] && hard+=("$f"); done
