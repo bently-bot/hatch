@@ -29,6 +29,7 @@ class Seat(val server: WaylandServer) {
 
     private fun enterKeyboard(s: SurfaceRes) {
         keyboardSurface = s
+        server.clipboard.keyboardEntering(s.client)
         for (seat in seats) if (seat.client === s.client) { seat.keyboard?.enter(s); seat.keyboard?.modifiers() }
         for (ti in server.textInputs) if (ti.client === s.client) ti.enter(s)
     }

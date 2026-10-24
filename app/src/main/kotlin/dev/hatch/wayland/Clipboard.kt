@@ -17,7 +17,10 @@ class Clipboard(val server: WaylandServer) {
         if (source?.client === c) { source = null; broadcast() }
     }
 
-    fun addDevice(d: DataDeviceRes) { devices.add(d); offerTo(d) }
+    /** Spec: selection goes only to the keyboard-focused client (and right before wl_keyboard.enter). */
+    fun addDevice(d: DataDeviceRes) { devices.add(d); if (isFocused(d.client)) offerTo(d) }
+    fun keyboardEntering(c: Client) { for (d in devices.toList()) if (d.alive && d.client === c) offerTo(d) }
+    private fun isFocused(c: Client) = server.seat.keyboardSurface?.client === c
     fun removeDevice(d: DataDeviceRes) { devices.remove(d) }
 
     fun mimes(): List<String> = source?.mimes?.toList()
@@ -63,7 +66,7 @@ class Clipboard(val server: WaylandServer) {
             .apply { isDaemon = true; start() }
     }
 
-    private fun broadcast() { for (d in devices.toList()) if (d.alive) offerTo(d) }
+    private fun broadcast() { for (d in devices.toList()) if (d.alive && isFocused(d.client)) offerTo(d) }
 
     private fun offerTo(d: DataDeviceRes) {
         val m = mimes()

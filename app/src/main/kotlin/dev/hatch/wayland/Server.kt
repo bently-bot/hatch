@@ -193,6 +193,7 @@ class Client(val server: WaylandServer, val fd: Int, val appTag: String) {
             if (size < 8) { postError(1, 1, "bad size"); return }
             if (inLen - pos < size) break
             val target = objects[obj]
+            if (TRACE) server.host.log("rq ${target?.iface ?: "?"}#$obj op=$op size=$size")
             if (target == null || !target.alive) {
             } else {
                 try {
@@ -211,6 +212,8 @@ class Client(val server: WaylandServer, val fd: Int, val appTag: String) {
             inLen -= pos
         }
     }
+
+    companion object { val TRACE: Boolean = runCatching { System.getProperty("hatch.trace") == "1" }.getOrDefault(false) }
 
     fun postError(obj: Int, code: Int, msg: String) {
         server.host.log("protocol error to client: obj=$obj code=$code $msg")
