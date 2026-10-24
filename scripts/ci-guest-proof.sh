@@ -13,11 +13,24 @@ t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
 
 if [ "${SKIP_HOST_DEPS:-0}" != 1 ]; then
   sudo apt-get update -qq
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc proot curl xz-utils python3-pil unzip
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make libtalloc-dev curl xz-utils python3-pil unzip
   curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
   sudo unzip -qo /tmp/kotlin.zip -d /opt
   export PATH="/opt/kotlinc/bin:$PATH"
 fi
+# Termux's proot fork (same code as the app's libproot.so; Ubuntu's arm64 proot 5.1.0 segfaults on 6.x kernels)
+if [ -z "${PROOT:-}" ]; then
+  PROOT_SHA=b27d81a68d765f3462e807f4a14e01a03f8e89ea
+  if [ ! -x "$WORK/proot-src/src/proot" ]; then
+    stamp "build termux/proot $PROOT_SHA"
+    rm -rf "$WORK/proot-src"; git init -q "$WORK/proot-src"
+    git -C "$WORK/proot-src" fetch -q --depth 1 https://github.com/termux/proot "$PROOT_SHA"
+    git -C "$WORK/proot-src" checkout -q FETCH_HEAD
+    make -C "$WORK/proot-src/src" -j"$(nproc)" proot >/dev/null 2>&1 || make -C "$WORK/proot-src/src" proot
+  fi
+  export PROOT="$WORK/proot-src/src/proot"
+fi
+export HATCH_L2S="${HATCH_L2S:-1}"   # termux proot honours PROOT_L2S_DIR, like on the phone
 KLIB="$(dirname "$(dirname "$(readlink -f "$(command -v kotlinc)")")")/lib"
 stamp "build compositor harness"
 gcc -shared -fPIC -O2 -DHATCH_HOST -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
@@ -43,7 +56,8 @@ if [ ! -f "$HATCH_ROOTFS/etc/os-release" ]; then
 fi
 # Mirror GuestConfig.apply
 R="$HATCH_ROOTFS"
-printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > "$R/etc/resolv.conf" 2>/dev/null || { rm -f "$R/etc/resolv.conf"; printf 'nameserver 1.1.1.1\n' > "$R/etc/resolv.conf"; }
+chmod -R u+w "$R/etc" 2>/dev/null || true
+rm -f "$R/etc/resolv.conf"; printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > "$R/etc/resolv.conf"
 printf '127.0.0.1 localhost\n::1 localhost\n' > "$R/etc/hosts"
 mkdir -p "$R/etc/apt/apt.conf.d" "$R/etc/dpkg/dpkg.cfg.d" "$R/run/hatch" "$R/tmp" "$R/root" "$R/usr/local/bin"
 printf 'APT::Sandbox::User "root";\nAcquire::Retries "3";\nAPT::Install-Recommends "false";\nAcquire::Languages "none";\n' > "$R/etc/apt/apt.conf.d/99hatch"
