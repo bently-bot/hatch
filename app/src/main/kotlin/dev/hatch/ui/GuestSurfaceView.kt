@@ -128,8 +128,14 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
     }
 
     @SuppressLint("ClickableViewAccessibility")
+    /** Uptime of the last finger tap in this view: the IME auto-shows only right after the user taps a text field. */
+    var lastTouchAt = 0L; private set
+    val recentlyTouched get() = android.os.SystemClock.uptimeMillis() - lastTouchAt < 1500
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) onTouchDown?.invoke()
+        if (event.actionMasked == MotionEvent.ACTION_UP && !event.isFromSource(InputDevice.SOURCE_MOUSE))
+            lastTouchAt = android.os.SystemClock.uptimeMillis()
         if (toplevel == null) return super.onTouchEvent(event)
         if (event.isFromSource(InputDevice.SOURCE_MOUSE)) return onMouse(event)
         val x = event.x.toInt(); val y = event.y.toInt()

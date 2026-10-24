@@ -175,7 +175,7 @@ class WindowActivity : ComponentActivity(), HatchRuntime.WindowSlot {
         if (boundWindow == null) finishAndRemoveTask()
     }
 
-    override fun textInput(enabled: Boolean) = runOnUiThread { if (enabled) surfaceView?.showKeyboard() }
+    override fun textInput(enabled: Boolean) = runOnUiThread { if (enabled && surfaceView?.recentlyTouched == true) surfaceView?.showKeyboard() }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)

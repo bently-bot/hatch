@@ -297,7 +297,8 @@ class FloatingWindow(
 
     override fun guestExited() { main.post { if (boundWindow == null) dismiss() } }
 
-    override fun textInput(enabled: Boolean) { if (enabled) main.post { takeFocus(); sv.showKeyboard() } }
+    // Text fields focused at window open don't pop the keyboard over the desktop; a tap into one does (⌨ always works).
+    override fun textInput(enabled: Boolean) { if (enabled) main.post { if (sv.recentlyTouched) { takeFocus(); sv.showKeyboard() } } }
 
     companion object {
         private const val TAG = "HatchFloat"

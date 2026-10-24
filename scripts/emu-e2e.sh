@@ -177,9 +177,10 @@ shot 08b-floating-over-home
 read L T R B <<<"$F"; SH=$(( (B - T) / 60 ))   # shadow ~10dp, handle 26dp; approx via density
 D=$(adb shell wm density | grep -o '[0-9]*' | tail -1); dp() { echo $(( $1 * D / 160 )); }
 HX=$(( (L + R) / 2 )); HY=$(( T + $(dp 10) + $(dp 13) ))
-adb shell input swipe $HX $HY $((HX - 60)) $((HY + 300)) 600; sleep 2
+# Drag up-left (keeps the whole window on screen, so the resize corner stays reachable on any profile).
+adb shell input swipe $HX $HY $((HX - 60)) $((HY - 200)) 600; sleep 2
 F2=$(float_frame Mousepad); stamp "after drag-move: $F2"; read L2 T2 R2 B2 <<<"$F2"
-[ $((T2 - T)) -gt 150 ] || fail "drag on the handle did not move the window ($F → $F2)"
+[ $((T - T2)) -gt 150 ] || fail "drag on the handle did not move the window ($F → $F2)"
 CX=$(( R2 - $(dp 10) - $(dp 8) )); CY=$(( B2 - $(dp 10) - $(dp 8) ))
 adb shell input swipe $CX $CY $((CX - 200)) $((CY - 250)) 700; sleep 3
 F3=$(float_frame Mousepad); stamp "after corner resize: $F3"; read L3 T3 R3 B3 <<<"$F3"
