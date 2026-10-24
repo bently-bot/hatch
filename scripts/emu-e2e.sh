@@ -11,7 +11,7 @@ UI="python3 $ROOT/scripts/ui.py"
 t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
 # Foldables have several displays: screencap prefixes a warning, so keep only the bytes from the PNG signature on.
 shot() { adb exec-out screencap -p | python3 -c 'import sys; b=sys.stdin.buffer.read(); sys.stdout.buffer.write(b[b.find(b"\x89PNG"):])' > "$OUT/$1.png"; stamp "screenshot $1 ($(stat -c%s "$OUT/$1.png") bytes)"; }
-fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s HatchRuntime HatchSetup HatchInstall HatchStub HatchWindow HatchSession HatchGuest HatchAudio AndroidRuntime:E > "$OUT/logcat.txt" 2>&1; tail -60 "$OUT/logcat.txt"; exit 1; }
+fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s HatchRuntime HatchSetup HatchInstall HatchStub HatchWindow HatchSession HatchGuest HatchAudio HatchFloat AndroidRuntime:E > "$OUT/logcat.txt" 2>&1; tail -60 "$OUT/logcat.txt"; exit 1; }
 
 # Hide the soft keyboard only if it's showing (BACK with no IME would leave Hatch, e.g. on large screens).
 hide_ime() { for k in 1 2 3; do adb shell dumpsys input_method | grep -q 'mInputShown=true' || return 0; adb shell input keyevent 4; sleep 1; done; }

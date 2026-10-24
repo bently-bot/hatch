@@ -116,7 +116,7 @@ class FloatingWindow(
         controls = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             background = GradientDrawable().apply { setColor(Color.argb(235, 0x33, 0x33, 0x3a)); cornerRadius = dp(18f).toFloat() }
-            elevation = dp(6f).toFloat(); setPadding(dp(6f), 0, dp(6f), 0); visibility = View.GONE
+            elevation = dp(12f).toFloat(); setPadding(dp(6f), 0, dp(6f), 0); visibility = View.GONE   // above the card (8dp): touch dispatch follows Z
             addView(button("—", "Minimise") { minimise() })
             addView(button("⤢", "Maximise") { toggleMaximise() })
             addView(button("⌨", "Keyboard") { takeFocus(); sv.toggleKeyboard() })
@@ -197,10 +197,31 @@ class FloatingWindow(
 
     private fun corner(left: Boolean) = View(ctx).apply {
         contentDescription = if (left) "Resize (bottom left)" else "Resize (bottom right)"
+        // Above the card's 8dp elevation: ViewGroups dispatch touches by Z, so a lower corner never got them.
+        // No background → no outline → no shadow; just a subtle diagonal grip like a desktop window's.
+        elevation = dp(10f).toFloat()
+        background = object : android.graphics.drawable.Drawable() {
+            private val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0x66808080; strokeWidth = dp(1.5f).toFloat(); strokeCap = android.graphics.Paint.Cap.ROUND
+            }
+            override fun draw(c: android.graphics.Canvas) {
+                val b = bounds; val m = dp(6f).toFloat()
+                for (k in 1..3) {
+                    val o = k * dp(5f).toFloat()
+                    if (left) c.drawLine(b.left + m, b.bottom - m - o, b.left + m + o, b.bottom - m, p)
+                    else c.drawLine(b.right - m - o, b.bottom - m, b.right - m, b.bottom - m - o, p)
+                }
+            }
+            override fun setAlpha(a: Int) {}
+            override fun setColorFilter(cf: android.graphics.ColorFilter?) {}
+            @Deprecated("") override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
+        }
+        outlineProvider = null
         var sx = 0f; var sy = 0f; var start = bounds()
         setOnTouchListener { _, e ->
             when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { sx = e.rawX; sy = e.rawY; start = bounds(); maximised = false }
+                MotionEvent.ACTION_DOWN -> { sx = e.rawX; sy = e.rawY; start = bounds(); maximised = false; Log.i(TAG, "resize start '$label' $start") }
+                MotionEvent.ACTION_UP -> Log.i(TAG, "resize end '$label' ${bounds()}")
                 MotionEvent.ACTION_MOVE -> apply(FloatGeometry.resizeCorner(start, (e.rawX - sx).toInt(), (e.rawY - sy).toInt(), left, minW, minH))
             }
             true
