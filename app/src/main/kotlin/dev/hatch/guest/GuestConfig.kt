@@ -21,15 +21,36 @@ object GuestConfig {
             .filterIsInstance<Inet4Address>().mapNotNull { it.hostAddress }
     }.getOrDefault(emptyList())
 
+    /** Hosts the guest must reach for installs; resolved with Android's resolver and pinned in /etc/hosts. */
+    val PINNED_HOSTS = listOf(
+        "deb.debian.org", "security.debian.org",
+        "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com",
+    )
+
+    /**
+     * /etc/hosts with the Debian mirrors pinned to addresses Android resolved just now. Guest DNS (plain UDP to the
+     * device/public resolvers) can be blocked — e.g. Samsung "Private DNS" or captive networks — but Android's own
+     * resolver always works for the app, so installs never depend on guest DNS. Call off the main thread.
+     */
+    fun hostsFile(): String = buildString {
+        append("127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback\n")
+        for (h in PINNED_HOSTS) runCatching {
+            java.net.InetAddress.getAllByName(h).filterIsInstance<Inet4Address>().take(2)
+                .forEach { append("${it.hostAddress} $h # hatch-pinned\n") }
+        }.onFailure { Log.w(TAG, "resolve $h: ${it.message}") }
+    }
+
     fun refreshDns(context: Context) {
         if (!LinuxRuntime.rootfsLooksComplete(context)) return
-        write(File(LinuxRuntime.rootfsDir(context), "etc/resolv.conf"), resolvConf(context))
+        val root = LinuxRuntime.rootfsDir(context)
+        write(File(root, "etc/resolv.conf"), resolvConf(context))
+        write(File(root, "etc/hosts"), hostsFile())
     }
 
     fun apply(context: Context) {
         val root = LinuxRuntime.rootfsDir(context)
         write(File(root, "etc/resolv.conf"), resolvConf(context))
-        write(File(root, "etc/hosts"), "127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback\n")
+        write(File(root, "etc/hosts"), hostsFile())
         write(
             File(root, "etc/apt/sources.list"),
             """
@@ -76,6 +97,8 @@ object GuestConfig {
     private fun write(file: File, text: String) {
         runCatching {
             file.parentFile?.mkdirs()
+            // rootfs files can be read-only or symlinks (resolv.conf → systemd stub); replace, don't write through
+            if (java.nio.file.Files.isSymbolicLink(file.toPath()) || (file.exists() && !file.canWrite())) file.delete()
             file.writeText(text)
         }.onFailure { Log.w(TAG, "write ${file.path}: ${it.message}") }
     }

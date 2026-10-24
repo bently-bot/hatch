@@ -12,6 +12,18 @@ t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; stamp "screenshot $1 ($(stat -c%s "$OUT/$1.png") bytes)"; }
 fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s HatchRuntime HatchSetup HatchInstall HatchStub HatchWindow HatchSession AndroidRuntime:E > "$OUT/logcat.txt" 2>&1; tail -60 "$OUT/logcat.txt"; exit 1; }
 
+# Run a shell snippet inside the app's guest (debug APK → run-as), mirroring LinuxRuntime's proot argv/env.
+guest() {
+  local lib; lib=$(adb shell pm dump dev.hatch | grep -m1 'legacyNativeLibraryDir=' | cut -d= -f2 | tr -d '\r')/x86_64
+  printf '%s\n' "$1" | adb shell "run-as dev.hatch sh -c 'cat > files/linux/tmp/hatch-probe.sh'"
+  adb shell "run-as dev.hatch sh -c 'cd /data/data/dev.hatch/files && LD_LIBRARY_PATH=$lib PROOT_LOADER=$lib/libproot_loader.so PROOT_TMP_DIR=/data/data/dev.hatch/files/tmp PROOT_L2S_DIR=/data/data/dev.hatch/files/linux/.l2s $lib/libproot.so -0 -l -r /data/data/dev.hatch/files/linux -b /dev -b /proc -b /sys -b /data/data/dev.hatch/files/linux/.l2s -w /root /bin/sh /tmp/hatch-probe.sh'" 2>&1
+}
+guest_probe() {
+  stamp "guest probe:"
+  adb shell "run-as dev.hatch cat files/linux/etc/resolv.conf files/linux/etc/hosts" 2>&1 | sed 's/^/  /'
+  guest 'getent hosts deb.debian.org; getent hosts google.com || echo GUEST-DNS-FAIL; getent ahostsv4 example.org | head -2' | sed 's/^/  /' | head -10
+}
+
 adb wait-for-device
 for i in $(seq 1 90); do [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ] && break; sleep 2; done
 adb shell settings put global package_verifier_enable 0 || true
@@ -28,7 +40,17 @@ $UI wait 'Download & set up' 60 || fail "no setup screen"
 shot 01-first-run
 $UI tap 'Download & set up' || fail "tap setup"
 sleep 20; shot 02-setup-progress
-$UI wait 'Search apps' 1500 || fail "setup did not reach store"
+# First run: download rootfs + apt; log what the setup screen says every minute so a slow/failed step is visible.
+ok=0
+for i in $(seq 1 25); do
+  if $UI wait 'Search apps' 60 >/dev/null 2>&1; then ok=1; break; fi
+  stamp "setup still running ($i min): $($UI dump 2>/dev/null | grep dev.hatch | cut -d: -f2- | tr '\n' '|' | cut -c1-300)"
+  [ $((i % 5)) -eq 0 ] && shot "02-setup-${i}min"
+done
+adb logcat -d -s HatchSetup HatchGuest > "$OUT/setup-logcat.txt" 2>&1 || true
+stamp "setup log: $(grep -c . "$OUT/setup-logcat.txt") lines; $(grep -cE 'Temporary failure|Could not resolve' "$OUT/setup-logcat.txt") DNS errors"
+guest_probe
+[ $ok = 1 ] || fail "setup did not reach store"
 shot 03-store
 
 stamp "search + install $APP"

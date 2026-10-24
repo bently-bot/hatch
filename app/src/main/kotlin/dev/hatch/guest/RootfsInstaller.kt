@@ -44,6 +44,7 @@ object RootfsInstaller {
 
     private fun logLine(line: String) {
         val t = line.trim(); if (t.isEmpty()) return
+        android.util.Log.i(TAG, t)
         if (t.startsWith("(Reading database")) return
         _log.value = (_log.value + t).takeLast(300)
     }
@@ -80,13 +81,16 @@ object RootfsInstaller {
             logLine("Configured apt, DNS, dpkg")
             File(LinuxRuntime.rootfsDir(context), "run/hatch").mkdirs()
             _stage.value = Stage.Working("Updating package lists")
-            LinuxRuntime.run(context, "apt-get update 2>&1", timeoutMs = 300_000, onLine = ::logLine)
+            val upd = LinuxRuntime.run(context, "apt-get update 2>&1", timeoutMs = 300_000, onLine = ::logLine)
+            if (upd == null || !upd.ok || upd.stdout.contains("Temporary failure resolving") || upd.stdout.contains("Could not resolve"))
+                return@withContext fail("Could not reach the Debian mirrors — check your internet connection and retry")
             _stage.value = Stage.Working("Installing base packages")
-            Apt.install(
+            val base = Apt.install(
                 context,
                 listOf("ca-certificates", "curl", "xz-utils", "libwayland-client0", "libwayland-cursor0", "libxkbcommon0", "fontconfig", "fonts-dejavu-core"),
                 ::logLine,
             )
+            if (!base) return@withContext fail("Installing base packages failed — retry")
             LinuxRuntime.markInstalled(context)
             LinuxRuntime.notifyInstallChanged()
             logLine("Runtime ready")
