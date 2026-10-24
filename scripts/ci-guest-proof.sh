@@ -133,7 +133,7 @@ if [ "${GPU_PROXY:-0}" = 1 ]; then
   stamp "== GPU path proxy: GL → Zink → Vulkan (lavapipe for Turnip) → sw WSI → Hatch compositor =="
   "${G[@]}" bash -c 'DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends mesa-vulkan-drivers mesa-utils libvulkan1 >/tmp/gpu-apt.log 2>&1; tail -1 /tmp/gpu-apt.log; ls /usr/share/vulkan/icd.d/'
   LVP=$("${G[@]}" bash -c 'ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -1' | tr -d '\r')
-  ZENV="LIBGL_ALWAYS_SOFTWARE=0 GALLIUM_DRIVER=zink MESA_LOADER_DRIVER_OVERRIDE=zink VK_ICD_FILENAMES=$LVP VK_DRIVER_FILES=$LVP MESA_VK_WSI_DEBUG=sw LIBGL_KOPPER_DRI2=1 HATCH_GPU=1"
+  ZENV="LIBGL_ALWAYS_SOFTWARE=0 GALLIUM_DRIVER=zink MESA_LOADER_DRIVER_OVERRIDE=zink VK_ICD_FILENAMES=$LVP VK_DRIVER_FILES=$LVP MESA_VK_WSI_DEBUG=sw LIBGL_KOPPER_DRI2=1 D3D_ALWAYS_SOFTWARE=1 HATCH_GPU=1"  # D3D_ALWAYS_SOFTWARE: proxy only, lets Zink accept the CPU Vulkan device
   SENV="LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe MESA_LOADER_DRIVER_OVERRIDE=llvmpipe"
   cat > "$HATCH_ROOTFS/tmp/hatch-fps.py" <<'PY'
 import bpy, time
