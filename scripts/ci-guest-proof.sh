@@ -126,6 +126,39 @@ for app in $APPS; do
   df -h / | tail -1 | awk '{print "disk free: "$4}'
 done
 
+if [ "${GPU_PROXY:-0}" = 1 ]; then
+  # Same GL stack the app uses on Adreno (Gpu.env(true): Zink → Vulkan → MESA_VK_WSI_DEBUG=sw present into Hatch),
+  # with lavapipe standing in for Turnip/KGSL, which only exists on Qualcomm hardware.
+  stamp "== GPU path proxy: GL → Zink → Vulkan (lavapipe for Turnip) → sw WSI → Hatch compositor =="
+  "${G[@]}" bash -c 'DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends mesa-vulkan-drivers mesa-utils libvulkan1 >/tmp/gpu-apt.log 2>&1; tail -1 /tmp/gpu-apt.log; ls /usr/share/vulkan/icd.d/'
+  LVP=$("${G[@]}" bash -c 'ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -1' | tr -d '\r')
+  ZENV="LIBGL_ALWAYS_SOFTWARE=0 GALLIUM_DRIVER=zink MESA_LOADER_DRIVER_OVERRIDE=zink VK_ICD_FILENAMES=$LVP VK_DRIVER_FILES=$LVP MESA_VK_WSI_DEBUG=sw HATCH_GPU=1"
+  SENV="LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe MESA_LOADER_DRIVER_OVERRIDE=llvmpipe"
+  cat > "$HATCH_ROOTFS/tmp/hatch-fps.py" <<'PY'
+import bpy, time
+def bench():
+    w = bpy.context.window_manager.windows[0]
+    area = next(a for a in w.screen.areas if a.type == "VIEW_3D")
+    with bpy.context.temp_override(window=w, area=area):
+        bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=3)
+        t = time.time(); n = 30
+        bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=n)
+        dt = time.time() - t
+    import gpu
+    print(f"HATCH-FPS renderer={gpu.platform.renderer_get()} viewport_fps={n/dt:.1f} ms_per_frame={1000*dt/n:.1f}", flush=True)
+bpy.app.timers.register(bench, first_interval=25)
+PY
+  for v in llvmpipe zink; do
+    E=$SENV; [ $v = zink ] && E=$ZENV
+    if capture "gpu-glxgears-$v" 60 --title=Xwayland --settle=15000 -- "${GU[@]}" bash -c "env $E glxinfo -B 2>&1 | grep -E 'renderer|version string'; env $E hatch-x11 timeout 40 glxgears -info 2>&1 | grep -E 'GL_RENDERER|frames in' "; then :; fi
+    grep -E 'renderer string|GL_RENDERER|frames in' "$PROOF/gpu-glxgears-$v-client.log" | tail -4 | sed "s/^/  [$v] /" || true
+    if capture "gpu-blender-$v" 300 --title=Xwayland --settle=60000 -- "${GU[@]}" bash -c "env $E hatch-x11 blender --python /tmp/hatch-fps.py"; then :; fi
+    grep -h 'HATCH-FPS' "$PROOF/gpu-blender-$v-client.log" | sed "s/^/  [$v] /" || stamp "WARN: no Blender FPS line for $v"
+  done
+  grep -q 'renderer string: zink' "$PROOF/gpu-glxgears-zink-client.log" && stamp "GPU proxy OK: GL runs on Zink over Vulkan, presented through Hatch" \
+    || { stamp "GPU proxy FAILED: Zink not active"; FAILED+=(gpu-proxy-zink); }
+fi
+
 if [[ " $APPS " == *" mousepad "* ]]; then
   stamp "== mousepad input inject =="
   if capture mousepad-inject 90 --title=Mousepad --inject -- "${GU[@]}" bash -c "$(python3 scripts/catalogue-args.py launch mousepad)" && png_ok "$PROOF/mousepad-inject.png"; then

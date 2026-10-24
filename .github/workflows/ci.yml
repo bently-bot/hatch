@@ -73,6 +73,7 @@ jobs:
           PROOF_DIR: harness-out
           APPS: mousepad galculator gnome-mines xterm featherpad gnome-chess notepadpp blender cursor brave-browser org.darktable.Darktable
           TURNIP_TAR: ${{ runner.temp }}/turnip/turnip.tar.xz
+          GPU_PROXY: "1"
         run: bash scripts/ci-guest-proof.sh
       - uses: actions/upload-artifact@v4
         if: always()
