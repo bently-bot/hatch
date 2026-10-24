@@ -54,3 +54,4 @@ Proof locations: proofs/ci-arm64/*, proofs/emu/*, proofs/local/*. "Fold-8-only" 
 - [ ] F2 Steam needs i386 libs: armhf multiarch for Box86, or an x86 rootfs for FEX. Prototype in the arm64 CI guest (proot), install `steam-installer`/the bootstrap, reach the login window.
 - [ ] F3 Store entry "Steam (Experimental)" with source badge "Experimental", own install script (hatch-install-app --emu box64|fex), floating window like any app.
 - [ ] F4 Verify on device (Fold 8); document the limits (anti-cheat, Proton under emulation = slow).
+- [ ] Re-add HDRView (GitHub-release AppImage): renders in CI after other apps, but on a fresh rootfs its first frame never commits; deps + ENOSYS fixed, root cause open.
