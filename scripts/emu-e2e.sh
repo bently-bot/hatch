@@ -11,7 +11,7 @@ UI="python3 $ROOT/scripts/ui.py"
 t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
 # Foldables have several displays: screencap prefixes a warning, so keep only the bytes from the PNG signature on.
 shot() { adb exec-out screencap -p | python3 -c 'import sys; b=sys.stdin.buffer.read(); sys.stdout.buffer.write(b[b.find(b"\x89PNG"):])' > "$OUT/$1.png"; stamp "screenshot $1 ($(stat -c%s "$OUT/$1.png") bytes)"; }
-fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s HatchRuntime HatchSetup HatchInstall HatchStub HatchWindow HatchSession HatchGuest HatchAudio HatchFloat AndroidRuntime:E > "$OUT/logcat.txt" 2>&1; tail -60 "$OUT/logcat.txt"; exit 1; }
+fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s HatchRuntime HatchSetup HatchInstall HatchStub HatchWindow HatchSession HatchGuest HatchAudio HatchFloat AndroidRuntime:E > "$OUT/logcat.txt" 2>&1; tail -60 "$OUT/logcat.txt"; adb logcat -d -b crash > "$OUT/crash.txt" 2>&1; adb logcat -d -b main,system | grep -E 'DEBUG|libc|dev\.hatch.*(died|Kill)|lowmemorykiller|ANR in' | tail -80 > "$OUT/am.txt" 2>&1; head -40 "$OUT/crash.txt"; exit 1; }
 
 # Hide the soft keyboard only if it's showing (BACK with no IME would leave Hatch, e.g. on large screens).
 hide_ime() { for k in 1 2 3; do adb shell dumpsys input_method | grep -q 'mInputShown=true' || return 0; adb shell input keyevent 4; sleep 1; done; }
@@ -183,7 +183,7 @@ F2=$(float_frame Mousepad); stamp "after drag-move: $F2"; read L2 T2 R2 B2 <<<"$
 [ $((T - T2)) -gt 150 ] || fail "drag on the handle did not move the window ($F → $F2)"
 CX=$(( R2 - $(dp 10) - $(dp 8) )); CY=$(( B2 - $(dp 10) - $(dp 8) ))
 adb shell input swipe $CX $CY $((CX - 200)) $((CY - 250)) 700; sleep 3
-F3=$(float_frame Mousepad); stamp "after corner resize: $F3"; read L3 T3 R3 B3 <<<"$F3"
+F3=$(float_frame Mousepad) || fail "floating window vanished after corner resize"; stamp "after corner resize: $F3"; read L3 T3 R3 B3 <<<"$F3"
 [ $(( (R2 - L2) - (R3 - L3) )) -gt 100 ] && [ $(( (B2 - T2) - (B3 - T3) )) -gt 100 ] || fail "corner drag did not resize ($F2 → $F3)"
 shot 08c-floating-moved-resized
 adb logcat -d -s HatchWindow | grep 'bound target' | tail -2

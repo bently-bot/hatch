@@ -76,7 +76,8 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
         if (!surf.isValid || surfaceW <= 0 || surfaceH <= 0) return
         val t = Native.targetForSurface(surf, surfaceW, surfaceH)
         if (t == 0L) { Log.e(TAG, "targetForSurface failed"); return }
-        if (target != 0L && target != t) Native.targetRelease(target)
+        // The Toplevel releases the previous target on the compositor thread once it stops drawing into it;
+        // releasing it here as well was a double free that killed Hatch mid-resize.
         target = t
         w.attachTarget(t, surfaceW, surfaceH)
         Log.i(TAG, "bound target ${surfaceW}x${surfaceH} for '${w.title}'")
