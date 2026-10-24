@@ -69,6 +69,9 @@ object LinuxRuntime {
             "DEBIAN_FRONTEND" to "noninteractive",
             "XDG_RUNTIME_DIR" to "/run/hatch",
             "WAYLAND_DISPLAY" to "wayland-0",
+            // Chromium/Electron (Cursor, VS Code, Brave) pick their Ozone backend from this; without it they try X11.
+            "XDG_SESSION_TYPE" to "wayland",
+            "ELECTRON_OZONE_PLATFORM_HINT" to "auto",
             "GDK_BACKEND" to "wayland",
             "QT_QPA_PLATFORM" to "wayland",
             "SDL_VIDEODRIVER" to "wayland",

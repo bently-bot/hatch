@@ -15,6 +15,8 @@ done
 case ":$PATH:" in *:/usr/games:*) ;; *) export PATH="$PATH:/usr/games" ;; esac
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/hatch}"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+# Chromium/Electron choose Wayland vs X11 from the session type.
+export XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-wayland}" ELECTRON_OZONE_PLATFORM_HINT="${ELECTRON_OZONE_PLATFORM_HINT:-auto}"
 export NO_AT_BRIDGE=1 GTK_A11Y=none
 export GSK_RENDERER="${GSK_RENDERER:-cairo}"
 if [ "$WINE" = 1 ]; then

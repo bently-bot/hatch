@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="hatch_orange">#FF6B2C</color>
-    <color name="hatch_ink">#1A1A1A</color>
+    <color name="hatch_bg">#FF141218</color>
 </resources>

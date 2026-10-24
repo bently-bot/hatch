@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Hatch" parent="android:Theme.Material.Light.NoActionBar"/>
+    <!-- Host app: dark Material 3 UI drawn by Compose; no platform action bar. -->
+    <style name="Theme.Hatch.Main" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/hatch_bg</item>
+        <item name="android:statusBarColor">@color/hatch_bg</item>
+        <item name="android:navigationBarColor">@color/hatch_bg</item>
+    </style>
     <!-- Program windows: no action bar (the app draws its own title/menu; freeform caption shows the task label). -->
     <style name="Theme.Hatch.Window" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>

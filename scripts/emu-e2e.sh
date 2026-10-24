@@ -80,8 +80,12 @@ $UI tap 'Search apps' && adb shell input text "$APP" && sleep 2
 adb shell input keyevent 111 || true   # hide IME
 shot 04-search
 APPNAME=$(python3 -c 'import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])' "$ROOT/catalogue/catalogue.json" "$APP")
+adb shell input keyevent 4 || true; sleep 1   # make sure the soft keyboard is gone before tapping the result
 $UI tap "^$APPNAME\$" dev.hatch || fail "no search result for $APPNAME"
-sleep 2; shot 04b-detail
+sleep 2
+# The first tap can be swallowed while the IME animates away; tap again until the detail page's Install button shows.
+for t in 1 2 3; do $UI has '^Install$' dev.hatch && break; $UI tap "^$APPNAME\$" dev.hatch || true; sleep 2; done
+shot 04b-detail
 $UI tap '^Install$' dev.hatch || fail "no Install button"
 sleep 6; shot 04c-installing
 # PackageInstaller confirmation for the generated stub APK

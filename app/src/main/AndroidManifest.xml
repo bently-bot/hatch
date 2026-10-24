@@ -32,6 +32,7 @@
 
         <activity
             android:name=".ui.MainActivity"
+            android:theme="@style/Theme.Hatch.Main"
             android:exported="true"
             android:resizeableActivity="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboard|keyboardHidden|navigation|uiMode">

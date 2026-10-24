@@ -32,7 +32,7 @@ if [ "${1:-}" = hatch-flatpak-run ]; then
   done < "$SPEC"
   exec "$PROOT" -i 1000:1000 "${l2s[@]}" -r "$froot" "${fb[@]}" -w /home/hatch /usr/bin/env -i \
     HOME=/home/hatch USER=hatch LOGNAME=hatch LANG=C.UTF-8 TERM=xterm-256color \
-    XDG_RUNTIME_DIR=/run/hatch WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" GDK_BACKEND=wayland QT_QPA_PLATFORM=wayland \
+    XDG_RUNTIME_DIR=/run/hatch WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" XDG_SESSION_TYPE=wayland ELECTRON_OZONE_PLATFORM_HINT=auto GDK_BACKEND=wayland QT_QPA_PLATFORM=wayland \
     SDL_VIDEODRIVER=wayland LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
     "${fenv[@]}" "${fcmd[@]}" "$@"
 fi
@@ -41,7 +41,7 @@ exec "$PROOT" "${id[@]}" "${l2s[@]}" -r "$R" "${binds[@]}" -w "$H" \
   HOME=$H USER=$U LOGNAME=$U LANG=C.UTF-8 TERM=xterm-256color \
   PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games \
   DEBIAN_FRONTEND=noninteractive \
-  XDG_RUNTIME_DIR=/run/hatch WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
+  XDG_RUNTIME_DIR=/run/hatch WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" XDG_SESSION_TYPE=wayland ELECTRON_OZONE_PLATFORM_HINT=auto \
   GDK_BACKEND=wayland QT_QPA_PLATFORM=wayland SDL_VIDEODRIVER=wayland \
   WINEPREFIX=$H/.wine LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
   "$@"
