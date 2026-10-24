@@ -36,17 +36,17 @@ class Seat(val server: WaylandServer) {
         if (keyboardSurface === s) keyboardSurface = null
     }
 
-    /** Pointer motion in target pixels of [w]. */
+    /** Pointer motion in target pixels of [w]; routes to the popup under the pointer, if any. */
     fun pointerMotion(w: Toplevel, xPx: Int, yPx: Int) {
         focusWindow(w)
-        val (lx, ly) = w.toLocal(xPx, yPx)
-        pointerX = lx; pointerY = ly
-        if (pointerSurface !== w.surface) {
-            pointerSurface?.let { for (seat in seats) if (seat.client === it.client) seat.pointer?.leave(it) }
-            pointerSurface = w.surface
-            for (seat in seats) if (seat.client === w.client) seat.pointer?.enter(w.surface, lx, ly)
+        val hit = w.hitTest(xPx, yPx)
+        pointerX = hit.x; pointerY = hit.y
+        if (pointerSurface !== hit.surface) {
+            pointerSurface?.let { old -> if (old.alive) for (seat in seats) if (seat.client === old.client) seat.pointer?.leave(old) }
+            pointerSurface = hit.surface
+            for (seat in seats) if (seat.client === hit.surface.client) seat.pointer?.enter(hit.surface, hit.x, hit.y)
         } else {
-            for (seat in seats) if (seat.client === w.client) seat.pointer?.motion(lx, ly)
+            for (seat in seats) if (seat.client === hit.surface.client) seat.pointer?.motion(hit.x, hit.y)
         }
     }
 
@@ -60,9 +60,15 @@ class Seat(val server: WaylandServer) {
             button == 2 -> 0x112
             else -> 0x110 + button
         }
+        // Press outside every open popup dismisses them (xdg_popup grab semantics).
+        if (pressed && w.popups.isNotEmpty() && w.popups.none { it.surface === pointerSurface }) {
+            w.dismissPopups()
+            return
+        }
         val bit = code and 0xff
         if (pressed) buttonsDown = buttonsDown or (1 shl bit) else buttonsDown = buttonsDown and (1 shl bit).inv()
-        for (seat in seats) if (seat.client === w.client)
+        val target = pointerSurface?.takeIf { it.alive } ?: w.surface
+        for (seat in seats) if (seat.client === target.client)
             seat.pointer?.button(code, if (pressed) 1 else 0)
     }
 
@@ -108,14 +114,8 @@ class SeatRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
 
 class PointerRes(c: Client, id: Int, val seat: SeatRes, v: Int) : Res(c, id, v) {
     override val iface = "wl_pointer"
-    /**
-     * Do NOT send wl_pointer.frame for now. Some guest libwayland/GTK stacks
-     * (Debian mousepad via custom ld path; also seen on Ubuntu CI) return
-     * EINVAL from wl_display_read_events when they receive frame (opcode 6),
-     * even at pointer version >= 5. Enter/motion/button without frame work.
-     * Re-enable once we verify guest libwayland >= 1.22 on device + CI.
-     */
-    private fun frameIfNeeded() { /* intentionally empty — see above */ }
+    /** wl_pointer.frame is opcode **5** (an earlier build sent 6 = axis_source, which broke clients). */
+    private fun frameIfNeeded() { if (version >= 5) event(5).end() }
     fun enter(s: SurfaceRes, x: Double, y: Double) {
         event(0).uint(client.server.nextSerial()).obj(s.id).fixed(x).fixed(y).end()
         frameIfNeeded()

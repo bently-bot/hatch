@@ -17,6 +17,14 @@ class Toplevel(val server: WaylandServer, val client: Client, val surface: Surfa
 
     fun hasTarget() = target != 0L
 
+    /** Re-render and read back the target (memory targets; used by the test harness). Server thread only. */
+    fun readPixels(out: IntArray): Boolean {
+        if (target == 0L) return false
+        dirty = true; render()
+        Native.targetRead(target, out)
+        return true
+    }
+
     /** Call from any thread; hops onto the server thread. */
     fun attachTarget(t: Long, w: Int, h: Int) {
         val apply = {
@@ -40,7 +48,9 @@ class Toplevel(val server: WaylandServer, val client: Client, val surface: Surfa
         val h = if (configuredH > 0) configuredH else 0
         if (w == lastSentW && h == lastSentH) return
         lastSentW = w; lastSentH = h
-        val states = if (activated) intArrayOf(4 /* activated */) else intArrayOf()
+        // Each window fills its own Android window: tell clients they're maximized so GTK/Qt drop
+        // client-side shadows and rounded corners (the Android task frame provides the border).
+        val states = if (activated) intArrayOf(1 /* maximized */, 4 /* activated */) else intArrayOf(1)
         xdg?.sendConfigure(w, h, states)
     }
 
@@ -48,12 +58,14 @@ class Toplevel(val server: WaylandServer, val client: Client, val surface: Surfa
         xdgSurface.applyPending()
         if (target != 0L) {
             if (Native.targetBegin(target, 0xff2a2a2a.toInt())) {
-                blitSurface(surface, 0, 0, targetW, targetH)
+                val sc = server.scale
+                // Surface pixels at 1:1 (×scale), shifted so the window geometry (no CSD shadow) starts at 0,0.
+                blitSurface(surface, -geomX() * sc, -geomY() * sc, surface.contentW() * sc, surface.contentH() * sc)
                 for (p in popups.toTypedArray()) {
                     if (!p.surface.alive || p.surface.store == 0L) continue
-                    val px = p.x * server.scale; val py = p.y * server.scale
-                    val pw = p.surface.contentW() * server.scale; val ph = p.surface.contentH() * server.scale
-                    blitSurface(p.surface, px, py, pw, ph)
+                    val (ox, oy) = surfaceOrigin(p.xdgSurface)
+                    blitSurface(p.surface, (ox - geomX()) * sc, (oy - geomY()) * sc,
+                        p.surface.contentW() * sc, p.surface.contentH() * sc)
                 }
                 Native.targetEnd(target)
             }
@@ -90,25 +102,102 @@ class Toplevel(val server: WaylandServer, val client: Client, val surface: Surfa
         xdg?.let { if (it.alive) it.client.destroyRes(it) }
     }
 
-    /** Map target-pixel (x,y) to surface-local logical coords. */
+    fun geomX() = xdgSurface.windowGeometry?.get(0) ?: 0
+    fun geomY() = xdgSurface.windowGeometry?.get(1) ?: 0
+
+    /** Top-left of [xdg]'s surface in this toplevel's surface-local logical coordinates. */
+    fun surfaceOrigin(xdg: XdgSurfaceRes, depth: Int = 0): Pair<Int, Int> {
+        if (xdg === xdgSurface || depth > 16) return 0 to 0
+        val p = popups.firstOrNull { it.xdgSurface === xdg } ?: return 0 to 0
+        val (px, py) = surfaceOrigin(p.parentXdg, depth + 1)
+        val pg = p.parentXdg.windowGeometry; val g = p.xdgSurface.windowGeometry
+        return (px + (pg?.get(0) ?: 0) + p.x - (g?.get(0) ?: 0)) to (py + (pg?.get(1) ?: 0) + p.y - (g?.get(1) ?: 0))
+    }
+
+    class Hit(val surface: SurfaceRes, val x: Double, val y: Double, val popup: Popup?)
+
+    /** Which surface is under target pixel (x,y)? Topmost popup first, else the toplevel. */
+    fun hitTest(xPx: Int, yPx: Int): Hit {
+        val lx = xPx.toDouble() / server.scale + geomX(); val ly = yPx.toDouble() / server.scale + geomY()
+        for (p in popups.asReversed()) {
+            if (!p.surface.alive) continue
+            val (ox, oy) = surfaceOrigin(p.xdgSurface)
+            val w = p.surface.contentW(); val h = p.surface.contentH()
+            if (lx >= ox && ly >= oy && lx < ox + w && ly < oy + h) return Hit(p.surface, lx - ox, ly - oy, p)
+        }
+        return Hit(surface, lx, ly, null)
+    }
+
+    /** Map target-pixel (x,y) to surface-local logical coords of the toplevel surface. */
     fun toLocal(x: Int, y: Int): Pair<Double, Double> =
-        Pair(x.toDouble() / server.scale, y.toDouble() / server.scale)
+        Pair(x.toDouble() / server.scale + geomX(), y.toDouble() / server.scale + geomY())
+
+    /** Dismiss every popup (outside click / focus loss). */
+    fun dismissPopups() {
+        for (p in popups.toTypedArray().reversed()) (p.xdgSurface.role as? XdgPopupRes)?.sendPopupDone()
+    }
 }
 
 class Popup(
     val server: WaylandServer, val client: Client, val surface: SurfaceRes,
-    val xdgSurface: XdgSurfaceRes, val parentXdg: XdgSurfaceRes, pos: XdgPositionerRes
+    val xdgSurface: XdgSurfaceRes, val parentXdg: XdgSurfaceRes, pos: XdgPositionerRes,
+    val root: Toplevel?,
 ) {
-    var x = pos.ax + pos.ox; var y = pos.ay + pos.oy
+    var x = 0; var y = 0
     var w = pos.w; var h = pos.h
+    init { place(pos) }
+
+    /** xdg_positioner placement: anchor point on the anchor rect, gravity, offset, then keep it on-window. */
+    fun place(pos: XdgPositionerRes) {
+        w = pos.w; h = pos.h
+        val r = PopupPlacement.place(pos.ax, pos.ay, pos.aw, pos.ah, pos.anchor, pos.gravity, pos.ox, pos.oy, w, h)
+        x = r.first; y = r.second
+        val tl = root ?: return
+        val bw = tl.xdgSurface.windowGeometry?.get(2)?.takeIf { it > 0 } ?: tl.configuredW
+        val bh = tl.xdgSurface.windowGeometry?.get(3)?.takeIf { it > 0 } ?: tl.configuredH
+        if (bw <= 0 || bh <= 0) return
+        // parent geometry origin, in root-geometry coordinates
+        val (po, poy) = tl.surfaceOrigin(parentXdg)
+        val pg = parentXdg.windowGeometry
+        val baseX = po + (pg?.get(0) ?: 0) - tl.geomX(); val baseY = poy + (pg?.get(1) ?: 0) - tl.geomY()
+        val c = PopupPlacement.constrain(baseX + x, baseY + y, w, h, bw, bh, pos.ax + baseX, pos.ay + baseY, pos.aw, pos.ah, pos.constraint)
+        x = c.first - baseX; y = c.second - baseY
+    }
     fun sendConfigure() {
         (xdgSurface.role as? XdgPopupRes)?.sendConfigure(x, y, w, h)
-        parentXdg.toplevel()?.dirty = true
+        root?.dirty = true
     }
     fun destroy() {
-        parentXdg.toplevel()?.popups?.remove(this)
-        parentXdg.toplevel()?.dirty = true
+        root?.popups?.remove(this)
+        root?.dirty = true
         if (surface.role is SurfaceRes.Role.PopupRole) surface.role = null
         (xdgSurface.role as? XdgPopupRes)?.let { if (it.alive) it.client.destroyRes(it) }
+    }
+}
+
+/** Pure placement maths (unit-tested). */
+object PopupPlacement {
+    private fun hx(e: Int) = when (e) { 3, 5, 6 -> -1; 4, 7, 8 -> 1; else -> 0 }  // left / right
+    private fun vy(e: Int) = when (e) { 1, 5, 7 -> -1; 2, 6, 8 -> 1; else -> 0 }  // top / bottom
+
+    fun place(ax: Int, ay: Int, aw: Int, ah: Int, anchor: Int, gravity: Int, ox: Int, oy: Int, w: Int, h: Int): Pair<Int, Int> {
+        val px = when (hx(anchor)) { -1 -> ax; 1 -> ax + aw; else -> ax + aw / 2 }
+        val py = when (vy(anchor)) { -1 -> ay; 1 -> ay + ah; else -> ay + ah / 2 }
+        val x = when (hx(gravity)) { -1 -> px - w; 1 -> px; else -> px - w / 2 }
+        val y = when (vy(gravity)) { -1 -> py - h; 1 -> py; else -> py - h / 2 }
+        return (x + ox) to (y + oy)
+    }
+
+    /** Flip (if allowed and it helps) then slide so the popup stays inside a bw×bh window. */
+    fun constrain(x0: Int, y0: Int, w: Int, h: Int, bw: Int, bh: Int, ax: Int, ay: Int, aw: Int, ah: Int, constraint: Int): Pair<Int, Int> {
+        var x = x0; var y = y0
+        if (y + h > bh && constraint and 8 != 0 && ay - h >= 0) y = ay - h          // flip_y above the anchor
+        if (x + w > bw && constraint and 4 != 0 && ax + aw - w >= 0) x = ax + aw - w // flip_x
+        // slide (always: a popup off a phone screen is useless)
+        if (x + w > bw) x = bw - w
+        if (y + h > bh) y = bh - h
+        if (x < 0) x = 0
+        if (y < 0) y = 0
+        return x to y
     }
 }

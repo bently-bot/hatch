@@ -12,6 +12,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -x /usr/local/bin/hatch-audio-env ] && . /usr/local/bin/hatch-audio-env || true
+case ":$PATH:" in *:/usr/games:*) ;; *) export PATH="$PATH:/usr/games" ;; esac
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/hatch}"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
 export NO_AT_BRIDGE=1 GTK_A11Y=none

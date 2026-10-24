@@ -92,7 +92,7 @@ capture() { # name seconds harness-opts... -- cmd...
   [ $rc -eq 0 ] || { echo "--- $name client log ---"; tail -30 "$PROOF/$name-client.log" 2>/dev/null || true; }
   return $rc
 }
-title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm) echo "";; *) echo "";; esac; }
+title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm) echo "Xwayland";; *) echo "";; esac; }
 
 FAILED=()
 for app in $APPS; do
@@ -115,6 +115,26 @@ if [[ " $APPS " == *" mousepad "* ]]; then
   stamp "== mousepad input inject =="
   if capture mousepad-inject 90 --title=Mousepad --inject -- "${G[@]}" bash -c "$(python3 scripts/catalogue-args.py launch mousepad)" && png_ok "$PROOF/mousepad-inject.png"; then
     stamp "inject OK"; else FAILED+=(mousepad-inject); fi
+fi
+
+if [[ " $APPS " == *" mousepad "* ]]; then
+  stamp "== mousepad menu (xdg_popup) + hover + dismiss + typing =="
+  rm -f "$PROOF"/mousepad-menu*.png
+  if JAVA_TOOL_OPTIONS="-Dhatch.inject=script -Dhatch.script=s:before;c:19,48;w:1500;s:open;m:40,103;w:800;s:hover;c:900,600;w:1000;s:dismissed;c:640,400;k:35,23;w:1000" \
+     capture mousepad-menu 90 --title=Mousepad --settle=2000 --inject -- "${G[@]}" bash -c "$(python3 scripts/catalogue-args.py launch mousepad)" \
+     && python3 - "$PROOF" <<'PY'
+import sys
+from PIL import Image, ImageChops
+d = sys.argv[1]
+im = {k: Image.open(f"{d}/mousepad-menu-{k}.png").convert("RGB") for k in ("before", "open", "hover", "dismissed")}
+im["final"] = Image.open(f"{d}/mousepad-menu.png").convert("RGB")
+def diff(a, b): return ImageChops.difference(im[a], im[b]).getbbox()
+checks = {"menu opened": diff("before", "open"), "hover highlight": diff("open", "hover"),
+          "dismissed": diff("hover", "dismissed"), "typed": diff("dismissed", "final")}
+for k, v in checks.items(): print(f"{k}: {v}")
+sys.exit(0 if all(checks.values()) else 1)
+PY
+  then stamp "menu OK"; else FAILED+=(mousepad-menu); fi
 fi
 
 stamp "done; failed: ${FAILED[*]:-none}"

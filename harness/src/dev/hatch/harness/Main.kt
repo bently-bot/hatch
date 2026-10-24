@@ -5,6 +5,17 @@ import java.io.File
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 
+fun savePng(px: IntArray, f: File) {
+    val img = BufferedImage(1280, 800, BufferedImage.TYPE_INT_ARGB)
+    for (i in px.indices) {
+        val v = px[i]
+        val r = v and 0xff; val g = (v shr 8) and 0xff; val b = (v shr 16) and 0xff; val a = (v shr 24) and 0xff
+        img.setRGB(i % 1280, i / 1280, (a shl 24) or (r shl 16) or (g shl 8) or b)
+    }
+    ImageIO.write(img, "png", f)
+    println("[host] wrote $f")
+}
+
 fun main(args: Array<String>) {
     if (args.size < 4) {
         System.err.println("usage: Main <socket-dir> <png> <seconds> [--inject] -- <cmd...>")
@@ -88,7 +99,31 @@ fun main(args: Array<String>) {
         if (inject && !injected) {
             injected = true
             val mode = System.getProperty("hatch.inject", "all")
-            server.call(1000) {
+            if (mode == "script") {
+                // -Dhatch.script="m:x,y;c:x,y;k:30,31;w:500;s:name" (move, click, keys, wait ms, snapshot)
+                for (step in System.getProperty("hatch.script", "").split(';').filter { it.isNotBlank() }) {
+                    val op = step.substringBefore(':'); val arg = step.substringAfter(':')
+                    when (op) {
+                        "w" -> Thread.sleep(arg.toLong())
+                        "s" -> { // intermediate snapshot
+                            val px0 = IntArray(1280 * 800)
+                            if (server.call(2000) { w.readPixels(px0) } == true) savePng(px0, File(png.parentFile, "${png.nameWithoutExtension}-$arg.png"))
+                        }
+                        else -> {
+                            val n = arg.split(',').map { it.trim().toInt() }
+                            server.call(1000) {
+                                when (op) {
+                                    "m" -> server.seat.pointerMotion(w, n[0], n[1])
+                                    "c" -> { server.seat.pointerMotion(w, n[0], n[1]); server.seat.pointerButton(w, 0, true); server.seat.pointerButton(w, 0, false) }
+                                    "k" -> for (k in n) { server.seat.key(w, k, true); server.seat.key(w, k, false) }
+                                }
+                                true
+                            }
+                            Thread.sleep(150)
+                        }
+                    }
+                }
+            } else server.call(1000) {
                 when (mode) {
                     "enter" -> server.seat.pointerMotion(w, 640, 400)
                     "click" -> {
@@ -119,21 +154,8 @@ fun main(args: Array<String>) {
 
         val img = BufferedImage(1280, 800, BufferedImage.TYPE_INT_ARGB)
         val px = IntArray(1280 * 800)
-        val ok = server.call(2000) {
-            val t = Native.targetMemory(1280, 800)
-            Native.targetBegin(t, 0xff2a2a2a.toInt())
-            if (w.surface.store != 0L)
-                Native.targetBlit(t, w.surface.store, 0, 0, w.surface.storeW, w.surface.storeH, 0, 0, w.surface.storeW, w.surface.storeH, w.surface.opaque)
-            for (p in w.popups) {
-                val s = p.surface
-                if (s.store != 0L)
-                    Native.targetBlit(t, s.store, p.x, p.y, s.storeW, s.storeH, 0, 0, s.storeW, s.storeH, s.opaque)
-            }
-            Native.targetEnd(t)
-            Native.targetRead(t, px)
-            Native.targetRelease(t)
-            true
-        } == true
+        // Read back exactly what the app's render path (Toplevel.render) produced.
+        val ok = server.call(2000) { w.readPixels(px) } == true
         if (!ok) { println("[host] blit call failed"); continue }
         var coloured = 0
         for (i in px.indices step 8) if ((px[i] and 0xffffff) != 0x2a2a2a) coloured++

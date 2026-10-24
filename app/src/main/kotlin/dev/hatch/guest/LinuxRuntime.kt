@@ -62,7 +62,7 @@ object LinuxRuntime {
             "USER" to "root",
             "LOGNAME" to "root",
             "LANG" to "C.UTF-8",
-            "PATH" to "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PATH" to "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games",
             "TMPDIR" to "/tmp",
             "DEBIAN_FRONTEND" to "noninteractive",
             "XDG_RUNTIME_DIR" to "/run/hatch",

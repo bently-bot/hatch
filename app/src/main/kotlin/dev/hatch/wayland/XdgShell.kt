@@ -5,11 +5,11 @@ class XdgWmBaseRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
     override fun request(op: Int, a: Args) {
         when (op) {
             0 -> destroy()
-            1 -> client.register(XdgPositionerRes(client, a.newId()))
+            1 -> client.register(XdgPositionerRes(client, a.newId(), version))
             2 -> {
                 val nid = a.newId(); val surface = client.get<SurfaceRes>(a.obj())!!
                 if (surface.role != null) throw ProtocolError(id, 0, "surface already has a role")
-                client.register(XdgSurfaceRes(client, nid, surface))
+                client.register(XdgSurfaceRes(client, nid, surface, version))
             }
             3 -> { /* pong */ a.uint() }
             else -> super.request(op, a)
@@ -17,27 +17,28 @@ class XdgWmBaseRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
     }
 }
 
-class XdgPositionerRes(c: Client, id: Int) : Res(c, id, 1) {
+class XdgPositionerRes(c: Client, id: Int, v: Int = 1) : Res(c, id, v) {
     override val iface = "xdg_positioner"
     var w = 0; var h = 0; var ax = 0; var ay = 0; var aw = 0; var ah = 0
-    var gravity = 0; var constraint = 0; var ox = 0; var oy = 0
+    var anchor = 0; var gravity = 0; var constraint = 0; var ox = 0; var oy = 0
     override fun request(op: Int, a: Args) {
         when (op) {
             0 -> destroy()
             1 -> { w = a.int(); h = a.int() }
             2 -> { ax = a.int(); ay = a.int(); aw = a.int(); ah = a.int() }
-            3 -> a.uint() // anchor
+            3 -> anchor = a.uint()
             4 -> gravity = a.uint()
             5 -> constraint = a.uint()
             6 -> { ox = a.int(); oy = a.int() }
             7 -> {}
-            8 -> a.uint()
+            8 -> { a.int(); a.int() } // set_parent_size
+            9 -> a.uint() // set_parent_configure
             else -> super.request(op, a)
         }
     }
 }
 
-class XdgSurfaceRes(c: Client, id: Int, val surface: SurfaceRes) : Res(c, id, 1) {
+class XdgSurfaceRes(c: Client, id: Int, val surface: SurfaceRes, v: Int = 1) : Res(c, id, v) {
     override val iface = "xdg_surface"
     var role: Any? = null
     private var pendingAck = 0; private var lastConfigure = 0
@@ -51,7 +52,7 @@ class XdgSurfaceRes(c: Client, id: Int, val surface: SurfaceRes) : Res(c, id, 1)
                 val nid = a.newId()
                 if (surface.role != null) throw ProtocolError(id, 0, "surface already has a role")
                 val tl = Toplevel(client.server, client, surface, this)
-                val res = XdgToplevelRes(client, nid, tl)
+                val res = XdgToplevelRes(client, nid, tl, version)
                 client.register(res); role = res
                 surface.role = SurfaceRes.Role.ToplevelRole(tl)
                 client.server.windows.add(tl)
@@ -61,11 +62,12 @@ class XdgSurfaceRes(c: Client, id: Int, val surface: SurfaceRes) : Res(c, id, 1)
             2 -> {
                 val nid = a.newId(); val parent = client.get<XdgSurfaceRes>(a.obj())!!; val pos = client.get<XdgPositionerRes>(a.obj())!!
                 if (surface.role != null) throw ProtocolError(id, 0, "surface already has a role")
-                val popup = Popup(client.server, client, surface, this, parent, pos)
-                val res = XdgPopupRes(client, nid, popup)
+                val root = parent.rootToplevel()
+                val popup = Popup(client.server, client, surface, this, parent, pos, root)
+                val res = XdgPopupRes(client, nid, popup, version)
                 client.register(res); role = res
                 surface.role = SurfaceRes.Role.PopupRole(popup)
-                parent.toplevel()?.popups?.add(popup)
+                root?.popups?.add(popup)
                 popup.sendConfigure()
             }
             3 -> { // set_window_geometry
@@ -88,6 +90,8 @@ class XdgSurfaceRes(c: Client, id: Int, val surface: SurfaceRes) : Res(c, id, 1)
     }
 
     fun toplevel(): Toplevel? = (role as? XdgToplevelRes)?.tl
+    /** The toplevel this surface ultimately belongs to (walks popup parents). */
+    fun rootToplevel(): Toplevel? = toplevel() ?: (role as? XdgPopupRes)?.popup?.root
     override fun onDestroy() {
         when (val r = role) {
             is XdgToplevelRes -> r.tl.destroyWindow()
@@ -98,7 +102,7 @@ class XdgSurfaceRes(c: Client, id: Int, val surface: SurfaceRes) : Res(c, id, 1)
     }
 }
 
-class XdgToplevelRes(c: Client, id: Int, val tl: Toplevel) : Res(c, id, 1) {
+class XdgToplevelRes(c: Client, id: Int, val tl: Toplevel, v: Int = 1) : Res(c, id, v) {
     override val iface = "xdg_toplevel"
     init { tl.xdg = this }
     override fun request(op: Int, a: Args) {
@@ -128,13 +132,20 @@ class XdgToplevelRes(c: Client, id: Int, val tl: Toplevel) : Res(c, id, 1) {
     }
 }
 
-class XdgPopupRes(c: Client, id: Int, val popup: Popup) : Res(c, id, 1) {
+class XdgPopupRes(c: Client, id: Int, val popup: Popup, v: Int = 1) : Res(c, id, v) {
     override val iface = "xdg_popup"
     override fun request(op: Int, a: Args) {
         when (op) {
             0 -> destroy()
             1 -> { a.obj(); a.obj() /* grab */ }
-            2 -> { a.obj() /* reposition */ }
+            2 -> { // reposition (v3)
+                val pos = client.get<XdgPositionerRes>(a.obj()); val token = a.uint()
+                if (pos != null) {
+                    popup.place(pos)
+                    if (version >= 3) event(2).uint(token).end()
+                    popup.sendConfigure()
+                }
+            }
             else -> super.request(op, a)
         }
     }
@@ -143,4 +154,5 @@ class XdgPopupRes(c: Client, id: Int, val popup: Popup) : Res(c, id, 1) {
         event(0).int(x).int(y).int(w).int(h).end()
         popup.xdgSurface.sendConfigure()
     }
+    fun sendPopupDone() { if (alive) event(1).end() }
 }

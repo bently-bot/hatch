@@ -16,7 +16,7 @@ l2s=(); [ "${HATCH_L2S:-0}" = 1 ] && l2s=(-l)
 exec "$PROOT" -0 "${l2s[@]}" -r "$R" "${binds[@]}" -w /root \
   /usr/bin/env -i \
   HOME=/root USER=root LOGNAME=root LANG=C.UTF-8 TERM=xterm-256color TMPDIR=/tmp \
-  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games \
   DEBIAN_FRONTEND=noninteractive \
   XDG_RUNTIME_DIR=/run/hatch WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
   GDK_BACKEND=wayland QT_QPA_PLATFORM=wayland SDL_VIDEODRIVER=wayland \
