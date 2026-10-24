@@ -46,15 +46,21 @@ if [ -n "$URL" ]; then
   rm -f "$TMP"
 fi
 if [ -n "$DESKTOP" ]; then
-  # X11-only toolkits need the Xwayland stack; native Wayland apps don't.
+  # Per-toolkit extras: Qt needs its Wayland platform plugin; X11-only toolkits / terminal apps need Xwayland.
   F=/usr/share/applications/$DESKTOP
-  BIN=$(awk '/^\[/{g=($0=="[Desktop Entry]")} g&&/^Exec=/{sub(/^Exec=/,"");print $1;exit}' "$F" 2>/dev/null || true)
-  BIN=$(command -v "$BIN" 2>/dev/null || true)
-  if [ -n "$BIN" ] && head -c 4 "$BIN" | grep -q ELF && \
-     ! ldd "$BIN" 2>/dev/null | grep -Eq 'libgtk-3|libgtk-4|libQt5Gui|libQt6Gui|libSDL2|libSDL3|libwayland-client|libKF[56]'; then
-    echo "hatch: $DESKTOP is X11-only → installing Xwayland"
-    apt-get install -y --no-install-recommends xwayland libegl1 libgl1-mesa-dri xfonts-base matchbox-window-manager xterm
+  XSTACK="xwayland libegl1 libgl1-mesa-dri xfonts-base matchbox-window-manager xterm"
+  field() { awk -v k="$1" '/^\[/{g=($0=="[Desktop Entry]")} g&&index($0,k"=")==1{sub(/^[^=]*=/,"");print;exit}' "$F" 2>/dev/null; }
+  BIN=$(field Exec | awk '{print $1}'); BIN=$(command -v "$BIN" 2>/dev/null || true)
+  EXTRA=""
+  if [ "$(field Terminal)" = true ]; then EXTRA="$XSTACK"
+  elif [ -n "$BIN" ] && head -c 4 "$BIN" | grep -q ELF; then
+    LIBS=$(ldd "$BIN" 2>/dev/null || true)
+    case "$LIBS" in *libQt5Gui*) EXTRA="qtwayland5" ;; *libQt6Gui*) EXTRA="qt6-wayland" ;; esac
+    if ! echo "$LIBS" | grep -Eq 'libgtk-3|libgtk-4|libQt5Gui|libQt6Gui|libSDL2|libSDL3|libwayland-client|libKF[56]'; then
+      echo "hatch: $DESKTOP is X11-only → installing Xwayland"; EXTRA="$XSTACK"
+    fi
   fi
+  [ -z "$EXTRA" ] || apt-get install -y --no-install-recommends $EXTRA
 fi
 if [ "$WINE" = 1 ]; then
   echo "hatch: wine prefix will initialise on first launch"
