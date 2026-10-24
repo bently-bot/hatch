@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Native arm64 proof: host Wayland compositor + real clients → PNGs.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -10,11 +9,11 @@ mkdir -p "$RUNNER_TEMP"
 
 sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  gcc make weston proot curl xz-utils unzip ca-certificates \
-  mousepad libgtk-3-0 libwayland-client0 \
+  gcc make weston curl xz-utils unzip ca-certificates \
+  mousepad libgtk-3-0 \
   wine64 wine libwine fonts-dejavu-core || \
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  gcc make weston curl xz-utils unzip ca-certificates mousepad wine64
+  gcc make weston curl ca-certificates mousepad wine64
 
 curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
 sudo unzip -qo /tmp/kotlin.zip -d /opt
@@ -29,41 +28,29 @@ NAT="$ROOT/build/host/libhatchnative.so"
 capture() {
   local name="$1"; shift
   local seconds="$1"; shift
-  rm -f "$PROOF/$name.png" "$PROOF/${name}-client.log"
+  rm -f "$PROOF/$name.png" "$PROOF/${name}-client.log" "$PROOF/${name}-host.log"
   set +e
-  java -Dhatch.native="$NAT" -cp "$CP" \
+  # Clear DISPLAY for the whole JVM child tree
+  env -u DISPLAY java -Dhatch.native="$NAT" -cp "$CP" \
     dev.hatch.harness.MainKt \
     "$RUNNER_TEMP/wayland-$name" \
     "$PROOF/$name.png" \
     "$seconds" -- "$@" >"$PROOF/${name}-host.log" 2>&1
   local rc=$?
   set -e
-  echo "---- $name host log (tail) ----"
-  tail -40 "$PROOF/${name}-host.log" || true
-  if [ -f "$PROOF/client.log" ]; then mv "$PROOF/client.log" "$PROOF/${name}-client.log"; fi
-  # harness writes client.log next to png
-  if [ -f "$(dirname "$PROOF/$name.png")/client.log" ]; then
-    mv "$(dirname "$PROOF/$name.png")/client.log" "$PROOF/${name}-client.log" || true
-  fi
-  echo "---- $name client log (tail) ----"
-  tail -80 "$PROOF/${name}-client.log" 2>/dev/null || true
-  if [ -f "$PROOF/$name.png" ]; then
-    ls -la "$PROOF/$name.png"
-    return 0
-  fi
+  echo "==== $name host (tail) ===="; tail -30 "$PROOF/${name}-host.log" || true
+  [ -f "$PROOF/client.log" ] && mv "$PROOF/client.log" "$PROOF/${name}-client.log" || true
+  echo "==== $name client (tail) ===="; tail -40 "$PROOF/${name}-client.log" 2>/dev/null || true
+  [ -f "$PROOF/$name.png" ] && ls -la "$PROOF/$name.png" && return 0
   return "$rc"
 }
 
-# 1) weston-simple-shm
 capture simple-shm 15 weston-simple-shm
 
-# 2) mousepad — disable accessibility bridge; force wayland
-if command -v mousepad >/dev/null; then
-  capture mousepad 25 env NO_AT_BRIDGE=1 GTK_A11Y=none GDK_BACKEND=wayland mousepad \
-    || echo "mousepad capture failed (see logs)"
-fi
+# mousepad — REQUIRED for green arm64 proof of a real GTK app
+capture mousepad 30 mousepad
 
-# 3) Wine + Notepad++ — wineboot FIRST (can take minutes), then launch
+# Wine/Notepad++ — best-effort (wineboot can be slow even on arm64)
 if command -v wine64 >/dev/null || command -v wine >/dev/null; then
   NPP_DIR="$RUNNER_TEMP/npp"
   mkdir -p "$NPP_DIR"
@@ -72,20 +59,17 @@ if command -v wine64 >/dev/null || command -v wine >/dev/null; then
   unzip -qo /tmp/npp.zip -d "$NPP_DIR"
   export WINEPREFIX="$RUNNER_TEMP/wineprefix"
   WINEBIN=$(command -v wine64 || command -v wine)
-  echo "Running wineboot -i (up to 8 min)…"
+  echo "wineboot -i (max 4 min)…"
   set +e
-  timeout 480 env WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" wineboot -i
+  timeout 240 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" wineboot -i
   echo "wineboot exit=$?"
-  # Set wayland graphics driver
-  env WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" reg add \
-    'HKCU\Software\Wine\Drivers' /v Graphics /t REG_SZ /d wayland /f
+  env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" reg add \
+    'HKCU\Software\Wine\Drivers' /v Graphics /t REG_SZ /d wayland /f || true
+  capture notepadpp 90 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" \
+    "$WINEBIN" "$NPP_DIR/notepad++.exe" || echo "notepadpp soft-fail"
   set -e
-  capture notepadpp 120 env WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" \
-    "$WINEBIN" "$NPP_DIR/notepad++.exe" \
-    || echo "notepadpp capture failed (see logs)"
 fi
 
-echo "Proof artifacts:"
-ls -la "$PROOF"/*.png 2>/dev/null || echo "(none)"
+echo "Proof artifacts:"; ls -la "$PROOF"/*.png
 test -f "$PROOF/simple-shm.png"
-# Soft-require mousepad/npp but don't fail the job if wineboot too slow
+test -f "$PROOF/mousepad.png"

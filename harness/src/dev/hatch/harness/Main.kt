@@ -35,9 +35,16 @@ fun main(args: Array<String>) {
     // Give the listen socket a moment, then spawn the client as a child of this JVM's env
     Thread.sleep(200)
     val pb = ProcessBuilder(cmd)
-    pb.environment()["XDG_RUNTIME_DIR"] = sockDir.absolutePath
+        pb.environment()["XDG_RUNTIME_DIR"] = sockDir.absolutePath
     pb.environment()["WAYLAND_DISPLAY"] = "wayland-0"
-    // pb.environment()["WAYLAND_DEBUG"] = "1"
+    pb.environment()["GDK_BACKEND"] = "wayland"
+    pb.environment()["QT_QPA_PLATFORM"] = "wayland"
+    pb.environment()["SDL_VIDEODRIVER"] = "wayland"
+    pb.environment()["NO_AT_BRIDGE"] = "1"
+    pb.environment()["GTK_A11Y"] = "none"
+    pb.environment().remove("DISPLAY")
+    pb.environment().remove("WAYLAND_DEBUG")
+
     pb.redirectErrorStream(true)
     val logFile = File(png.parent, "client.log")
     pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile))

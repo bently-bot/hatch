@@ -94,19 +94,33 @@ class ShmRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
     }
 }
 
-class ShmPoolRes(c: Client, id: Int, rawFd: Int, val size: Int) : Res(c, id, 1) {
+class ShmPoolRes(c: Client, id: Int, rawFd: Int, initialSize: Int) : Res(c, id, 1) {
     override val iface = "wl_shm_pool"
     val fd: Int = rawFd
-    val ptr: Long = Native.mmap(fd, size)
+    /** Protocol size — must grow on resize or GTK cursor pools fail create_buffer. */
+    var size: Int = initialSize
+        private set
+    var ptr: Long = Native.mmap(fd, initialSize)
+        private set
+    private var mapSize = initialSize
     private var refs = 1 // the pool object itself
     private var destroyed = false
     fun retain() { refs++ }
     fun release() {
         refs--
         if (refs <= 0) {
-            if (ptr != 0L) Native.munmap(ptr, size)
+            if (ptr != 0L) Native.munmap(ptr, mapSize)
             Native.close(fd)
         }
+    }
+    fun resize(newSize: Int) {
+        if (newSize <= size) return
+        // Remap so ptr stays valid for any leftover mmap-based paths; storeCopyFd uses pread(fd).
+        if (ptr != 0L) Native.munmap(ptr, mapSize)
+        size = newSize
+        mapSize = newSize
+        ptr = Native.mmap(fd, newSize)
+        if (ptr == 0L) throw ProtocolError(id, 1, "pool resize mmap failed")
     }
     override fun request(op: Int, a: Args) {
         when (op) {
@@ -118,7 +132,7 @@ class ShmPoolRes(c: Client, id: Int, rawFd: Int, val size: Int) : Res(c, id, 1) 
                 client.register(BufferRes(client, nid, this, offset, w, h, stride, format))
             }
             1 -> destroy()
-            2 -> { a.int() /* resize ignored */ }
+            2 -> resize(a.int())
             else -> super.request(op, a)
         }
     }
@@ -144,8 +158,11 @@ class OutputRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
         event(0).int(0).int(0).int(s.outputWidth * 254 / (96 * s.scale)).int(s.outputHeight * 254 / (96 * s.scale))
             .int(0).string("Hatch").string("Display").int(0).end() // geometry
         event(1).uint(3 /* current|preferred */).int(s.outputWidth).int(s.outputHeight).int(60000).end() // mode
-        if (version >= 2) event(2).int(s.scale).end()
-        event(3).end() // done
+        // wl_output v2+: scale=3, done=2 (done has no args; scale takes factor)
+        if (version >= 2) {
+            event(3).int(s.scale).end() // scale
+            event(2).end() // done
+        }
     }
     override fun request(op: Int, a: Args) { if (op == 0) destroy() else super.request(op, a) }
 }
