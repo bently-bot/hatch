@@ -5,7 +5,7 @@
 # x86_64 KVM emulator: uses the x86_64 Termux proot + amd64 Debian; arm64-only bits are proven on the arm64 runner.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APK="${1:?apk}"; APP="${E2E_APP:-mousepad}"; STUB="dev.hatch.app.${APP//-/_}"
+APK="${1:-$(find "$ROOT/apks" "$ROOT/app/build/outputs" -name app-debug.apk 2>/dev/null | head -1)}"; [ -f "$APK" ] || { echo "no apk"; exit 1; }; echo "Using $APK"; APP="${E2E_APP:-mousepad}"; STUB="dev.hatch.app.${APP//-/_}"
 OUT="${PROOF_DIR:-$ROOT/harness-out/emu}"; mkdir -p "$OUT"
 UI="python3 $ROOT/scripts/ui.py"
 t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
