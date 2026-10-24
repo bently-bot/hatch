@@ -95,27 +95,24 @@ capture() { # name seconds harness-opts... -- cmd...
 }
 title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm) echo "Xwayland";; *) echo "";; esac; }
 
-wine_diag() { # Wine arm64 diagnostics: proot variants vs a real (sudo) chroot of the same rootfs
-  "${G[@]}" bash -c "/usr/local/bin/hatch-install-app --wine >/tmp/wd.log 2>&1; tail -3 /tmp/wd.log; apt-get install -y -qq gdb file >/dev/null 2>&1; true"
-  local W='export WINEDEBUG=err+all,warn+module WINEDLLOVERRIDES="mscoree,mshtml="; unset DISPLAY; '
-  local T='ls -la /usr/lib/wine /usr/lib/aarch64-linux-gnu/wine 2>&1 | head -20; file -L /usr/bin/wine /usr/lib/wine/wine* 2>&1 | head; getconf PAGESIZE; uname -a'
-  echo "### info"; "${G[@]}" bash -c "$T" || true
-  for variant in "l2s HATCH_L2S=1" "nol2s HATCH_L2S=0" "noseccomp PROOT_NO_SECCOMP=1"; do
-    set -- $variant; echo "### proot $1"
-    env "$2" timeout 120 "${G[@]}" bash -c "$W rm -rf /tmp/pfx-$1; WINEPREFIX=/tmp/pfx-$1 wine cmd /c echo HATCH-WINE-OK 2>&1 | tail -25" || echo "rc=$?"
-  done
-  echo "### proot +all tail"
-  timeout 120 "${G[@]}" bash -c "unset DISPLAY; rm -rf /root/pfx-a; WINEPREFIX=/root/pfx-a WINEDEBUG=+all wine cmd /c echo HATCH-WINE-OK 2>&1 | tail -60" || true
-  echo "### sudo chroot (no proot)"
+wine_diag() { # Wine arm64: works in a real chroot, aborts under proot → find where
+  "${G[@]}" bash -c "/usr/local/bin/hatch-install-app --wine >/tmp/wd.log 2>&1; tail -2 /tmp/wd.log; apt-get install -y -qq gdb file strace >/dev/null 2>&1; true"
+  echo "### maps under proot"; "${G[@]}" cat /proc/self/maps | head -30
+  echo "### wine --version under proot"; timeout 60 "${G[@]}" wine --version 2>&1 | tail -3 || true
+  echo "### chroot: create prefix"
   for d in proc sys dev dev/pts; do sudo mount --bind /$d "$HATCH_ROOTFS/$d" || true; done
   sudo chmod 1777 "$HATCH_ROOTFS/tmp"
-  CH=(sudo timeout 180 chroot "$HATCH_ROOTFS" /usr/bin/env -i HOME=/root USER=root PATH=/usr/local/bin:/usr/bin:/bin)
-  "${CH[@]}" bash -c "chown -R root:root /root; $W rm -rf /root/pfx-c; WINEPREFIX=/root/pfx-c wine cmd /c echo HATCH-WINE-OK 2>&1 | tail -25" || echo "rc=$?"
-  echo "### gdb in chroot"
-  "${CH[@]}" bash -c "rm -rf /root/pfx-g; WINEPREFIX=/root/pfx-g gdb -q -batch -ex 'set follow-fork-mode child' -ex 'set detach-on-fork on' -ex run -ex bt -ex 'info proc mappings' --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | tail -80" || true
-  echo "### gdb under proot (ptrace may be unavailable)"
-  timeout 180 "${G[@]}" bash -c "rm -rf /root/pfx-h; WINEPREFIX=/root/pfx-h gdb -q -batch -ex run -ex bt --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | tail -40" || true
+  sudo timeout 240 chroot "$HATCH_ROOTFS" /usr/bin/env -i HOME=/root USER=root PATH=/usr/local/bin:/usr/bin:/bin WINEDEBUG=-all \
+    bash -c "rm -rf /root/pfx-c; WINEPREFIX=/root/pfx-c wine cmd /c echo CHROOT-OK 2>&1 | tail -2; wineserver -k; true" || true
   for d in dev/pts dev sys proc; do sudo umount "$HATCH_ROOTFS/$d" 2>/dev/null || true; done
+  echo "### proot: reuse chroot-made prefix"
+  timeout 120 "${G[@]}" bash -c "unset DISPLAY; WINEPREFIX=/root/pfx-c WINEDEBUG=err+all wine cmd /c echo PROOT-REUSE-OK 2>&1 | tail -15" || true
+  echo "### proot: +server,+process,+module tail"
+  timeout 120 "${G[@]}" bash -c "unset DISPLAY; P=/root/pfx-s\$RANDOM; WINEPREFIX=\$P WINEDEBUG=+server,+process,+module,+loaddll wine cmd /c echo X 2>&1 | tail -40" || true
+  echo "### proot: gdb (no follow) bt"
+  timeout 180 "${G[@]}" bash -c "P=/root/pfx-g\$RANDOM; WINEPREFIX=\$P gdb -q -batch -ex 'handle SIGPIPE nostop' -ex run -ex bt -ex 'info inferiors' -ex 'info proc mappings' --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | grep -v '^\[' | tail -70" || true
+  echo "### proot: strace -f tail"
+  timeout 180 "${G[@]}" bash -c "P=/root/pfx-t\$RANDOM; WINEPREFIX=\$P strace -f -e trace=execve,mmap,munmap,brk,clone,clone3,exit_group,rt_sigprocmask,kill,tgkill -o /tmp/st.txt /usr/lib/wine/wine64 cmd /c echo hi >/dev/null 2>&1; grep -n 'SIGABRT\|tgkill\|execve\|brk' /tmp/st.txt | tail -40; tail -40 /tmp/st.txt" || true
 }
 
 FAILED=()
