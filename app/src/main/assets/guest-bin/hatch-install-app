@@ -67,8 +67,9 @@ if [ -n "$PKGS" ]; then
     apt_update
   fi
   # shellcheck disable=SC2086
-  # Status-Fd=1: machine-readable "dlstatus:/pmstatus:" lines drive the store's progress bar.
-  apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $PKGS || { apt_update && apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $PKGS; }
+  # Machine-readable "dlstatus:/pmstatus:" lines on fd 3 (dup'ed onto stdout) drive the store's progress bar.
+  # Not Status-Fd=1 + Dpkg::Use-Pty=0: maintainer scripts then hit EIO writing to stdout under proot (fontconfig, gstreamer…).
+  apt-get install -y --no-install-recommends -o APT::Status-Fd=3 $PKGS 3>&1 || { apt_update && apt-get install -y --no-install-recommends -o APT::Status-Fd=3 $PKGS 3>&1; }
 fi
 dedupe_sources
 if [ -n "$URL" ]; then
@@ -101,7 +102,7 @@ if [ -n "$DESKTOP" ]; then
       echo "hatch: $DESKTOP is X11-only → installing Xwayland"; EXTRA="$XSTACK"
     fi
   fi
-  [ -z "$EXTRA" ] || apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $EXTRA
+  [ -z "$EXTRA" ] || apt-get install -y --no-install-recommends -o APT::Status-Fd=3 $EXTRA 3>&1
 fi
 if [ "$WINE" = 1 ]; then
   echo "hatch: wine prefix will initialise on first launch"

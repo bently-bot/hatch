@@ -5,7 +5,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Turns apt's output (with -o APT::Status-Fd=1) into store progress, e.g.
+ * Turns apt's output (with -o APT::Status-Fd=3 3>&1) into store progress, e.g.
  *   "31% : Downloading 121 of 192 MB"   /   "60% : Unpacking cursor (arm64)"
  *   sizes: "201 MB to download - 1.0 GB on disk"
  * Download is the first half of the bar, dpkg the second. Never moves backwards (several apt runs per install).

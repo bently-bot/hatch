@@ -76,7 +76,7 @@ case "$ACT" in
   install)
     if ! command -v flatpak >/dev/null 2>&1; then
       echo "hatch: installing flatpak"
-      apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 flatpak ca-certificates \
+      apt-get install -y --no-install-recommends -o APT::Status-Fd=3 flatpak ca-certificates 3>&1 \
         || { apt-get update && apt-get install -y --no-install-recommends flatpak ca-certificates; }
     fi
     flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
