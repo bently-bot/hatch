@@ -110,6 +110,12 @@ class MainActivity : ComponentActivity() {
                                 g.describe(g.mode(this@MainActivity), g.info(this@MainActivity, LinuxRuntime.rootfsDir(this@MainActivity)))
                             },
                             gpuEnabled = { dev.hatch.gpu.Gpu.mode(this@MainActivity) == dev.hatch.gpu.Gpu.Mode.AUTO },
+                            floatingEnabled = { dev.hatch.floating.FloatingWindows.enabled(this@MainActivity) },
+                            setFloatingEnabled = { on ->
+                                val fw = dev.hatch.floating.FloatingWindows
+                                fw.setMode(this@MainActivity, if (on) fw.MODE_FLOATING else fw.MODE_TASKS)
+                                if (on && !fw.canOverlay(this@MainActivity)) { startActivity(fw.overlayPermissionIntent(this@MainActivity)); false } else true
+                            },
                             setGpuEnabled = { on ->
                                 dev.hatch.gpu.Gpu.setMode(this@MainActivity, if (on) dev.hatch.gpu.Gpu.Mode.AUTO else dev.hatch.gpu.Gpu.Mode.SOFTWARE)
                             }),

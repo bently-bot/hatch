@@ -99,6 +99,9 @@ data class StoreActions(
     val gpuStatus: () -> String = { "Software rendering" },
     val gpuEnabled: () -> Boolean = { false },
     val setGpuEnabled: (Boolean) -> Unit = {},
+    val floatingEnabled: () -> Boolean = { false },
+    /** Returns false when the overlay permission must be granted first (the permission screen was opened). */
+    val setFloatingEnabled: (Boolean) -> Boolean = { true },
 )
 
 @Composable
@@ -110,6 +113,16 @@ private fun SettingsDialog(actions: StoreActions, onDismiss: () -> Unit) {
         title = { Text("Settings") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Windows", fontWeight = FontWeight.SemiBold)
+                var floatOn by remember { mutableStateOf(actions.floatingEnabled()) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Floating windows over other apps", Modifier.weight(1f))
+                    Switch(checked = floatOn, onCheckedChange = { floatOn = actions.setFloatingEnabled(it) && it })
+                }
+                Text(if (floatOn) "Programs open as movable, resizable windows above everything, with a bubble to reach Hatch."
+                    else "Each program window opens as its own Android app window (Recents card, split screen, DeX).",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                HorizontalDivider()
                 Text("Graphics", fontWeight = FontWeight.SemiBold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Use the GPU when available", Modifier.weight(1f))
