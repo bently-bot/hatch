@@ -17,6 +17,7 @@ local.properties
 /.gradle/
 /harness-out/
 *.apk
+!app/src/main/assets/stub-template.apk
 /proofs/
 /.cxx/
 /app/.cxx/
@@ -25,3 +26,4 @@ local.properties
 /captures/
 local.properties
 hs_err_pid*.log
+/stub-template/build/

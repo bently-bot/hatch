@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.hatch.stub.template" android:versionCode="1" android:versionName="1">
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35"/>
+    <queries><package android:name="dev.hatch"/></queries>
+    <application android:label="TEMPLATE_LABEL" android:icon="@mipmap/ic_app" android:hasCode="true">
+        <meta-data android:name="hatch.appId" android:value="TEMPLATE_APP_ID"/>
+        <activity android:name="dev.hatch.stub.Launch" android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:resizeableActivity="true" android:excludeFromRecents="true" android:noHistory="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
