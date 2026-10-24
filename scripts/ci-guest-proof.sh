@@ -102,24 +102,17 @@ capture() { # name seconds harness-opts... -- cmd...
 }
 title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm) echo "Xwayland";; *) echo "";; esac; }
 
-wine_diag() { # Wine arm64: works in a real chroot, aborts under proot → find where
-  "${G[@]}" bash -c "/usr/local/bin/hatch-install-app --wine >/tmp/wd.log 2>&1; tail -2 /tmp/wd.log; apt-get install -y -qq gdb file strace >/dev/null 2>&1; true"
-  echo "### maps under proot"; "${G[@]}" cat /proc/self/maps | head -30
-  echo "### wine --version under proot"; timeout 60 "${G[@]}" wine --version 2>&1 | tail -3 || true
-  echo "### chroot: create prefix"
-  for d in proc sys dev dev/pts; do sudo mount --bind /$d "$HATCH_ROOTFS/$d" || true; done
-  sudo chmod 1777 "$HATCH_ROOTFS/tmp"
-  sudo timeout 240 chroot "$HATCH_ROOTFS" /usr/bin/env -i HOME=/root USER=root PATH=/usr/local/bin:/usr/bin:/bin WINEDEBUG=-all \
-    bash -c "rm -rf /root/pfx-c; WINEPREFIX=/root/pfx-c wine cmd /c echo CHROOT-OK 2>&1 | tail -2; wineserver -k; true" || true
-  for d in dev/pts dev sys proc; do sudo umount "$HATCH_ROOTFS/$d" 2>/dev/null || true; done
-  echo "### proot: reuse chroot-made prefix"
-  timeout 120 "${G[@]}" bash -c "unset DISPLAY; WINEPREFIX=/root/pfx-c WINEDEBUG=err+all wine cmd /c echo PROOT-REUSE-OK 2>&1 | tail -15" || true
-  echo "### proot: +server,+process,+module tail"
-  timeout 120 "${G[@]}" bash -c "unset DISPLAY; P=/root/pfx-s\$RANDOM; WINEPREFIX=\$P WINEDEBUG=+server,+process,+module,+loaddll wine cmd /c echo X 2>&1 | tail -40" || true
-  echo "### proot: gdb (no follow) bt"
-  timeout 180 "${G[@]}" bash -c "P=/root/pfx-g\$RANDOM; WINEPREFIX=\$P gdb -q -batch -ex 'handle SIGPIPE nostop' -ex run -ex bt -ex 'info inferiors' -ex 'info proc mappings' --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | grep -v '^\[' | tail -70" || true
-  echo "### proot: strace -f tail"
-  timeout 180 "${G[@]}" bash -c "P=/root/pfx-t\$RANDOM; WINEPREFIX=\$P strace -f -e trace=execve,mmap,munmap,brk,clone,clone3,exit_group,rt_sigprocmask,kill,tgkill -o /tmp/st.txt /usr/lib/wine/wine64 cmd /c echo hi >/dev/null 2>&1; grep -n 'SIGABRT\|tgkill\|execve\|brk' /tmp/st.txt | tail -40; tail -40 /tmp/st.txt" || true
+wine_diag() { # Wine arm64: works in a real chroot, aborts under proot → symbolised backtrace + other proot builds
+  "${G[@]}" bash -c "/usr/local/bin/hatch-install-app --wine >/tmp/wd.log 2>&1; tail -2 /tmp/wd.log; apt-get install -y -qq gdb debuginfod libc6-dbg >/dev/null 2>&1; true"
+  echo "### gdb + debuginfod bt under proot"
+  timeout 600 "${G[@]}" bash -c "export DEBUGINFOD_URLS=https://debuginfod.debian.net; P=/root/pfx-g\$RANDOM; WINEPREFIX=\$P gdb -q -batch -ex 'set debuginfod enabled on' -ex 'set pagination off' -ex run -ex 'bt 30' -ex 'frame 4' -ex 'info locals' --args /usr/lib/wine/wine64 cmd /c echo hi 2>&1 | grep -v '^\[\|Download' | tail -60" || true
+  echo "### MALLOC_CHECK_ via libc_malloc_debug"
+  timeout 120 "${G[@]}" bash -c "P=/root/pfx-m\$RANDOM; WINEPREFIX=\$P LD_PRELOAD=libc_malloc_debug.so.0 MALLOC_CHECK_=3 /usr/lib/wine/wine64 cmd /c echo MALLOCDBG-OK 2>&1 | tail -5" || true
+  for v in v5.4.0 v5.3.0; do
+    echo "### upstream proot $v static"
+    curl -fsSL -o "$WORK/proot-$v" "https://github.com/proot-me/proot/releases/download/$v/proot-$v-aarch64-static" && chmod +x "$WORK/proot-$v" || { echo "no download"; continue; }
+    PROOT="$WORK/proot-$v" HATCH_L2S=0 timeout 180 bash "$ROOT/scripts/guest-run.sh" bash -c "unset DISPLAY; P=/root/pfx-u\$RANDOM; WINEPREFIX=\$P WINEDEBUG=-all wine cmd /c echo UPSTREAM-OK 2>&1 | tail -4" || echo "rc=$?"
+  done
 }
 
 FAILED=()
