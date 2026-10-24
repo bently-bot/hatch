@@ -200,10 +200,20 @@ private fun ProgressBanner(progress: InstallManager.Progress, apps: List<StoreAp
             Text("$name — ${progress.message}", style = MaterialTheme.typography.bodySmall, color = Accent, maxLines = 1,
                 overflow = TextOverflow.Ellipsis)
         }
-        is InstallManager.Progress.Failed -> Text(
-            "${apps.firstOrNull { it.id == progress.appId }?.name ?: progress.appId}: ${progress.message}",
-            color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+        is InstallManager.Progress.Failed -> Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+            var open by remember(progress) { mutableStateOf(false) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${apps.firstOrNull { it.id == progress.appId }?.name ?: progress.appId}: ${progress.message}",
+                    color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                if (progress.log.isNotEmpty()) TextButton(onClick = { open = !open }) { Text(if (open) "Hide details" else "Details") }
+            }
+            if (open) Text(
+                progress.log.takeLast(25).joinToString("\n"),
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, lineHeight = 12.sp,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(8.dp),
+            )
+        }
         else -> {}
     }
 }

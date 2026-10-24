@@ -21,7 +21,23 @@ object InstallManager {
         data object Idle : Progress
         data class Working(val appId: String, val message: String) : Progress
         data class Done(val appId: String) : Progress
-        data class Failed(val appId: String, val message: String) : Progress
+        data class Failed(val appId: String, val message: String, val log: List<String> = emptyList()) : Progress
+    }
+
+    /** Human-readable cause for a failed install, from the tail of its log. Pure; unit-tested. */
+    fun failureReason(log: List<String>): String {
+        val text = log.joinToString("\n")
+        return when {
+            listOf("Temporary failure resolving", "Could not resolve", "Network is unreachable", "Could not connect")
+                .any { it in text } -> "Install failed: no connection to the download servers — check your internet and retry"
+            "No space left on device" in text -> "Install failed: not enough storage space"
+            "Unable to locate package" in text || "has no installation candidate" in text ->
+                "Install failed: package not available for this device"
+            "checksum mismatch" in text || "sha256" in text.lowercase() && "FAILED" in text ->
+                "Install failed: download was corrupted — retry"
+            "Could not get lock" in text -> "Install failed: another install is running — retry in a moment"
+            else -> "Install failed"
+        }
     }
 
     private val _progress = MutableStateFlow<Progress>(Progress.Idle)
@@ -43,17 +59,20 @@ object InstallManager {
                     payloadDest = payload?.extractTo,
                     desktopId = app.desktopId,
                 )
+                val tail = ArrayDeque<String>()
                 val res = LinuxRuntime.run(
                     context, cmd, timeoutMs = 1_800_000, waylandHostDir = waylandHostDir,
                     onLine = { line ->
                         Log.i(TAG, line)
+                        synchronized(tail) { if (line.isNotBlank()) { tail.addLast(line.trimEnd()); if (tail.size > 60) tail.removeFirst() } }
                         val t = line.trim()
                         if (t.startsWith("hatch:") || t.startsWith("Get:") || t.startsWith("Unpacking") || t.startsWith("Setting up"))
                             _progress.value = Progress.Working(app.id, t.removePrefix("hatch: ").take(80))
                     },
                 )
                 if (res?.ok != true) {
-                    _progress.value = Progress.Failed(app.id, "Install failed (see log)")
+                    val log = synchronized(tail) { tail.toList() }
+                    _progress.value = Progress.Failed(app.id, failureReason(log), log)
                     return@withContext false
                 }
                 _progress.value = Progress.Working(app.id, "Creating launcher…")
