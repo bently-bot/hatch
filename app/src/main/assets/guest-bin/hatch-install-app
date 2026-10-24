@@ -15,6 +15,9 @@ export DEBIAN_FRONTEND=noninteractive
 if [ "$WINE" = 1 ]; then PKGS="$PKGS wine wine64 libwine fonts-wine"; fi
 if [ -n "$URL" ]; then PKGS="$PKGS curl ca-certificates unzip"; fi
 PKGS=$(echo $PKGS | tr ' ' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ' ')
+mkdir -p /etc/apt/preferences.d /var/lib/dpkg/updates
+# Recover from an interrupted dpkg run (app killed mid-install, phone rebooted, …)
+dpkg --configure -a >/dev/null 2>&1 || true
 if [ -n "$PKGS" ]; then
   echo "hatch: apt install $PKGS"
   # Refresh lists if older than a day (or missing)

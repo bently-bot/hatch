@@ -43,7 +43,9 @@ jobs:
           path: harness-out/simple-shm.png
 
   arm64-guest-proof:
-    timeout-minutes: 45
+    # Real Debian 13 arm64 rootfs under proot, apps installed by the app's own guest scripts from
+    # catalogue.json, rendered through Hatch's compositor. Wine = Debian's wine 10 arm64 + winewayland.drv.
+    timeout-minutes: 60
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -51,14 +53,22 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Mousepad + Wine Notepad++ screenshots
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/rootfs.tar.xz
+          key: rootfs-${{ hashFiles('app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt') }}
+      - name: Guest apps (Linux + Wine + X11) rendered by Hatch compositor
         env:
           PROOF_DIR: harness-out
-        run: bash scripts/ci-arm64-guest-proof.sh
+          APPS: mousepad galculator gnome-mines xterm notepadpp
+        run: bash scripts/ci-guest-proof.sh
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: arm64-guest-proofs
-          path: harness-out/*.png
+          path: |
+            harness-out/*.png
+            harness-out/*.log
 
   android-assemble:
     timeout-minutes: 35
