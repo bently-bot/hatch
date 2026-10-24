@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Hatch" parent="android:Theme.Material.Light.NoActionBar"/>
+    <!-- Program windows: no action bar (the app draws its own title/menu; freeform caption shows the task label). -->
+    <style name="Theme.Hatch.Window" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
 </resources>

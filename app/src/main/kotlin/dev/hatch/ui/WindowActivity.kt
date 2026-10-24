@@ -75,7 +75,7 @@ class WindowActivity : ComponentActivity(), SurfaceHolder.Callback, HatchRuntime
             if (task != null && existing != taskId) { task.moveToFront(); finish(); return }
         }
         if (!secondary) primaryTasks[appId] = taskId
-        setTaskLabel(label)
+        setTaskLabel(label); title = label
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val sv = object : SurfaceView(this) {

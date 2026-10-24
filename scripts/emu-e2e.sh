@@ -14,7 +14,7 @@ fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s Hatc
 
 # Run a shell snippet inside the app's guest (debug APK → run-as), mirroring LinuxRuntime's proot argv/env.
 guest() {
-  local lib; lib=$(adb shell pm dump dev.hatch | grep -m1 'legacyNativeLibraryDir=' | cut -d= -f2 | tr -d '\r')/x86_64
+  local lib; lib=$(adb shell pm dump dev.hatch | grep -m1 'legacyNativeLibraryDir=' | sed 's|.*legacyNativeLibraryDir=||' | tr -d '\r')/x86_64
   printf '%s\n' "$1" | adb shell "run-as dev.hatch sh -c 'cat > files/linux/tmp/hatch-probe.sh'"
   adb shell "run-as dev.hatch sh -c 'cd /data/data/dev.hatch/files && LD_LIBRARY_PATH=$lib PROOT_LOADER=$lib/libproot_loader.so PROOT_TMP_DIR=/data/data/dev.hatch/files/tmp PROOT_L2S_DIR=/data/data/dev.hatch/files/linux/.l2s $lib/libproot.so -0 -l -r /data/data/dev.hatch/files/linux -b /dev -b /proc -b /sys -b /data/data/dev.hatch/files/linux/.l2s -w /root /bin/sh /tmp/hatch-probe.sh'" 2>&1
 }
@@ -88,8 +88,8 @@ adb shell input keyevent 3
 stamp "launch stub → program window"
 adb logcat -c
 adb shell monkey -p "$STUB" -c android.intent.category.LAUNCHER 1 >/dev/null
-for i in $(seq 1 120); do adb logcat -d | grep -q 'window created' && break; sleep 2; done
-adb logcat -d | grep -q 'window created' || fail "no Wayland window created"
+for i in $(seq 1 120); do adb logcat -d | grep -qE 'windowCreated|window created' && break; sleep 2; done
+adb logcat -d | grep -qE 'windowCreated|window created' || fail "no Wayland window created"
 sleep 8
 shot 08-app-window
 adb shell dumpsys activity activities | grep -E 'topResumedActivity|ResumedActivity' | head -3
@@ -119,6 +119,6 @@ adb shell wm size 1812x2176; sleep 6; shot 10-unfolded
 adb shell wm size reset; sleep 4
 PID_AFTER=$(adb shell pidof dev.hatch | tr -d '\r')
 [ "$PID_BEFORE" = "$PID_AFTER" ] || fail "process restarted on resize ($PID_BEFORE → $PID_AFTER)"
-adb logcat -d | grep -q 'window destroyed' && stamp "WARN: window destroyed during resize"
+adb logcat -d | grep -qE 'windowDestroyed|window destroyed' && stamp "WARN: window destroyed during resize"
 adb logcat -d -s HatchRuntime HatchWindow HatchSession > "$OUT/logcat.txt" 2>&1
 stamp "emu-e2e OK"
