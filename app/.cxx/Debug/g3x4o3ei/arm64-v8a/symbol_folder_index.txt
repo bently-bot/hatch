@@ -1,0 +1,1 @@
+/workspace/app-builder/droidbox/hatch/app/build/intermediates/cxx/Debug/g3x4o3ei/obj/arm64-v8a

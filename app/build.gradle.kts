@@ -1,0 +1,68 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+}
+
+android {
+    namespace = "dev.hatch"
+    compileSdk = 37
+
+    defaultConfig {
+        applicationId = "dev.hatch"
+        minSdk = 29
+        targetSdk = 35
+        versionCode = 1
+        versionName = "0.1.0-dev"
+        ndk { abiFilters += listOf("arm64-v8a") }
+        externalNativeBuild {
+            cmake { cppFlags += listOf("-std=c11"); arguments += listOf("-DANDROID_STL=none") }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        debug { isDebuggable = true }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlin { jvmToolchain(17) }
+
+    buildFeatures { compose = true; buildConfig = true }
+
+    packaging {
+        jniLibs { useLegacyPackaging = true } // W^X: proot/loader must be loadable from nativeLibraryDir
+        resources.excludes += setOf("META-INF/INDEX.LIST", "META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+    }
+
+    externalNativeBuild {
+        cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" }
+    }
+
+    androidResources {
+        noCompress += listOf("so", "tar", "xz", "zst")
+    }
+}
+
+dependencies {
+    val bom = platform(libs.compose.bom)
+    implementation(bom)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.compose.ui)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.core)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.arsclib)
+    implementation(libs.apksig)
+    testImplementation(libs.junit)
+}

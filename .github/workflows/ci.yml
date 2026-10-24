@@ -1,0 +1,78 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  host-wayland-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc make libwayland-dev weston curl unzip
+      - name: Fetch kotlinc
+        run: |
+          curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
+          sudo unzip -q /tmp/kotlin.zip -d /opt
+          echo /opt/kotlinc/bin >> $GITHUB_PATH
+      - name: Build host native + compositor proof
+        run: |
+          mkdir -p build/host harness-out
+          gcc -shared -fPIC -O2 -DHATCH_HOST -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
+            -o build/host/libhatchnative.so app/src/main/cpp/hatchnative.c -lpthread
+          kotlinc -d build/host/classes -jvm-target 17 \
+            app/src/main/kotlin/dev/hatch/wayland/*.kt harness/src/dev/hatch/harness/Main.kt
+          # Prefer system weston-simple-shm when guest rootfs is absent
+          CLIENT=$(command -v weston-simple-shm || true)
+          if [ -z "$CLIENT" ]; then echo "no weston-simple-shm"; exit 1; fi
+          java -Dhatch.native=$PWD/build/host/libhatchnative.so \
+            -cp "build/host/classes:/opt/kotlinc/lib/kotlin-stdlib.jar" \
+            dev.hatch.harness.MainKt \
+            $RUNNER_TEMP/wayland \
+            harness-out/simple-shm.png \
+            20 -- "$CLIENT"
+      - uses: actions/upload-artifact@v4
+        with: { name: simple-shm-png, path: harness-out/simple-shm.png }
+
+  android-assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: android-actions/setup-android@v3
+      - name: SDK packages
+        run: |
+          sdkmanager "platforms;android-37" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
+      - name: Assemble debug
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with: { name: hatch-debug-apk, path: app/build/outputs/apk/debug/*.apk }
+
+  draft-release:
+    needs: [host-wayland-proof, android-assemble]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: arts }
+      - name: Draft release
+        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+        run: |
+          APK=$(ls arts/hatch-debug-apk/*.apk | head -1)
+          PNG=$(ls arts/simple-shm-png/*.png | head -1)
+          TAG="v0.1.0-dev.${GITHUB_SHA::7}"
+          gh release create "$TAG" "$APK" "$PNG" \
+            --draft \
+            --title "Hatch $TAG" \
+            --notes "Automated draft. Wayland host proof + debug APK. Not for production."

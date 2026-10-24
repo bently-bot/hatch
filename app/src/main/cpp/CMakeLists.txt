@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.22)
+project(hatchnative C)
+add_library(hatchnative SHARED hatchnative.c)
+target_compile_options(hatchnative PRIVATE -O3 -Wall -Wextra)
+find_library(log-lib log)
+find_library(android-lib android)
+find_library(nativewindow-lib nativewindow)
+target_link_libraries(hatchnative ${log-lib} ${android-lib} ${nativewindow-lib})
