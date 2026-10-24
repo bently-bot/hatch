@@ -52,9 +52,16 @@ class Seat(val server: WaylandServer) {
 
     fun pointerButton(w: Toplevel, button: Int, pressed: Boolean) {
         focusWindow(w)
-        if (pressed) buttonsDown = buttonsDown or (1 shl button) else buttonsDown = buttonsDown and (1 shl button).inv()
-        // Linux button codes: BTN_LEFT=0x110, BTN_RIGHT=0x111, BTN_MIDDLE=0x112
-        val code = when (button) { 0 -> 0x110; 1 -> 0x111; 2 -> 0x112; else -> 0x110 + button }
+        // Accept either index (0/1/2) or Linux BTN_* (0x110+)
+        val code = when {
+            button >= 0x110 -> button
+            button == 0 -> 0x110
+            button == 1 -> 0x111
+            button == 2 -> 0x112
+            else -> 0x110 + button
+        }
+        val bit = code and 0xff
+        if (pressed) buttonsDown = buttonsDown or (1 shl bit) else buttonsDown = buttonsDown and (1 shl bit).inv()
         for (seat in seats) if (seat.client === w.client)
             seat.pointer?.button(code, if (pressed) 1 else 0)
     }
