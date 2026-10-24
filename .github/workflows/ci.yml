@@ -65,7 +65,7 @@ jobs:
       - name: Guest apps (Linux + Wine + X11) rendered by Hatch compositor
         env:
           PROOF_DIR: harness-out
-          APPS: mousepad galculator gnome-mines xterm featherpad gnome-chess notepadpp
+          APPS: mousepad galculator gnome-mines xterm featherpad gnome-chess notepadpp blender
           TURNIP_TAR: ${{ runner.temp }}/turnip/turnip.tar.xz
         run: bash scripts/ci-guest-proof.sh
       - uses: actions/upload-artifact@v4
