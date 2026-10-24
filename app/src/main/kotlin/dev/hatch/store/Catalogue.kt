@@ -8,6 +8,17 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 @Serializable
+data class AptRepo(
+    /** File stem for /etc/apt/sources.list.d/<id>.sources and /etc/apt/keyrings/<id>.asc */
+    val id: String,
+    val keyUrl: String,
+    /** deb822 "URIs:", "Suites:", "Components:" values. */
+    val uris: String,
+    val suites: String,
+    val components: String = "main",
+)
+
+@Serializable
 data class WindowsPayload(
     val url: String,
     val sha256: String = "",
@@ -33,6 +44,9 @@ data class StoreApp(
     val windowsPayload: WindowsPayload? = null,
     /** Per guest-arch overrides ("amd64" for x86_64 devices/emulators); [windowsPayload] is the arm64 default. */
     val payloads: Map<String, WindowsPayload> = emptyMap(),
+    /** source == "vendor": the vendor's own signed apt repository (added on install), e.g. Anysphere for Cursor. */
+    val vendorName: String = "",
+    val repo: AptRepo? = null,
     val description: String = "",
     val desktopId: String = "",
     val iconUrl: String = "",

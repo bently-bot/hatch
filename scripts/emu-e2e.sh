@@ -70,7 +70,11 @@ stamp "search + install $APP"
 $UI tap 'Search apps' && adb shell input text "$APP" && sleep 2
 adb shell input keyevent 111 || true   # hide IME
 shot 04-search
+APPNAME=$(python3 -c 'import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])' "$ROOT/catalogue/catalogue.json" "$APP")
+$UI tap "^$APPNAME\$" dev.hatch || fail "no search result for $APPNAME"
+sleep 2; shot 04b-detail
 $UI tap '^Install$' dev.hatch || fail "no Install button"
+sleep 6; shot 04c-installing
 # PackageInstaller confirmation for the generated stub APK
 for i in $(seq 1 300); do
   adb shell pm list packages | grep -q "package:$STUB$" && break
@@ -171,6 +175,8 @@ if [ "${E2E_WINE:-1}" = 1 ]; then
   $UI tap 'Search apps' && adb shell input text "notepad" && sleep 2
   adb shell input keyevent 111 || true
   shot 11-search-notepadpp
+  $UI tap '^Notepad\+\+$' dev.hatch || fail "no search result for Notepad++"
+  sleep 2; shot 11b-notepadpp-detail
   $UI tap '^Install$' dev.hatch || fail "no Install button for Notepad++"
   for i in $(seq 1 360); do
     adb shell pm list packages | grep -q "package:$WSTUB$" && break

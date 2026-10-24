@@ -19,7 +19,8 @@ object InstallManager {
 
     sealed interface Progress {
         data object Idle : Progress
-        data class Working(val appId: String, val message: String) : Progress
+        /** [fraction] null = indeterminate; [sizes] e.g. "201 MB to download - 1.0 GB on disk". */
+        data class Working(val appId: String, val message: String, val fraction: Float? = null, val sizes: String? = null) : Progress
         data class Done(val appId: String) : Progress
         data class Failed(val appId: String, val message: String, val log: List<String> = emptyList()) : Progress
     }
@@ -43,8 +44,15 @@ object InstallManager {
     private val _progress = MutableStateFlow<Progress>(Progress.Idle)
     val progress = _progress.asStateFlow()
 
+    @Volatile private var current: kotlinx.coroutines.Job? = null
+    @Volatile private var currentId: String? = null
+
+    /** Stop the running install (apt/dpkg are killed; the next install repairs dpkg state). */
+    fun cancel() { current?.cancel() }
+
     suspend fun install(context: Context, app: StoreApp, waylandHostDir: String?): Boolean =
         withContext(Dispatchers.IO) {
+            current = coroutineContext[kotlinx.coroutines.Job]; currentId = app.id
             try {
                 _progress.value = Progress.Working(app.id, "Installing packages…")
                 GuestConfig.refreshDns(context)
@@ -60,14 +68,18 @@ object InstallManager {
                     desktopId = app.desktopId,
                 )
                 val tail = ArrayDeque<String>()
+                val apt = AptProgress()
                 val res = LinuxRuntime.run(
                     context, cmd, timeoutMs = 1_800_000, waylandHostDir = waylandHostDir,
                     onLine = { line ->
-                        Log.i(TAG, line)
-                        synchronized(tail) { if (line.isNotBlank()) { tail.addLast(line.trimEnd()); if (tail.size > 60) tail.removeFirst() } }
                         val t = line.trim()
-                        if (t.startsWith("hatch:") || t.startsWith("Get:") || t.startsWith("Unpacking") || t.startsWith("Setting up"))
-                            _progress.value = Progress.Working(app.id, t.removePrefix("hatch: ").take(80))
+                        val status = t.startsWith("dlstatus:") || t.startsWith("pmstatus:")
+                        if (!status) {
+                            Log.i(TAG, line)
+                            synchronized(tail) { if (line.isNotBlank()) { tail.addLast(line.trimEnd()); if (tail.size > 60) tail.removeFirst() } }
+                        }
+                        if (apt.feed(t))
+                            _progress.value = Progress.Working(app.id, apt.headline(), apt.fraction.takeIf { it > 0f }, apt.sizes())
                     },
                 )
                 if (res?.ok != true) {
@@ -92,12 +104,39 @@ object InstallManager {
                 )
                 _progress.value = Progress.Done(app.id)
                 true
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                Log.i(TAG, "install of ${app.id} cancelled")
+                _progress.value = Progress.Idle
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "install failed", e)
                 _progress.value = Progress.Failed(app.id, e.message ?: "install failed")
                 false
             }
         }
+
+    /** apt-get update + `apt list --upgradable`, mapped to installed catalogue apps. */
+    suspend fun checkUpdates(context: Context, apps: List<StoreApp>): List<String> = withContext(Dispatchers.IO) {
+        GuestConfig.refreshDns(context)
+        val r = LinuxRuntime.run(context, "apt-get update -qq >/dev/null 2>&1; apt list --upgradable 2>/dev/null", timeoutMs = 300_000)
+            ?: return@withContext emptyList()
+        val upgradable = upgradablePackages(r.stdout)
+        val installed = InstalledApps.list(context).map { it.id }.toSet()
+        apps.filter { it.id in installed && it.packages.any { p -> p in upgradable } }.map { it.id }
+    }
+
+    /** Pure: package names from `apt list --upgradable` ("mousepad/stable 0.6.3-2 arm64 [upgradable from: 0.6.3-1]"). */
+    fun upgradablePackages(out: String): Set<String> =
+        out.lineSequence().filter { "/" in it && "upgradable" in it }.map { it.substringBefore('/') }.toSet()
+
+    /** Size of the Linux system (rootfs) on disk, e.g. "2.4 GB". */
+    suspend fun storageUsed(context: Context): String = withContext(Dispatchers.IO) {
+        runCatching {
+            val p = ProcessBuilder("du", "-sk", LinuxRuntime.rootfsDir(context).absolutePath).redirectErrorStream(true).start()
+            val kb = p.inputStream.bufferedReader().readText().trim().substringBefore('\t').substringBefore(' ').toLong()
+            AptProgress.human(kb * 1024)
+        }.getOrDefault("")
+    }
 
     /** Re-run install (apt refresh + stub rebuild). */
     suspend fun update(context: Context, app: StoreApp, waylandHostDir: String?): Boolean =

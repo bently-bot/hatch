@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
         HatchApp.instance.runtime.ensureStarted()
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            HatchTheme {
                 Surface(Modifier.fillMaxSize()) {
                     val installedTick by LinuxRuntime.installChanges.collectAsStateWithLifecycle()
                     val setupStage by RootfsInstaller.stage.collectAsStateWithLifecycle()
@@ -72,53 +72,40 @@ class MainActivity : ComponentActivity() {
                         )
                     } else {
                         LaunchedEffect(ready) { dev.hatch.gpu.Gpu.ensureChecked(this@MainActivity) }
-                        StoreScreen(
-                            apps = catalogue.apps,
-                            categories = catalogue.categories,
-                            installed = installed,
-                            progress = installProg,
-                            actions = StoreActions(install = { app ->
-                                scope.launch {
-                                    InstallManager.install(
-                                        this@MainActivity, app,
-                                        HatchApp.instance.runtime.socketDir().absolutePath,
-                                    )
-                                }
-                            },
-                            uninstall = { app ->
-                                scope.launch { InstallManager.uninstall(this@MainActivity, app) }
-                            },
-                            update = { app ->
-                                scope.launch {
-                                    InstallManager.update(
-                                        this@MainActivity, app,
-                                        HatchApp.instance.runtime.socketDir().absolutePath,
-                                    )
-                                }
-                            },
-                            launch = { app -> launchApp(app) },
-                            installSettings = {
-                                startActivity(
-                                    Intent(
-                                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                                        Uri.parse("package:$packageName"),
-                                    )
-                                )
-                            },
-                            gpuStatus = {
-                                val g = dev.hatch.gpu.Gpu
-                                g.describe(g.mode(this@MainActivity), g.info(this@MainActivity, LinuxRuntime.rootfsDir(this@MainActivity)))
-                            },
-                            gpuEnabled = { dev.hatch.gpu.Gpu.mode(this@MainActivity) == dev.hatch.gpu.Gpu.Mode.AUTO },
-                            floatingEnabled = { dev.hatch.floating.FloatingWindows.enabled(this@MainActivity) },
-                            setFloatingEnabled = { on ->
-                                val fw = dev.hatch.floating.FloatingWindows
-                                fw.setMode(this@MainActivity, if (on) fw.MODE_FLOATING else fw.MODE_TASKS)
-                                if (on && !fw.canOverlay(this@MainActivity)) { startActivity(fw.overlayPermissionIntent(this@MainActivity)); false } else true
-                            },
-                            setGpuEnabled = { on ->
-                                dev.hatch.gpu.Gpu.setMode(this@MainActivity, if (on) dev.hatch.gpu.Gpu.Mode.AUTO else dev.hatch.gpu.Gpu.Mode.SOFTWARE)
-                            }),
+                        HatchHome(
+                            HatchUiState(catalogue.apps, catalogue.categories, installed, installProg),
+                            StoreActions(
+                                install = { app -> scope.launch { InstallManager.install(this@MainActivity, app, HatchApp.instance.runtime.socketDir().absolutePath) } },
+                                uninstall = { app -> scope.launch { InstallManager.uninstall(this@MainActivity, app) } },
+                                update = { app -> scope.launch { InstallManager.update(this@MainActivity, app, HatchApp.instance.runtime.socketDir().absolutePath) } },
+                                launch = { app -> launchApp(app) },
+                                installSettings = {
+                                    startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                                },
+                                gpuStatus = {
+                                    val g = dev.hatch.gpu.Gpu
+                                    g.describe(g.mode(this@MainActivity), g.info(this@MainActivity, LinuxRuntime.rootfsDir(this@MainActivity)))
+                                },
+                                gpuEnabled = { dev.hatch.gpu.Gpu.mode(this@MainActivity) == dev.hatch.gpu.Gpu.Mode.AUTO },
+                                setGpuEnabled = { on ->
+                                    dev.hatch.gpu.Gpu.setMode(this@MainActivity, if (on) dev.hatch.gpu.Gpu.Mode.AUTO else dev.hatch.gpu.Gpu.Mode.SOFTWARE)
+                                },
+                                floatingEnabled = { dev.hatch.floating.FloatingWindows.enabled(this@MainActivity) },
+                                setFloatingEnabled = { on ->
+                                    val fw = dev.hatch.floating.FloatingWindows
+                                    fw.setMode(this@MainActivity, if (on) fw.MODE_FLOATING else fw.MODE_TASKS)
+                                    if (on && !fw.canOverlay(this@MainActivity)) { startActivity(fw.overlayPermissionIntent(this@MainActivity)); false } else true
+                                },
+                                cancel = { InstallManager.cancel() },
+                                checkUpdates = { InstallManager.checkUpdates(this@MainActivity, catalogue.apps) },
+                                updateAll = { list -> scope.launch { for (a in list) InstallManager.update(this@MainActivity, a, HatchApp.instance.runtime.socketDir().absolutePath) } },
+                                bubbleEnabled = { dev.hatch.floating.Bubble.enabled(this@MainActivity) },
+                                setBubbleEnabled = { on -> dev.hatch.floating.Bubble.setEnabled(this@MainActivity, on) },
+                                uiScale = { getSharedPreferences("hatch", MODE_PRIVATE).getInt("ui_scale", 0) },
+                                setUiScale = { v -> getSharedPreferences("hatch", MODE_PRIVATE).edit().putInt("ui_scale", v).apply() },
+                                storageUsed = { InstallManager.storageUsed(this@MainActivity) },
+                                versionName = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "",
+                            ),
                         )
                     }
                 }
@@ -145,7 +132,7 @@ private fun SetupScreen(stage: RootfsInstaller.Stage, log: List<String>, onStart
         Text("Welcome to Hatch", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         Text(
-            "First run downloads Debian 13 arm64 and prepares a Linux desktop environment. " +
+            "First run downloads Debian 13 (${deviceArch}) and prepares a Linux desktop environment. " +
                 "Apps install as their own launcher icons and open in real windows — Fold / DeX friendly.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

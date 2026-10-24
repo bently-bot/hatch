@@ -31,7 +31,8 @@ if [ -n "$PKGS" ]; then
     apt-get update
   fi
   # shellcheck disable=SC2086
-  apt-get install -y --no-install-recommends $PKGS || { apt-get update && apt-get install -y --no-install-recommends $PKGS; }
+  # Status-Fd=1: machine-readable "dlstatus:/pmstatus:" lines drive the store's progress bar.
+  apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $PKGS || { apt-get update && apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $PKGS; }
 fi
 if [ -n "$URL" ]; then
   mkdir -p "$DEST"
@@ -63,7 +64,7 @@ if [ -n "$DESKTOP" ]; then
       echo "hatch: $DESKTOP is X11-only → installing Xwayland"; EXTRA="$XSTACK"
     fi
   fi
-  [ -z "$EXTRA" ] || apt-get install -y --no-install-recommends $EXTRA
+  [ -z "$EXTRA" ] || apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $EXTRA
 fi
 if [ "$WINE" = 1 ]; then
   echo "hatch: wine prefix will initialise on first launch"

@@ -5,7 +5,11 @@ set -u
 OUT=/var/lib/hatch/gpu-check; T=/opt/hatch/turnip
 mkdir -p /var/lib/hatch "$T"
 res() { echo "$*" > "$OUT"; echo "hatch: gpu-check: $*"; }
-if [ -f /opt/hatch/turnip.tar.xz ]; then tar -xJf /opt/hatch/turnip.tar.xz -C "$T" && rm -f /opt/hatch/turnip.tar.xz; fi
+if [ -f /opt/hatch/turnip.tar.xz ]; then
+  command -v xz >/dev/null 2>&1 || apt-get install -y --no-install-recommends xz-utils >/dev/null 2>&1 || { res "fail could not install xz-utils"; exit 1; }
+  tar -xJf /opt/hatch/turnip.tar.xz -C "$T" || { res "fail could not unpack driver"; exit 1; }
+  rm -f /opt/hatch/turnip.tar.xz
+fi
 [ -f "$T/libvulkan_freedreno.so" ] || { res "fail driver not bundled"; exit 1; }
 printf '{"file_format_version":"1.0.0","ICD":{"library_path":"%s/libvulkan_freedreno.so","api_version":"1.4.0"}}\n' "$T" > "$T/freedreno_icd.json"
 # Runtime deps of the driver + Zink (in Debian's gallium) + vulkaninfo for the probe.

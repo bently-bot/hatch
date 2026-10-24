@@ -42,13 +42,13 @@ import kotlinx.coroutines.withContext
 private val Accent = Color(0xFFFF7A3D)
 
 @Composable
-fun AppIconImage(app: StoreApp, size: Int = 52) {
+fun AppIconImage(app: StoreApp, size: Int = 52, circle: Boolean = false) {
     val ctx = LocalContext.current
     val bmp by produceState<Bitmap?>(AppIcons.cached(app.id), app.id) {
         if (value == null) value = withContext(Dispatchers.IO) { AppIcons.bitmap(ctx, app) }
     }
     Box(
-        Modifier.size(size.dp).clip(RoundedCornerShape((size / 4).dp))
+        Modifier.size(size.dp).clip(if (circle) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape((size / 4).dp))
             .background(if (bmp != null) Color(0xFFF1F1F4) else categoryColour(app)),
         contentAlignment = Alignment.Center,
     ) {
@@ -66,7 +66,7 @@ private fun categoryColour(app: StoreApp) = when (app.category) {
 }
 
 @Composable
-private fun RemoteImage(url: String, modifier: Modifier) {
+internal fun RemoteImage(url: String, modifier: Modifier) {
     val ctx = LocalContext.current
     val bmp by produceState<Bitmap?>(null, url) {
         value = withContext(Dispatchers.IO) {
@@ -102,6 +102,16 @@ data class StoreActions(
     val floatingEnabled: () -> Boolean = { false },
     /** Returns false when the overlay permission must be granted first (the permission screen was opened). */
     val setFloatingEnabled: (Boolean) -> Boolean = { true },
+    val cancel: () -> Unit = {},
+    /** Refresh package lists; returns ids of installed apps with updates. */
+    val checkUpdates: suspend () -> List<String> = { emptyList() },
+    val updateAll: (List<StoreApp>) -> Unit = {},
+    val bubbleEnabled: () -> Boolean = { true },
+    val setBubbleEnabled: (Boolean) -> Unit = {},
+    val uiScale: () -> Int = { 0 },
+    val setUiScale: (Int) -> Unit = {},
+    val storageUsed: suspend () -> String = { "" },
+    val versionName: String = "",
 )
 
 @Composable
