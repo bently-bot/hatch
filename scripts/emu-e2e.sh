@@ -9,9 +9,12 @@ APK="${1:-$(find "$ROOT/apks" "$ROOT/app/build/outputs" -name app-debug.apk 2>/d
 OUT="${PROOF_DIR:-$ROOT/harness-out/emu}"; mkdir -p "$OUT"
 UI="python3 $ROOT/scripts/ui.py"
 t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
-shot() { adb exec-out screencap -p > "$OUT/$1.png"; stamp "screenshot $1 ($(stat -c%s "$OUT/$1.png") bytes)"; }
+# Foldables have several displays: screencap prefixes a warning, so keep only the bytes from the PNG signature on.
+shot() { adb exec-out screencap -p | python3 -c 'import sys; b=sys.stdin.buffer.read(); sys.stdout.buffer.write(b[b.find(b"\x89PNG"):])' > "$OUT/$1.png"; stamp "screenshot $1 ($(stat -c%s "$OUT/$1.png") bytes)"; }
 fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s HatchRuntime HatchSetup HatchInstall HatchStub HatchWindow HatchSession HatchGuest HatchAudio AndroidRuntime:E > "$OUT/logcat.txt" 2>&1; tail -60 "$OUT/logcat.txt"; exit 1; }
 
+# Hide the soft keyboard only if it's showing (BACK with no IME would leave Hatch, e.g. on large screens).
+hide_ime() { for k in 1 2 3; do adb shell dumpsys input_method | grep -q 'mInputShown=true' || return 0; adb shell input keyevent 4; sleep 1; done; }
 # Install a catalogue app through the store UI (search → result → detail → Install → stub prompt). $1 = app id.
 store_install() {
   local id=$1 name stub=dev.hatch.app.${1//-/_}
@@ -19,7 +22,7 @@ store_install() {
   adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 3
   $UI tap 'Get apps' dev.hatch || true; sleep 1
   $UI tap 'Search apps' dev.hatch || $UI tap 'Search' dev.hatch || return 1
-  adb shell input text "$id"; sleep 2; adb shell input keyevent 4 || true; sleep 1
+  adb shell input text "$id"; sleep 2; hide_ime; sleep 1
   for t in 1 2 3 4; do $UI has '^Install$' dev.hatch && break; $UI tap "^$name\$" dev.hatch || true; sleep 2; done
   $UI tap '^Install$' dev.hatch || return 1
   for i in $(seq 1 240); do
@@ -113,7 +116,7 @@ $UI tap 'Search apps' && adb shell input text "$APP" && sleep 2
 adb shell input keyevent 111 || true   # hide IME
 shot 04-search
 APPNAME=$(python3 -c 'import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])' "$ROOT/catalogue/catalogue.json" "$APP")
-adb shell input keyevent 4 || true; sleep 1   # make sure the soft keyboard is gone before tapping the result
+hide_ime; sleep 1   # make sure the soft keyboard is gone before tapping the result
 $UI tap "^$APPNAME\$" dev.hatch || fail "no search result for $APPNAME"
 sleep 2
 # The first tap can be swallowed while the IME animates away; tap again until the detail page's Install button shows.
