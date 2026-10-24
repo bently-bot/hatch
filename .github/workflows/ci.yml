@@ -135,13 +135,15 @@ jobs:
     needs: [android-assemble]
     if: needs.android-assemble.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: hatch-apks
           path: apks
+      - name: Python deps
+        run: python3 -m pip install --quiet pillow || sudo apt-get install -y -qq python3-pil
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -153,17 +155,21 @@ jobs:
           target: google_apis
           arch: x86_64
           force-avd-creation: true
+          disk-size: 8G
+          ram-size: 4096M
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            APK=$(find apks -name '*.apk' | head -1)
+            APK=$(find apks -name 'app-debug.apk' | head -1)
             echo "Using $APK"
-            bash scripts/emu-e2e.sh "$APK"
+            PROOF_DIR=harness-out/emu bash scripts/emu-e2e.sh "$APK"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: emu-e2e-proofs
-          path: harness-out/emu/*.png
+          path: |
+            harness-out/emu/*.png
+            harness-out/emu/*.txt
 
   draft-release:
     needs: [host-wayland-proof, android-assemble, arm64-guest-proof]
