@@ -186,7 +186,9 @@ class FloatingWindow(
                         apply(Bounds(start.x + dx, start.y + dy, start.w, start.h))
                     }
                 }
-                MotionEvent.ACTION_UP -> if (!moved && !pinching) {
+                MotionEvent.ACTION_UP -> if (moved && !pinching) {
+                    apply(Bounds(start.x + (e.rawX - sx).toInt(), start.y + (e.rawY - sy).toInt(), start.w, start.h))
+                } else if (!moved && !pinching) {
                     controls.visibility = if (controls.visibility == View.VISIBLE) View.GONE else View.VISIBLE
                     if (controls.visibility == View.VISIBLE) controls.post { logTargets(controls, "control", label) }
                 }
@@ -217,12 +219,20 @@ class FloatingWindow(
             @Deprecated("") override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
         }
         outlineProvider = null
-        var sx = 0f; var sy = 0f; var start = bounds()
+        var sx = 0f; var sy = 0f; var start = bounds(); var last = 0L
         setOnTouchListener { _, e ->
             when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { sx = e.rawX; sy = e.rawY; start = bounds(); maximised = false; Log.i(TAG, "resize start '$label' $start") }
-                MotionEvent.ACTION_UP -> Log.i(TAG, "resize end '$label' ${bounds()}")
-                MotionEvent.ACTION_MOVE -> apply(FloatGeometry.resizeCorner(start, (e.rawX - sx).toInt(), (e.rawY - sy).toInt(), left, minW, minH))
+                MotionEvent.ACTION_DOWN -> { sx = e.rawX; sy = e.rawY; start = bounds(); maximised = false; last = 0L; Log.i(TAG, "resize start '$label' $start") }
+                // Each relayout resizes the guest surface (the client re-renders), so throttle live updates
+                // and always land exactly where the finger lifted.
+                MotionEvent.ACTION_MOVE -> if (e.eventTime - last >= 60) {
+                    last = e.eventTime
+                    apply(FloatGeometry.resizeCorner(start, (e.rawX - sx).toInt(), (e.rawY - sy).toInt(), left, minW, minH))
+                }
+                MotionEvent.ACTION_UP -> {
+                    apply(FloatGeometry.resizeCorner(start, (e.rawX - sx).toInt(), (e.rawY - sy).toInt(), left, minW, minH))
+                    Log.i(TAG, "resize end '$label' ${bounds()}")
+                }
             }
             true
         }
