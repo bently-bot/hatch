@@ -127,10 +127,10 @@ jobs:
         run: |
           TAG="v0.1.0-dev.${GITHUB_SHA::7}"
           mkdir -p upload
-          cp arts/hatch-apks/*.apk upload/ 2>/dev/null || true
-          cp arts/simple-shm-png/*.png upload/ 2>/dev/null || true
-          cp arts/arm64-guest-proofs/*.png upload/ 2>/dev/null || true
+          find arts -name '*.apk' -exec cp {} upload/ \;
+          find arts -name '*.png' -exec cp {} upload/ \;
           cp catalogue/catalogue.json upload/
+          ls -la upload/
           NOTES="Hatch draft $TAG. Wayland host proof + Android APKs + arm64 guest screenshots when available. Fold 8 / 4K pages. Not production."
           gh release create "$TAG" upload/* \
             --draft \
