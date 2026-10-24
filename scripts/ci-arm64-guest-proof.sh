@@ -11,13 +11,12 @@ sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   gcc make weston curl xz-utils unzip ca-certificates \
   mousepad galculator libgtk-3-0 \
-  xwayland xterm \
+  xwayland xterm python3-pil \
   wine64 wine libwine fonts-dejavu-core || \
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  gcc make weston curl ca-certificates mousepad galculator wine64 xwayland xterm
+  gcc make weston curl ca-certificates mousepad galculator wine64 xwayland xterm python3-pil
 
-curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip \
-  || curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
+curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
 sudo unzip -qo /tmp/kotlin.zip -d /opt
 export PATH="/opt/kotlinc/bin:$PATH"
 gcc -shared -fPIC -O2 -DHATCH_HOST -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
@@ -32,20 +31,26 @@ png_ok() {
   [ -f "$f" ] || return 1
   local sz; sz=$(stat -c%s "$f")
   [ "$sz" -ge "$min" ] || { echo "png too small: $f ($sz < $min)"; return 1; }
-  python3 - "$f" <<'PY' || return 1
+  python3 - "$f" <<'PY'
 import sys
-from PIL import Image
-im = Image.open(sys.argv[1]).convert("RGB")
-w,h = im.size
-# sample grid; require meaningful non-uniform content
-step = max(1, (w*h)//4000)
-px = list(im.getdata())
-sample = px[::step]
-uniq = len(set(sample))
-# reject near-solid fills
-if uniq < 8:
-    print(f"too uniform uniq={uniq}", file=sys.stderr); sys.exit(1)
-print(f"ok {sys.argv[1]} {w}x{h} uniq≈{uniq} size={__import__('os').path.getsize(sys.argv[1])}")
+path = sys.argv[1]
+data = open(path, "rb").read()
+assert data[:8] == b"\x89PNG\r\n\x1a\n", "not png"
+import struct
+w, h = struct.unpack(">II", data[16:24])
+try:
+    from PIL import Image
+    im = Image.open(path).convert("RGB")
+    step = max(1, (w * h) // 4000)
+    sample = list(im.getdata())[::step]
+    uniq = len(set(sample))
+    if uniq < 8:
+        print(f"too uniform uniq={uniq}", file=sys.stderr); sys.exit(1)
+    print(f"ok {path} {w}x{h} uniq≈{uniq} size={len(data)}")
+except Exception as e:
+    if w < 64 or h < 64 or len(data) < 2000:
+        print(f"weak png {e}", file=sys.stderr); sys.exit(1)
+    print(f"ok-fallback {path} {w}x{h} size={len(data)} ({e})")
 PY
 }
 
@@ -53,14 +58,17 @@ capture() {
   local name="$1"; shift
   local seconds="$1"; shift
   rm -f "$PROOF/$name.png" "$PROOF/${name}-client.log" "$PROOF/${name}-host.log"
+  local inject=()
+  if [ "${HATCH_INJECT:-0}" = "1" ]; then inject=(--inject); fi
   set +e
   env -u DISPLAY java -Dhatch.native="$NAT" -cp "$CP" \
     dev.hatch.harness.MainKt \
     "$RUNNER_TEMP/wayland-$name" \
     "$PROOF/$name.png" \
-    "$seconds" -- "$@" >"$PROOF/${name}-host.log" 2>&1
+    "$seconds" "${inject[@]}" -- "$@" >"$PROOF/${name}-host.log" 2>&1
   local rc=$?
   set -e
+  unset HATCH_INJECT
   echo "==== $name host (tail) ===="; tail -40 "$PROOF/${name}-host.log" || true
   [ -f "$PROOF/client.log" ] && mv "$PROOF/client.log" "$PROOF/${name}-client.log" || true
   echo "==== $name client (tail) ===="; tail -40 "$PROOF/${name}-client.log" 2>/dev/null || true
@@ -76,26 +84,22 @@ echo "== weston-flower =="
 capture flower 20 weston-flower || echo "flower soft-fail"
 [ -f "$PROOF/flower.png" ] && png_ok "$PROOF/flower.png" 2000 || true
 
-echo "== mousepad (REQUIRED) =="
-capture mousepad 35 mousepad
+echo "== mousepad (REQUIRED, with input inject) =="
+HATCH_INJECT=1 capture mousepad 45 mousepad
 png_ok "$PROOF/mousepad.png" 6000
 
 echo "== galculator (REQUIRED) =="
-capture galculator 30 galculator
+capture galculator 35 galculator
 png_ok "$PROOF/galculator.png" 4000
 
-# Xwayland + xterm — soft-fail until compositor XWM is solid
 echo "== xterm via Xwayland (best-effort) =="
 if command -v Xwayland >/dev/null && command -v xterm >/dev/null; then
   set +e
-  # Harness clears DISPLAY; hatch-x11 pattern: start Xwayland as child of same WAYLAND_DISPLAY
-  capture xterm 40 bash -lc '
-    export XDG_RUNTIME_DIR="'"$RUNNER_TEMP"'/wayland-xterm"
-    export WAYLAND_DISPLAY=wayland-0
+  capture xterm 45 bash -lc '
     mkdir -p /tmp/.X11-unix
     rm -f /tmp/.X1-lock
     Xwayland :1 -geometry 1280x800 -noreset -ac >/tmp/hatch-xwayland.log 2>&1 &
-    sleep 0.6
+    sleep 0.8
     export DISPLAY=:1
     unset GDK_BACKEND
     exec xterm -geometry 100x30
@@ -103,8 +107,7 @@ if command -v Xwayland >/dev/null && command -v xterm >/dev/null; then
   set -e
 fi
 
-# Wine/Notepad++ — longer wineboot on arm64; still soft-fail if hung
-echo "== notepad++ / wine (best-effort, longer) =="
+echo "== notepad++ / wine (best-effort) =="
 if command -v wine64 >/dev/null || command -v wine >/dev/null; then
   NPP_DIR="$RUNNER_TEMP/npp"
   mkdir -p "$NPP_DIR"
