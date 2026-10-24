@@ -1,3 +1,0 @@
-/workspace/app-builder/droidbox/hatch/app/.cxx/Debug/g3x4o3ei/arm64-v8a/CMakeFiles/hatchnative.dir
-/workspace/app-builder/droidbox/hatch/app/.cxx/Debug/g3x4o3ei/arm64-v8a/CMakeFiles/edit_cache.dir
-/workspace/app-builder/droidbox/hatch/app/.cxx/Debug/g3x4o3ei/arm64-v8a/CMakeFiles/rebuild_cache.dir

@@ -18,3 +18,10 @@ local.properties
 /harness-out/
 *.apk
 /proofs/
+/.cxx/
+/app/.cxx/
+/app/build/
+/build/
+/captures/
+local.properties
+hs_err_pid*.log
