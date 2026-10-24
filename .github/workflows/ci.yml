@@ -131,10 +131,7 @@ jobs:
           cp arts/simple-shm-png/*.png upload/ 2>/dev/null || true
           cp arts/arm64-guest-proofs/*.png upload/ 2>/dev/null || true
           cp catalogue/catalogue.json upload/
-          NOTES="Hatch draft $TAG
-
-Wayland host proof + Android APKs + (if available) arm64 guest screenshots.
-Fold 8 / 4K pages. Not production."
+          NOTES="Hatch draft $TAG. Wayland host proof + Android APKs + arm64 guest screenshots when available. Fold 8 / 4K pages. Not production."
           gh release create "$TAG" upload/* \
             --draft \
             --title "Hatch $TAG" \
