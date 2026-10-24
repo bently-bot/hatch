@@ -35,7 +35,9 @@ def find(rx, pkg=None):
     if root is None: return None
     r = re.compile(rx, re.I)
     parents = {c: p for p in root.iter() for c in p}
-    for n in root.iter("node"):
+    # Prefer real labels over text fields: a search box holding "mousepad" must not win over the "Mousepad" result.
+    nodes = sorted(root.iter("node"), key=lambda n: "EditText" in (n.get("class") or ""))
+    for n in nodes:
         if pkg and not re.search(pkg, n.get("package", "")): continue
         if r.search(n.get("text", "") or "") or r.search(n.get("content-desc", "") or ""):
             m = n
