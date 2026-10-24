@@ -16,6 +16,12 @@ class GuestScriptsTest {
         assertTrue(c, c.startsWith("/usr/local/bin/hatch-install-app --packages 'a b' --wine --payload 'https://x/y z.zip' 'ab' '/opt/x'"))
     }
 
+    @Test fun installCommandAddsVendorRepo() {
+        val repo = dev.hatch.store.AptRepo("cursor", "https://downloads.cursor.com/keys/anysphere.asc", "https://downloads.cursor.com/aptrepo", "stable")
+        val c = GuestScripts.installCommand(listOf("cursor"), wine = false, repo = repo)
+        assertTrue(c, c.startsWith("/usr/local/bin/hatch-install-app --packages 'cursor' --repo 'cursor' 'https://downloads.cursor.com/keys/anysphere.asc' 'https://downloads.cursor.com/aptrepo' 'stable' 'main'"))
+    }
+
     @Test fun assetsShipScripts() {
         val dir = java.io.File("src/main/assets/guest-bin")
         for (n in listOf("hatch-launch", "hatch-install-app", "hatch-xwayland", "hatch-x11")) {

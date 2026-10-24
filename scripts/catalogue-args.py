@@ -8,6 +8,8 @@ a = next(x for x in cat["apps"] if x["id"] == app_id)
 if mode == "install":
     argv = ["/usr/local/bin/hatch-install-app"]
     if a.get("packages"): argv += ["--packages", " ".join(a["packages"])]
+    r = a.get("repo")
+    if r: argv += ["--repo", r["id"], r["keyUrl"], r["uris"], r["suites"], r.get("components", "main")]
     if a.get("wine"): argv.append("--wine")
     if a.get("desktopId"): argv += ["--desktop", a["desktopId"]]
     p = a.get("windowsPayload")

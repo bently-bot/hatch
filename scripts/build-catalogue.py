@@ -86,7 +86,7 @@ for d in comps:
 
 # Curated entries override/extend generated ones (keep their tested commands & flags).
 for cid, c in cur_by_id.items():
-    base = apps.get(cid) or next((x for x in apps.values() if c.get("packages") and x["packages"] == c["packages"][:1]), None) or {}
+    base = apps.get(cid) or next((x for x in apps.values() if c.get("packages") and x.get("packages") == c["packages"][:1]), None) or {}
     merged = {**base, **{k: v for k, v in c.items() if v not in (None, "", [])}}
     if base and "desktopId" in base and c.get("command"): merged["command"] = c["command"]
     if base: merged["category"] = base["category"]   # AppStream categories beat our old hand-picked ones

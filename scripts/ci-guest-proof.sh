@@ -100,19 +100,19 @@ capture() { # name seconds harness-opts... -- cmd...
   [ $rc -eq 0 ] || { echo "--- $name client log ---"; tail -30 "$PROOF/$name-client.log" 2>/dev/null || true; }
   return $rc
 }
-title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender) echo "Xwayland";; *) echo "";; esac; }
+title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender) echo "Xwayland";; cursor) echo "Cursor";; brave-browser) echo "Brave";; *) echo "";; esac; }
 
 FAILED=()
 for app in $APPS; do
   stamp "== install $app =="
-  if ! "${G[@]}" bash -c "$(python3 scripts/catalogue-args.py install "$app") > /tmp/hatch-install-$app.log 2>&1; rc=\$?; tail -5 /tmp/hatch-install-$app.log; exit \$rc"; then
+  if ! "${G[@]}" bash -c "$(python3 scripts/catalogue-args.py install "$app") > /tmp/hatch-install-$app.log 2>&1; rc=\$?; tail -5 /tmp/hatch-install-$app.log; [ \$rc = 0 ] || grep -E \"^(E:|dpkg: |pmerror)|rror|hatch:\" /tmp/hatch-install-$app.log | head -25; exit \$rc"; then
     echo "install $app FAILED"; FAILED+=("$app"); continue
   fi
   stamp "== launch $app =="
   LAUNCH=$(python3 scripts/catalogue-args.py launch "$app")
   T=$(title_for "$app"); topt=(); [ -n "$T" ] && topt=(--title="$T")
-  secs=90; [ "$app" = notepadpp ] && secs=420; [ "$app" = blender ] && secs=300
-  settle=3000; [ "$app" = blender ] && settle=90000   # rootful Xwayland appears first; Blender compiles GL shaders on llvmpipe
+  secs=90; [ "$app" = notepadpp ] && secs=420; [ "$app" = blender ] && secs=300; case "$app" in cursor|brave-browser) secs=240 ;; esac
+  settle=3000; [ "$app" = blender ] && settle=90000; case "$app" in cursor|brave-browser) settle=30000 ;; esac   # rootful Xwayland appears first; Blender compiles GL shaders on llvmpipe
   minu=12; [ "$app" = xterm ] && minu=2   # xterm's core bitmap font really is 2 colours
   if capture "$app" "$secs" "${topt[@]}" --settle=$settle -- "${GU[@]}" bash -c "$LAUNCH" && png_ok "$PROOF/$app.png" "$minu"; then
     stamp "$app OK"

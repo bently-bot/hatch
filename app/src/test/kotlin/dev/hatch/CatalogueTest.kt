@@ -43,4 +43,18 @@ class CatalogueTest {
         assertTrue(npp.payloadFor("amd64")!!.url.contains("x64"))
         assertEquals(64, npp.payloadFor("amd64")!!.sha256.length)
     }
+
+    @Test
+    fun vendorAppsCarryTheirRepo() {
+        val apps = load().apps.associateBy { it.id }
+        for (id in listOf("cursor", "code", "brave-browser")) {
+            val a = apps.getValue(id)
+            assertEquals("vendor", a.source)
+            assertTrue(a.vendorName.isNotBlank())
+            val r = a.repo!!
+            assertTrue(r.keyUrl.startsWith("https://") && r.uris.startsWith("https://"))
+            assertTrue("$id needs --no-sandbox under proot", "--no-sandbox" in a.command)
+        }
+        assertTrue(apps.getValue("blender").x11)
+    }
 }

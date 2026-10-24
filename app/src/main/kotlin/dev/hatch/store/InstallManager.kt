@@ -66,6 +66,7 @@ object InstallManager {
                     payloadSha = payload?.sha256,
                     payloadDest = payload?.extractTo,
                     desktopId = app.desktopId,
+                    repo = app.repo,
                 )
                 val tail = ArrayDeque<String>()
                 val apt = AptProgress()

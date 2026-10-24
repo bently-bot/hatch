@@ -1,18 +1,32 @@
 #!/bin/sh
 # Hatch guest installer. Same script is used by the Android app and by CI.
-# usage: hatch-install-app [--packages "a b"] [--payload URL SHA256 DEST] [--wine]
+# usage: hatch-install-app [--packages "a b"] [--repo ID KEYURL URIS SUITES COMPONENTS] [--payload URL SHA256 DEST] [--wine]
 set -eu
-PKGS=""; URL=""; SHA=""; DEST=""; WINE=0; DESKTOP=""
+PKGS=""; URL=""; SHA=""; DEST=""; WINE=0; DESKTOP=""; REPO=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --packages) PKGS="$2"; shift 2 ;;
     --payload) URL="$2"; SHA="$3"; DEST="$4"; shift 4 ;;
+    --repo) REPO="$2"; RKEY="$3"; RURIS="$4"; RSUITES="$5"; RCOMP="$6"; shift 6 ;;
     --wine) WINE=1; shift ;;
     --desktop) DESKTOP="$2"; shift 2 ;;
     *) echo "unknown arg $1" >&2; exit 2 ;;
   esac
 done
 export DEBIAN_FRONTEND=noninteractive
+# Mirrors/CDNs hiccup (5xx, resets); never fail an install on one bad response.
+# Vendor packages (Cursor, VS Code, Chrome, Brave…) install their own sources entry for their repo on first install.
+# Ours only bootstraps that: once the vendor's entry exists, drop ours (apt rejects two Signed-By for one source).
+vendor_has() { u=$(echo "$1" | sed 's:/*$::'); grep -lsF "$u" /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null | grep -qv '/hatch-[^/]*\.sources$'; }
+dedupe_sources() {
+  for f in /etc/apt/sources.list.d/hatch-*.sources; do
+    [ -e "$f" ] || continue
+    u=$(sed -n 's/^URIs: *//p' "$f")
+    if [ -n "$u" ] && vendor_has "$u"; then echo "hatch: $(basename "$f") superseded by the vendor's own entry"; rm -f "$f"; fi
+  done
+}
+dedupe_sources
+apt_update() { for i in 1 2 3 4; do apt-get update && return 0; echo "hatch: apt update failed, retrying ($i)"; sleep $((i*3)); done; return 1; }
 if [ "$WINE" = 1 ]; then PKGS="$PKGS wine wine64 libwine fonts-wine"; fi
 if [ -n "$URL" ]; then PKGS="$PKGS curl ca-certificates unzip"; fi
 # Sound: one shared PulseAudio (hatch-audio) for every app; ALSA-only apps go through the pulse plugin.
@@ -24,16 +38,39 @@ PKGS=$(echo $PKGS | tr ' ' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ' ')
 mkdir -p /etc/apt/preferences.d /var/lib/dpkg/updates
 # Recover from an interrupted dpkg run (app killed mid-install, phone rebooted, …)
 dpkg --configure -a >/dev/null 2>&1 || true
+FORCE_UPDATE=0
+if [ -n "$REPO" ]; then
+  # Vendor apt repository (deb822 + its own signing key), like adding Cursor's or VS Code's repo by hand.
+  case "$REPO" in *[!a-z0-9.-]*|"") echo "hatch: bad repo id" >&2; exit 2 ;; esac
+  SRC=/etc/apt/sources.list.d/hatch-$REPO.sources
+  if [ ! -s "$SRC" ] && ! vendor_has "$RURIS"; then
+    echo "hatch: adding $REPO's repository ($RURIS)"
+    command -v curl >/dev/null 2>&1 && [ -e /etc/ssl/certs/ca-certificates.crt ] || {
+      apt-get update >/dev/null 2>&1 || true
+      apt-get install -y --no-install-recommends curl ca-certificates >/dev/null || { echo "hatch: could not install curl" >&2; exit 5; }
+    }
+    mkdir -p /etc/apt/keyrings /etc/apt/sources.list.d
+    KTMP=/etc/apt/keyrings/hatch-$REPO.key.tmp
+    curl -fsSL --retry 3 -o "$KTMP" "$RKEY" || { echo "hatch: could not download $REPO's signing key" >&2; exit 5; }
+    # apt's Signed-By takes an armored .asc or a binary keyring (.gpg); keep the vendor's format.
+    if head -c 40 "$KTMP" | grep -q 'BEGIN PGP'; then KEY=/etc/apt/keyrings/hatch-$REPO.asc; else KEY=/etc/apt/keyrings/hatch-$REPO.gpg; fi
+    mv "$KTMP" "$KEY"
+    printf 'Types: deb\nURIs: %s\nSuites: %s\nComponents: %s\nArchitectures: %s\nSigned-By: %s\n' \
+      "$RURIS" "$RSUITES" "$RCOMP" "$(dpkg --print-architecture)" "$KEY" > "$SRC"
+    FORCE_UPDATE=1
+  fi
+fi
 if [ -n "$PKGS" ]; then
   echo "hatch: apt install $PKGS"
   # Refresh lists if older than a day (or missing)
-  if [ -z "$(find /var/lib/apt/lists -maxdepth 1 -name '*Packages*' -mtime -1 2>/dev/null | head -1)" ]; then
-    apt-get update
+  if [ "$FORCE_UPDATE" = 1 ] || [ -z "$(find /var/lib/apt/lists -maxdepth 1 -name '*Packages*' -mtime -1 2>/dev/null | head -1)" ]; then
+    apt_update
   fi
   # shellcheck disable=SC2086
   # Status-Fd=1: machine-readable "dlstatus:/pmstatus:" lines drive the store's progress bar.
-  apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $PKGS || { apt-get update && apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $PKGS; }
+  apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $PKGS || { apt_update && apt-get install -y --no-install-recommends -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 $PKGS; }
 fi
+dedupe_sources
 if [ -n "$URL" ]; then
   mkdir -p "$DEST"
   TMP="/tmp/hatch-payload.$$"

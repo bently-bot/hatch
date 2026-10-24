@@ -71,9 +71,13 @@ object GuestScripts {
         payloadSha: String? = null,
         payloadDest: String? = null,
         desktopId: String? = null,
+        repo: dev.hatch.store.AptRepo? = null,
     ): String = buildList {
         add("$BIN/hatch-install-app")
         if (packages.isNotEmpty()) { add("--packages"); add(sq(packages.joinToString(" "))) }
+        if (repo != null) {
+            add("--repo"); add(sq(repo.id)); add(sq(repo.keyUrl)); add(sq(repo.uris)); add(sq(repo.suites)); add(sq(repo.components))
+        }
         if (wine) add("--wine")
         if (!desktopId.isNullOrEmpty()) { add("--desktop"); add(sq(desktopId)) }
         if (!payloadUrl.isNullOrEmpty() && !payloadDest.isNullOrEmpty()) {
