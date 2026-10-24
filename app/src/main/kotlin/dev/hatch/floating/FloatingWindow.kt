@@ -133,8 +133,13 @@ class FloatingWindow(
             }
             override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
                 if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) { releaseFocus(); controls.visibility = View.GONE; return true }
-                if (ev.actionMasked == MotionEvent.ACTION_DOWN) { FloatingWindows.raise(this@FloatingWindow); takeFocus() }
-                return super.dispatchTouchEvent(ev)
+                if (ev.actionMasked == MotionEvent.ACTION_DOWN) takeFocus()
+                val handled = super.dispatchTouchEvent(ev)
+                // Raising re-adds the view (the only z-order control for overlays), which would cancel a gesture in
+                // flight, so the window comes to the front when the finger lifts.
+                if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL)
+                    post { FloatingWindows.raise(this@FloatingWindow) }
+                return handled
             }
         }.apply { setPadding(shadow, shadow, shadow, shadow); clipToPadding = false; clipChildren = false }
         root.addView(card, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))

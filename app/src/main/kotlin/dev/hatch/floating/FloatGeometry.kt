@@ -37,7 +37,10 @@ object FloatGeometry {
         val w = (screenW * if (wide) 0.70f else 0.88f).roundToInt()
         val h = (screenH * if (wide) 0.70f else 0.60f).roundToInt()
         val step = (min(screenW, screenH) * 0.05f).roundToInt() * (cascade % 5)
-        return Bounds((screenW - w) / 2 + step, (screenH - h) / 2 + step, w, h)
+        // Keep cascaded windows fully on screen (the 2nd/3rd window must not run off the bottom/right edge).
+        val x = ((screenW - w) / 2 + step).coerceAtMost(screenW - w)
+        val y = ((screenH - h) / 2 + step).coerceAtMost(screenH - h - (screenH * 0.04f).roundToInt()).coerceAtLeast(0)
+        return Bounds(x, y, w, h)
     }
 
     /** Bubble snaps to the nearest vertical screen edge. */
