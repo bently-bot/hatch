@@ -160,13 +160,31 @@ adb logcat -d | grep -qE 'windowCreated|window created' || fail "no Wayland wind
 sleep 8
 shot 08-app-window
 adb shell dumpsys activity activities | grep -E 'topResumedActivity|ResumedActivity' | head -3
-python3 - "$OUT/08-app-window.png" <<'PY' || fail "window looks empty"
+[ "${E2E_MODE:-}" = blender ] || python3 - "$OUT/08-app-window.png" <<'PY' || fail "window looks empty"
 import sys
 from PIL import Image
 im = Image.open(sys.argv[1]).convert("RGB"); w, h = im.size
 crop = im.crop((0, h // 8, w, h * 7 // 8)); px = list(crop.getdata())[::97]
 u = len(set(px)); print(f"app window uniq colours={u}"); sys.exit(0 if u > 12 else 1)
 PY
+
+if [ "${E2E_MODE:-}" = blender ]; then
+  # Blender (X11 via rootful Xwayland, llvmpipe) as a floating window over the home screen, then the store on top.
+  stamp "blender: floating over home"
+  adb shell input keyevent 3; sleep 3
+  for i in $(seq 1 60); do float_frame Blender >/dev/null && break; sleep 5; done
+  F=$(float_frame Blender) || fail "Blender is not a floating overlay window"
+  stamp "blender overlay frame: $F (screen $(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1))"
+  sleep 150   # first start compiles shaders on llvmpipe
+  shot B1-blender-floating-over-home
+  adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 5
+  float_frame Blender >/dev/null || fail "Blender window closed when the store opened"
+  shot B2-blender-floating-with-store
+  adb shell input keyevent 3; sleep 3
+  shot B3-blender-floating-over-home-later
+  adb logcat -d -s HatchWindow HatchFloat HatchSession > "$OUT/logcat.txt" 2>&1
+  stamp "blender floating proof done"; exit 0
+fi
 
 stamp "floating window checks"
 adb shell input keyevent 3; sleep 3   # home: the overlay must stay above the launcher

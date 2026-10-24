@@ -48,3 +48,9 @@ Proof locations: proofs/ci-arm64/*, proofs/emu/*, proofs/local/*. "Fold-8-only" 
 ## F. Final pass
 - [ ] F1 README with screenshots; full test summary (unit, host compositor, arm64 guest, emulator E2E)
 - [ ] F2 Signed draft release (never published)
+
+## F. Stretch (after the core checklist + GPU): Steam (Experimental)
+- [ ] F1 Investigate x86 emulation on arm64: Box64 (+ Box86 for the 32-bit Steam client/bootstrap; Debian/Ryan Fortner box64/box86 debs or upstream builds) vs FEX-Emu (needs an x86-64 rootfs image). Pick per device test.
+- [ ] F2 Steam needs i386 libs: armhf multiarch for Box86, or an x86 rootfs for FEX. Prototype in the arm64 CI guest (proot), install `steam-installer`/the bootstrap, reach the login window.
+- [ ] F3 Store entry "Steam (Experimental)" with source badge "Experimental", own install script (hatch-install-app --emu box64|fex), floating window like any app.
+- [ ] F4 Verify on device (Fold 8); document the limits (anti-cheat, Proton under emulation = slow).

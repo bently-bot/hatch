@@ -229,6 +229,67 @@ jobs:
             harness-out/emu/*.png
             harness-out/emu/*.txt
 
+  emu-blender:
+    # Bently: Blender as a floating window on the Fold-sized emulator (software GL = llvmpipe; slow, so generous limits).
+    needs: [android-assemble]
+    if: needs.android-assemble.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: hatch-apks
+          path: apks
+      - name: Free disk space (emulator userdata needs room)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules /usr/share/swift || true
+          df -h /
+      - name: Python deps
+        run: python3 -m pip install --quiet pillow || sudo apt-get install -y -qq python3-pil
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Pre-install emulator + system image (retries; the runner action's own download is flaky)
+        run: |
+          SDKM=$(ls "$ANDROID_HOME"/cmdline-tools/latest/bin/sdkmanager 2>/dev/null || command -v sdkmanager)
+          for i in 1 2 3 4; do
+            yes | "$SDKM" --install emulator 'system-images;android-34;google_apis;x86_64' platform-tools > /tmp/sdk.log 2>&1 && break
+            tail -3 /tmp/sdk.log; echo "retry $i"; sleep 20
+          done
+          # Newer cmdline-tools know the foldable/tablet device profiles (pixel_fold ≈ the Fold's 7.6" inner screen).
+          C="$ANDROID_HOME/cmdline-tools"
+          for i in 1 2 3; do yes | "$SDKM" --install 'cmdline-tools;latest' > /tmp/ct.log 2>&1 && break; sleep 15; done
+          N=$(ls -d "$C"/latest-* 2>/dev/null | sort -V | tail -1)
+          if [ -n "$N" ]; then sudo rm -rf "$C/latest" && sudo mv "$N" "$C/latest"; fi
+          P=pixel_6
+          for d in pixel_fold pixel_tablet pixel_c; do
+            "$C/latest/bin/avdmanager" list device -c 2>/dev/null | grep -qx "$d" && { P=$d; break; }
+          done
+          echo "EMU_PROFILE=$P" >> "$GITHUB_ENV"; echo "emulator profile: $P"
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: ${{ env.EMU_PROFILE }}
+          force-avd-creation: true
+          disk-size: 10G
+          ram-size: 4096M
+          emulator-options: -no-metrics -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          # emulator-runner runs each script line in its own sh, so keep it to one line
+          script: E2E_APP=blender E2E_MODE=blender PROOF_DIR=harness-out/emu-blender bash scripts/emu-e2e.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emu-blender-proofs
+          path: |
+            harness-out/emu-blender/*.png
+            harness-out/emu-blender/*.txt
+
   draft-release:
     needs: [host-wayland-proof, android-assemble, arm64-guest-proof]
     if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.android-assemble.result == 'success' && needs.host-wayland-proof.result == 'success'
