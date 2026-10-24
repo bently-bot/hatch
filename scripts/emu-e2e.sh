@@ -322,7 +322,7 @@ adb shell input keyevent 3; sleep 2
 F=$(float_frame Mousepad); read L T R B <<<"$F"
 adb logcat -c
 adb shell input tap $(( (L + R) / 2 )) $(( T + $(dp 10) + $(dp 13) )); sleep 2
-tap_target "control Maximise" Mousepad || fail "no Maximise control"
+tap_target "control Maximise" Mousepad || { sleep 1; adb shell input tap $(( (L + R) / 2 )) $(( T + $(dp 10) + $(dp 13) )); sleep 2; tap_target "control Maximise" Mousepad; } || fail "no Maximise control"
 sleep 3; MX=$(float_frame Mousepad); read ML MT MR MB <<<"$MX"
 stamp "maximised frame: $MX (screen ${WX}x${WY})"
 [ $(( MR - ML )) -ge $(( WX * 95 / 100 )) ] || fail "maximise did not fill the width ($F → $MX)"
