@@ -33,7 +33,8 @@ guest() {
 guest_probe() {
   stamp "guest probe:"
   adb shell "run-as dev.hatch cat files/linux/etc/resolv.conf files/linux/etc/hosts" 2>&1 | sed 's/^/  /'
-  guest 'getent hosts deb.debian.org; getent hosts google.com || echo GUEST-DNS-FAIL; getent ahostsv4 example.org | head -2' | sed 's/^/  /' | head -10
+  guest 'getent hosts deb.debian.org; getent hosts google.com || echo GUEST-DNS-FAIL; getent ahostsv4 example.org | head -2' | sed 's/^/  /' | head -10 | tee "$OUT/guest-dns.txt"
+  grep -q GUEST-DNS-FAIL "$OUT/guest-dns.txt" && stamp "WARN: guest DNS (runtime name lookups by apps) not working" || stamp "guest DNS OK"
 }
 
 adb wait-for-device
