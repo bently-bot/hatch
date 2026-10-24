@@ -50,26 +50,30 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Android SDK (preinstalled runner image)
+      - name: Set up Android SDK
         run: |
+          # GitHub-hosted runners ship an Android SDK; locate it.
+          if [ -z "$ANDROID_HOME" ]; then
+            for d in /usr/local/lib/android/sdk "$HOME/Android/Sdk"; do
+              [ -d "$d" ] && export ANDROID_HOME="$d" && break
+            done
+          fi
           echo "ANDROID_HOME=$ANDROID_HOME"
+          test -d "$ANDROID_HOME" || { echo "no SDK"; exit 1; }
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-          # Accept licenses + install what we need (no obsolete 'tools' package)
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-36" "platforms;android-35" "build-tools;36.0.0" \
+          SM=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort | tail -1)
+          [ -n "$SM" ] || SM=$(find "$ANDROID_HOME" -type f -name sdkmanager 2>/dev/null | head -1)
+          echo "sdkmanager=$SM"
+          test -x "$SM" || { echo "sdkmanager missing"; exit 1; }
+          yes | "$SM" --licenses >/dev/null || true
+          "$SM" "platforms;android-36" "platforms;android-35" "build-tools;36.0.0" \
             "ndk;27.0.12077973" "cmake;3.22.1"
       - name: Assemble debug
         run: |
           chmod +x gradlew
-          # compileSdk 37 may not be on runners yet — fall back to 36 if needed
           if ! ls "$ANDROID_HOME"/platforms | grep -q 'android-37'; then
             sed -i 's/compileSdk = 37/compileSdk = 36/' app/build.gradle.kts
-            # Silence AarMetadata check for compose needing 37 when only 36 present
-            mkdir -p app
-            grep -q 'android.experimental' gradle.properties || \
-              echo 'android.experimental.lint.missingResourceTracking=true' >> gradle.properties
-            # Allow lower compileSdk via gradle property used by AGP CheckAarMetadata
-            echo 'android.suppressUnsupportedCompileSdk=37' >> gradle.properties
           fi
           ./gradlew :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
