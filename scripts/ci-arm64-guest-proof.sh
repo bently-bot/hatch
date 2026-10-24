@@ -10,11 +10,11 @@ mkdir -p "$RUNNER_TEMP"
 sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   gcc make weston curl xz-utils unzip ca-certificates \
-  mousepad galculator libgtk-3-0 \
+  mousepad galculator thunar gedit libgtk-3-0 \
   xwayland xterm python3-pil dbus-x11 \
   wine64 wine libwine fonts-dejavu-core || \
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  gcc make weston curl ca-certificates mousepad galculator wine64 xwayland xterm python3-pil
+  gcc make weston curl ca-certificates mousepad galculator thunar gedit wine64 xwayland xterm python3-pil
 
 curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
 sudo unzip -qo /tmp/kotlin.zip -d /opt
@@ -112,6 +112,14 @@ echo "== galculator (REQUIRED) =="
 capture galculator 35 galculator
 png_ok "$PROOF/galculator.png" 4000
 
+echo "== thunar (soft) =="
+capture thunar 30 thunar || echo "thunar soft-fail"
+[ -f "$PROOF/thunar.png" ] && png_ok "$PROOF/thunar.png" 3000 || true
+
+echo "== gedit (soft) =="
+capture gedit 35 gedit || echo "gedit soft-fail"
+[ -f "$PROOF/gedit.png" ] && png_ok "$PROOF/gedit.png" 3000 || true
+
 echo "== xterm via Xwayland (best-effort) =="
 if command -v Xwayland >/dev/null && command -v xterm >/dev/null; then
   set +e
@@ -136,9 +144,9 @@ if command -v wine64 >/dev/null || command -v wine >/dev/null; then
   unzip -qo /tmp/npp.zip -d "$NPP_DIR"
   export WINEPREFIX="$RUNNER_TEMP/wineprefix"
   WINEBIN=$(command -v wine64 || command -v wine)
-  echo "wineboot -i (max 3 min)…"
+  echo "wineboot -i (max 5 min)…"
   set +e
-  timeout 180 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" wineboot -i
+  timeout 300 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" wineboot -i
   wb=$?
   echo "wineboot exit=$wb"
   if [ "$wb" -eq 0 ]; then

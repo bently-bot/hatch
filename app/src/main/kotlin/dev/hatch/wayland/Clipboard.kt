@@ -21,8 +21,11 @@ class Clipboard(val server: WaylandServer) {
     }
     fun setFromHost(t: String) {
         text = t; source = null
+        // Clear client selection; host text remains in [text] for Android→guest paste bridge
+        // (full wl_data_offer from host needs a synthetic DataSource — next pass).
         for (seat in server.seat.seats) seat.dataDevice?.selection(null)
     }
+    fun hostText(): String? = text
 }
 
 class DataDeviceManagerRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
