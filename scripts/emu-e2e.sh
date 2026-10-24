@@ -121,4 +121,50 @@ PID_AFTER=$(adb shell pidof dev.hatch | tr -d '\r')
 [ "$PID_BEFORE" = "$PID_AFTER" ] || fail "process restarted on resize ($PID_BEFORE → $PID_AFTER)"
 adb logcat -d | grep -qE 'windowDestroyed|window destroyed' && stamp "WARN: window destroyed during resize"
 adb logcat -d -s HatchRuntime HatchWindow HatchSession > "$OUT/logcat.txt" 2>&1
+stamp "mousepad leg OK"
+
+if [ "${E2E_WINE:-1}" = 1 ]; then
+  stamp "Windows app via Wine: Notepad++ (x64 build on this x86_64 emulator; ARM64 build is proven on the arm64 runner)"
+  WSTUB=dev.hatch.app.notepadpp
+  adb shell am start -S -W -n dev.hatch/.ui.MainActivity >/dev/null
+  $UI wait 'Search apps' 60 || fail "store not shown again"
+  $UI tap 'Search apps' && adb shell input text "notepad" && sleep 2
+  adb shell input keyevent 111 || true
+  shot 11-search-notepadpp
+  $UI tap '^Install$' dev.hatch || fail "no Install button for Notepad++"
+  for i in $(seq 1 360); do
+    adb shell pm list packages | grep -q "package:$WSTUB$" && break
+    if $UI has 'Install failed' dev.hatch; then
+      $UI tap '^Details$' dev.hatch || true; sleep 2; shot 12-wine-install-failed
+      adb logcat -d -s HatchInstall > "$OUT/wine-install-logcat.txt" 2>&1; fail "Notepad++ install failed"
+    fi
+    if $UI has 'Do you want to install|install this app'; then shot 12-wine-stub-prompt; $UI tap '^Install$' 'packageinstaller' || true; fi
+    [ $((i % 12)) -eq 0 ] && stamp "wine install running ($((i / 12)) min): $($UI dump 2>/dev/null | grep -m1 -E 'Notepad\+\+ —' | cut -c1-120)"
+    sleep 5
+  done
+  adb shell pm list packages | grep -q "package:$WSTUB$" || fail "stub $WSTUB not installed"
+  stamp "Notepad++ stub installed"
+  adb logcat -c
+  adb shell monkey -p "$WSTUB" -c android.intent.category.LAUNCHER 1 >/dev/null
+  for i in $(seq 1 240); do adb logcat -d -s HatchWindow | grep -q "bound target.*Notepad++" && break; sleep 3; done
+  adb logcat -d -s HatchRuntime HatchWindow HatchSession > "$OUT/wine-logcat.txt" 2>&1
+  grep -q "bound target.*Notepad++" "$OUT/wine-logcat.txt" || fail "no Notepad++ window (see wine-logcat.txt)"
+  sleep 10; shot 13-notepadpp-window
+  python3 - "$OUT/13-notepadpp-window.png" <<'PY' || fail "Notepad++ window looks empty"
+import sys
+from PIL import Image
+im = Image.open(sys.argv[1]).convert("RGB"); w, h = im.size
+px = list(im.crop((0, h // 8, w, h * 7 // 8)).getdata())[::97]
+u = len(set(px)); print(f"notepad++ uniq colours={u}"); sys.exit(0 if u > 12 else 1)
+PY
+  adb shell input tap $((WX / 2)) $((WY / 2)); sleep 1
+  adb shell input text "Wine%son%sHatch"; sleep 3; shot 14-notepadpp-typed
+  python3 - "$OUT/13-notepadpp-window.png" "$OUT/14-notepadpp-typed.png" <<'PY' || fail "typing into Notepad++ changed nothing"
+import sys
+from PIL import Image, ImageChops
+a = Image.open(sys.argv[1]).convert("RGB"); b = Image.open(sys.argv[2]).convert("RGB")
+bbox = ImageChops.difference(a, b).getbbox(); print("diff bbox", bbox); sys.exit(0 if bbox else 1)
+PY
+  stamp "wine leg OK"
+fi
 stamp "emu-e2e OK"

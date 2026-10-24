@@ -1,6 +1,7 @@
 package dev.hatch
 
 import dev.hatch.store.CatalogueFile
+import dev.hatch.store.payloadFor
 import kotlinx.serialization.json.Json
 import org.junit.Assert.*
 import org.junit.Test
@@ -33,5 +34,13 @@ class CatalogueTest {
         val npp = load().apps.first { it.id == "notepadpp" }
         assertNotNull(npp.windowsPayload)
         assertEquals(64, npp.windowsPayload!!.sha256.length)
+    }
+
+    @Test
+    fun windowsPayloadPerArch() {
+        val npp = load().apps.first { it.id == "notepadpp" }
+        assertTrue(npp.payloadFor("arm64")!!.url.contains("arm64"))
+        assertTrue(npp.payloadFor("amd64")!!.url.contains("x64"))
+        assertEquals(64, npp.payloadFor("amd64")!!.sha256.length)
     }
 }

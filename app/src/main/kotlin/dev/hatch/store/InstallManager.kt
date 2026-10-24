@@ -50,7 +50,7 @@ object InstallManager {
                 GuestConfig.refreshDns(context)
                 GuestScripts.install(context, LinuxRuntime.rootfsDir(context))
                 LinuxRuntime.run(context, "dpkg --configure -a 2>&1", timeoutMs = 600_000, waylandHostDir = waylandHostDir)
-                val payload = app.windowsPayload
+                val payload = app.payloadFor(dev.hatch.guest.RootfsCatalog.lxcArch())
                 val cmd = GuestScripts.installCommand(
                     packages = app.packages,
                     wine = app.wine,

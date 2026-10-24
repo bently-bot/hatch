@@ -31,6 +31,8 @@ data class StoreApp(
     val wine: Boolean = false,
     val x11: Boolean = false,
     val windowsPayload: WindowsPayload? = null,
+    /** Per guest-arch overrides ("amd64" for x86_64 devices/emulators); [windowsPayload] is the arm64 default. */
+    val payloads: Map<String, WindowsPayload> = emptyMap(),
     val description: String = "",
     val desktopId: String = "",
     val iconUrl: String = "",
@@ -82,3 +84,6 @@ object Catalogue {
         true
     }.getOrDefault(false)
 }
+
+/** The Windows payload to install on a guest of [arch] ("arm64" | "amd64"). */
+fun StoreApp.payloadFor(arch: String): WindowsPayload? = payloads[arch] ?: windowsPayload
