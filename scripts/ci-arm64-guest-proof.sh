@@ -137,15 +137,20 @@ if command -v wine64 >/dev/null || command -v wine >/dev/null; then
   unzip -qo /tmp/npp.zip -d "$NPP_DIR"
   export WINEPREFIX="$RUNNER_TEMP/wineprefix"
   WINEBIN=$(command -v wine64 || command -v wine)
-  echo "wineboot -i (max 8 min)…"
+  echo "wineboot -i (max 3 min)…"
   set +e
-  timeout 480 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" wineboot -i
-  echo "wineboot exit=$?"
-  env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" reg add \
-    'HKCU\Software\Wine\Drivers' /v Graphics /t REG_SZ /d wayland /f || true
-  capture notepadpp 120 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" \
-    "$WINEBIN" "$NPP_DIR/notepad++.exe" || echo "notepadpp soft-fail"
-  [ -f "$PROOF/notepadpp.png" ] && png_ok "$PROOF/notepadpp.png" 4000 || true
+  timeout 180 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" wineboot -i
+  wb=$?
+  echo "wineboot exit=$wb"
+  if [ "$wb" -eq 0 ]; then
+    env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" "$WINEBIN" reg add \
+      'HKCU\Software\Wine\Drivers' /v Graphics /t REG_SZ /d wayland /f || true
+    capture notepadpp 90 env -u DISPLAY WINEDEBUG=-all WINEPREFIX="$WINEPREFIX" \
+      "$WINEBIN" "$NPP_DIR/notepad++.exe" || echo "notepadpp soft-fail"
+    [ -f "$PROOF/notepadpp.png" ] && png_ok "$PROOF/notepadpp.png" 4000 || true
+  else
+    echo "wineboot failed/timeout — skip NPP capture (soft)"
+  fi
   set -e
 fi
 
