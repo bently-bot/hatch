@@ -57,4 +57,15 @@ class CatalogueTest {
         }
         assertTrue(apps.getValue("blender").x11)
     }
+
+    @Test
+    fun buildPickerGroupsSourcesRecommendedFirst() {
+        fun app(id: String, name: String, source: String) = dev.hatch.store.StoreApp(id = id, name = name, summary = "", source = source, command = listOf(id))
+        val all = listOf(app("firefox-esr", "Firefox ESR", "debian"), app("org.mozilla.firefox", "Firefox", "flathub"),
+            app("gimp", "GIMP", "debian"), app("org.gimp.GIMP", "GIMP", "flathub"), app("code", "Visual Studio Code", "vendor"))
+        assertEquals(listOf("org.gimp.GIMP", "gimp"), dev.hatch.ui.buildsOf(all[2], all).map { it.id })
+        assertEquals(listOf("firefox-esr"), dev.hatch.ui.buildsOf(all[0], all).map { it.id })
+        val real = load().apps
+        assertEquals(listOf("org.darktable.Darktable"), dev.hatch.ui.buildsOf(real.first { it.id == "org.darktable.Darktable" }, real).map { it.id })
+    }
 }

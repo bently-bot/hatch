@@ -78,16 +78,26 @@ val deviceArch: String get() = if (RootfsCatalog.lxcArch() == "amd64") "x86-64" 
 data class SourceInfo(val label: String, val colour: Color, val subtitle: String, val buildTitle: String, val buildDesc: String)
 
 fun sourceOf(app: StoreApp): SourceInfo = when (app.source) {
-    "flathub" -> SourceInfo("Flathub", Color(0xFF7FB7FF), "Flathub", "Flathub • Recommended",
+    "flathub" -> SourceInfo("Flathub", Color(0xFF7FB7FF), "Flathub", "Flathub",
         "Sandboxed build from Flathub, built for this device. Updates with Update all.")
     "vendor" -> SourceInfo("Vendor", Color(0xFF6FD6C2), app.vendorName.ifEmpty { "Vendor repository" },
-        "${app.vendorName.ifEmpty { "Vendor" }} repository • Recommended",
+        "${app.vendorName.ifEmpty { "Vendor" }} repository",
         "Native $deviceArch build from ${app.vendorName.ifEmpty { "the vendor" }}'s signed repository: the vendor's own build, which updates with Update all.")
-    "winget", "release" -> SourceInfo("Release", Color(0xFFFFB68A), "Windows · Wine", "Official release • Recommended",
+    "winget", "release" -> SourceInfo("Release", Color(0xFFFFB68A), "Windows · Wine", "Official release",
         "The developer's own $deviceArch Windows release, run with Wine. Updates with Update all.")
-    else -> SourceInfo("Debian", HatchPurple, "Debian 13", "Debian 13 • Recommended",
+    else -> SourceInfo("Debian", HatchPurple, "Debian 13", "Debian 13",
         "Native $deviceArch build from Debian's signed archive. Updates with Update all.")
 }
+
+/** Same app from other sources (Debian / Flathub / vendor / release): matched by normalised name. */
+fun buildsOf(app: StoreApp, all: List<StoreApp>): List<StoreApp> {
+    fun key(a: StoreApp) = a.name.lowercase().replace(Regex("[^a-z0-9]"), "")
+    val k = key(app)
+    return all.filter { it.id == app.id || (key(it) == k && k.isNotEmpty()) }.sortedBy { sourceRank(it) }
+}
+
+/** Recommended build order: the vendor's own build, then Flathub (newest upstream), Debian, then Windows releases. */
+fun sourceRank(a: StoreApp): Int = when (a.source) { "vendor" -> 0; "flathub" -> 1; "debian" -> 2; else -> 3 }
 
 private val CHIPS = listOf(
     "All" to emptySet(), "Develop" to setOf("dev", "editors"), "Productivity" to setOf("office", "internet", "utilities", "education", "science", "system"),
@@ -139,7 +149,7 @@ fun HatchHome(state: HatchUiState, actions: StoreActions) {
     val detail = state.apps.firstOrNull { it.id == detailId }
     if (detail != null) {
         BackHandler { detailId = null }
-        AppDetailScreen(detail, state, actions, onBack = { detailId = null })
+        AppDetailScreen(detail, state, actions, onBack = { detailId = null }, onSelect = { detailId = it })
         return
     }
     Scaffold(
@@ -373,7 +383,7 @@ private fun UpdatesPane(state: HatchUiState, actions: StoreActions, onDetail: (S
 
 // ---------- App details ----------
 @Composable
-private fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreActions, onBack: () -> Unit) {
+private fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreActions, onBack: () -> Unit, onSelect: (String) -> Unit = {}) {
     val src = sourceOf(app)
     val installed = app.id in state.installed
     val working = (state.progress as? InstallManager.Progress.Working)?.takeIf { it.appId == app.id }
@@ -447,15 +457,23 @@ private fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreAc
             Spacer(Modifier.height(24.dp))
             Text("Build", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .selectable(true, onClick = {}).padding(12.dp), verticalAlignment = Alignment.Top) {
-                RadioButton(true, null, colors = RadioButtonDefaults.colors(selectedColor = HatchBlue))
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text(src.buildTitle, fontWeight = FontWeight.SemiBold)
-                    Text("${app.packages.firstOrNull() ?: app.id} : $deviceArch", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    Text(src.buildDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val builds = buildsOf(app, state.apps)
+            builds.forEachIndexed { i, b ->
+                val bs = sourceOf(b)
+                val selected = b.id == app.id
+                if (i > 0) Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                    .background(if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow)
+                    .selectable(selected, onClick = { if (!selected) onSelect(b.id) }).padding(12.dp), verticalAlignment = Alignment.Top) {
+                    RadioButton(selected, null, colors = RadioButtonDefaults.colors(selectedColor = HatchBlue))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(bs.buildTitle + if (i == 0) " • Recommended" else "", fontWeight = FontWeight.SemiBold)
+                        Text("${b.flatpak.ifEmpty { b.packages.firstOrNull() ?: b.id }} : $deviceArch", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(4.dp))
+                        Text(bs.buildDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (b.id in state.installed) Text("Installed", fontSize = 11.sp, color = HatchBlue)
                 }
             }
             Spacer(Modifier.height(24.dp))
