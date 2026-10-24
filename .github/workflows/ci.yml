@@ -42,6 +42,23 @@ jobs:
           name: simple-shm-png
           path: harness-out/simple-shm.png
 
+  arm64-guest-proof:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Mousepad + Wine Notepad++ screenshots
+        env:
+          PROOF_DIR: harness-out
+        run: bash scripts/ci-arm64-guest-proof.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arm64-guest-proofs
+          path: harness-out/*.png
+
   android-assemble:
     runs-on: ubuntu-latest
     steps:
@@ -52,20 +69,15 @@ jobs:
           java-version: '17'
       - name: Set up Android SDK
         run: |
-          # GitHub-hosted runners ship an Android SDK; locate it.
           if [ -z "$ANDROID_HOME" ]; then
             for d in /usr/local/lib/android/sdk "$HOME/Android/Sdk"; do
               [ -d "$d" ] && export ANDROID_HOME="$d" && break
             done
           fi
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          test -d "$ANDROID_HOME" || { echo "no SDK"; exit 1; }
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           SM=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort | tail -1)
           [ -n "$SM" ] || SM=$(find "$ANDROID_HOME" -type f -name sdkmanager 2>/dev/null | head -1)
-          echo "sdkmanager=$SM"
-          test -x "$SM" || { echo "sdkmanager missing"; exit 1; }
           yes | "$SM" --licenses >/dev/null || true
           "$SM" "platforms;android-36" "platforms;android-35" "build-tools;36.0.0" \
             "ndk;27.0.12077973" "cmake;3.22.1"
@@ -76,14 +88,31 @@ jobs:
             sed -i 's/compileSdk = 37/compileSdk = 36/' app/build.gradle.kts
           fi
           ./gradlew :app:assembleDebug --stacktrace
+      - name: Assemble signed release
+        env:
+          HATCH_KEYSTORE_BASE64: ${{ secrets.HATCH_KEYSTORE_BASE64 }}
+          HATCH_KEYSTORE_PASSWORD: ${{ secrets.HATCH_KEYSTORE_PASSWORD }}
+          HATCH_KEY_ALIAS: hatch
+          HATCH_KEY_PASSWORD: ${{ secrets.HATCH_KEY_PASSWORD }}
+        run: |
+          if [ -z "$HATCH_KEYSTORE_BASE64" ]; then
+            echo "No signing secrets; skip release APK"
+            exit 0
+          fi
+          if ! ls "$ANDROID_HOME"/platforms | grep -q 'android-37'; then
+            sed -i 's/compileSdk = 37/compileSdk = 36/' app/build.gradle.kts
+          fi
+          ./gradlew :app:assembleRelease --stacktrace
       - uses: actions/upload-artifact@v4
         with:
-          name: hatch-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: hatch-apks
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
 
   draft-release:
-    needs: [host-wayland-proof, android-assemble]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [host-wayland-proof, android-assemble, arm64-guest-proof]
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.android-assemble.result == 'success' && needs.host-wayland-proof.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -96,11 +125,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          APK=$(ls arts/hatch-debug-apk/*.apk | head -1)
-          PNG=$(ls arts/simple-shm-png/*.png | head -1)
           TAG="v0.1.0-dev.${GITHUB_SHA::7}"
-          gh release create "$TAG" "$APK" "$PNG" \
+          mkdir -p upload
+          cp arts/hatch-apks/*.apk upload/ 2>/dev/null || true
+          cp arts/simple-shm-png/*.png upload/ 2>/dev/null || true
+          cp arts/arm64-guest-proofs/*.png upload/ 2>/dev/null || true
+          cp catalogue/catalogue.json upload/
+          NOTES="Hatch draft $TAG
+
+Wayland host proof + Android APKs + (if available) arm64 guest screenshots.
+Fold 8 / 4K pages. Not production."
+          gh release create "$TAG" upload/* \
             --draft \
             --title "Hatch $TAG" \
-            --notes "Automated draft. Wayland host proof + debug APK. Not for production." \
-            || gh release upload "$TAG" "$APK" "$PNG" --clobber
+            --notes "$NOTES" \
+            || { gh release upload "$TAG" upload/* --clobber; }

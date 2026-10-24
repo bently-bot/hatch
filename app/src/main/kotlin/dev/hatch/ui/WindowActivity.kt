@@ -5,19 +5,19 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.WindowManager
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import dev.hatch.HatchApp
+import dev.hatch.guest.AppSession
+import dev.hatch.guest.LinuxRuntime
+import dev.hatch.store.InstalledApps
 import dev.hatch.wayland.Native
 import dev.hatch.wayland.Toplevel
 
-/**
- * One Android task per xdg_toplevel.
- * Fold/unfold and freeform resize are handled via configChanges so the guest session
- * (owned by HatchRuntimeService) is not killed — we only rebind the ANativeWindow target.
- */
 class WindowActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var appId: String = ""
     private var label: String = "App"
@@ -26,11 +26,17 @@ class WindowActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var target: Long = 0
     private var surfaceW = 0
     private var surfaceH = 0
+    private var started = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        appId = intent.getStringExtra(EXTRA_APP_ID) ?: intent.data?.lastPathSegment ?: "unknown"
-        label = intent.getStringExtra(EXTRA_LABEL) ?: appId
+        appId = intent.getStringExtra(EXTRA_APP_ID)
+            ?: intent.data?.lastPathSegment
+            ?: "unknown"
+        // Stub meta-data path: hatch://app/<id>
+        label = intent.getStringExtra(EXTRA_LABEL)
+            ?: InstalledApps.get(this, appId)?.name
+            ?: appId
         if (Build.VERSION.SDK_INT >= 33) {
             setTaskDescription(ActivityManager.TaskDescription.Builder().setLabel(label).build())
         } else {
@@ -44,16 +50,42 @@ class WindowActivity : ComponentActivity(), SurfaceHolder.Callback {
         sv.holder.addCallback(this)
         setContentView(sv)
 
-        HatchApp.instance.runtime.ensureStarted()
-        HatchApp.instance.runtime.onWindowAttached(appId) { w ->
-            runOnUiThread { bindToplevel(w) }
+        val rt = HatchApp.instance.runtime
+        rt.ensureStarted()
+        rt.onWindowAttached(appId) { w -> runOnUiThread { bindToplevel(w) } }
+        // Also accept any toplevel with empty/unknown appId matching this session
+        rt.onWindowAttached("") { w ->
+            if (toplevel == null) runOnUiThread { bindToplevel(w) }
         }
-        Log.i(TAG, "open appId=$appId cmd=${intent.getStringExtra(EXTRA_COMMAND)}")
+
+        maybeStartGuest()
+    }
+
+    private fun maybeStartGuest() {
+        if (started) return
+        if (!LinuxRuntime.isInstalled(this)) {
+            Log.w(TAG, "runtime not installed")
+            return
+        }
+        val rec = InstalledApps.get(this, appId)
+        val cmd = rec?.command ?: intent.getStringArrayListExtra(EXTRA_COMMAND)?.toList()
+        if (cmd.isNullOrEmpty()) {
+            Log.w(TAG, "no command for $appId")
+            return
+        }
+        started = true
+        val waylandDir = HatchApp.instance.runtime.socketDir().absolutePath
+        val ok = AppSession.start(
+            this, appId, cmd, waylandDir,
+            extraEnv = if (rec?.wine == true) mapOf("WINEDEBUG" to "-all") else emptyMap(),
+        )
+        Log.i(TAG, "spawn $appId ok=$ok cmd=$cmd")
     }
 
     private fun bindToplevel(w: Toplevel) {
         toplevel = w
         rebindTarget()
+        HatchApp.instance.runtime.server?.seat?.focusWindow(w)
     }
 
     private fun rebindTarget() {
@@ -72,21 +104,55 @@ class WindowActivity : ComponentActivity(), SurfaceHolder.Callback {
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         surfaceW = width; surfaceH = height
         rebindTarget()
+        maybeStartGuest()
     }
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         toplevel?.detachTarget()
         if (target != 0L) { Native.targetRelease(target); target = 0 }
     }
 
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val w = toplevel ?: return super.onTouchEvent(event)
+        val server = HatchApp.instance.runtime.server ?: return super.onTouchEvent(event)
+        server.post {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    server.seat.focusWindow(w)
+                    server.seat.pointerMotion(w, event.x.toInt(), event.y.toInt())
+                    server.seat.pointerButton(w, 0x110 /* BTN_LEFT */, true)
+                }
+                MotionEvent.ACTION_MOVE -> server.seat.pointerMotion(w, event.x.toInt(), event.y.toInt())
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                    server.seat.pointerButton(w, 0x110, false)
+            }
+        }
+        return true
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val server = HatchApp.instance.runtime.server ?: return super.onKeyDown(keyCode, event)
+        val w = toplevel; if (w != null) server.post { server.seat.key(w, event.scanCode, true) }
+        return true
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        val server = HatchApp.instance.runtime.server ?: return super.onKeyUp(keyCode, event)
+        val w = toplevel; if (w != null) server.post { server.seat.key(w, event.scanCode, false) }
+        return true
+    }
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        Log.i(TAG, "configChanged smallest=${newConfig.smallestScreenWidthDp}dp orient=${newConfig.orientation}")
+        Log.i(TAG, "configChanged smallest=${newConfig.smallestScreenWidthDp}dp")
     }
 
     override fun onDestroy() {
         HatchApp.instance.runtime.onWindowDetached(appId)
+        HatchApp.instance.runtime.onWindowDetached("")
         toplevel?.detachTarget()
         if (target != 0L) { Native.targetRelease(target); target = 0 }
+        // Keep guest running if user is just rotating; kill when finishing
+        if (isFinishing) AppSession.stop(appId)
         super.onDestroy()
     }
 

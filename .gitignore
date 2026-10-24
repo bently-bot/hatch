@@ -11,7 +11,6 @@ keystore.properties
 hs_err_pid*.log
 /build/
 /harness-out/
-/app/src/main/jniLibs/
 local.properties
 /app/build/
 /.gradle/
@@ -27,3 +26,8 @@ local.properties
 local.properties
 hs_err_pid*.log
 /stub-template/build/
+!app/src/main/jniLibs/**
+!app/src/main/assets/stub-keystore.p12
+keystore.properties
+*.p12
+!app/src/main/assets/stub-keystore.p12

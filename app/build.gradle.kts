@@ -1,3 +1,5 @@
+import java.util.Properties
+import java.util.Base64
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -20,10 +22,33 @@ android {
         }
     }
 
+
+    signingConfigs {
+        create("release") {
+            val propsFile = rootProject.file("keystore.properties")
+            if (propsFile.exists()) {
+                val props = Properties().apply { propsFile.inputStream().use { load(it) } }
+                storeFile = file(props["storeFile"] as String)
+                storePassword = props["storePassword"] as String
+                keyAlias = props["keyAlias"] as String
+                keyPassword = props["keyPassword"] as String
+            } else if (System.getenv("HATCH_KEYSTORE_BASE64") != null) {
+                val bytes = Base64.getDecoder().decode(System.getenv("HATCH_KEYSTORE_BASE64"))
+                val f = file("${layout.buildDirectory.get().asFile}/hatch-release.jks")
+                f.parentFile.mkdirs(); f.writeBytes(bytes)
+                storeFile = f
+                storePassword = System.getenv("HATCH_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("HATCH_KEY_ALIAS") ?: "hatch"
+                keyPassword = System.getenv("HATCH_KEY_PASSWORD") ?: storePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
         debug { isDebuggable = true }
     }
@@ -64,6 +89,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.arsclib)
     implementation(libs.apksig)
+    implementation(libs.tukaani.xz)
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
 }
 

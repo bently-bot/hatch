@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "updated": "2026-10-24",
+  "apps": [
+    {
+      "id": "mousepad",
+      "name": "Mousepad",
+      "summary": "Simple XFCE text editor",
+      "source": "debian",
+      "icon": "text",
+      "packages": [
+        "mousepad"
+      ],
+      "command": [
+        "mousepad"
+      ],
+      "wine": false
+    },
+    {
+      "id": "galculator",
+      "name": "Calculator",
+      "summary": "GTK calculator",
+      "source": "debian",
+      "icon": "calc",
+      "packages": [
+        "galculator"
+      ],
+      "command": [
+        "galculator"
+      ],
+      "wine": false
+    },
+    {
+      "id": "gnome-mines",
+      "name": "Mines",
+      "summary": "GNOME Minesweeper",
+      "source": "debian",
+      "icon": "game",
+      "packages": [
+        "gnome-mines"
+      ],
+      "command": [
+        "gnome-mines"
+      ],
+      "wine": false
+    },
+    {
+      "id": "weston-simple-shm",
+      "name": "Simple SHM",
+      "summary": "Weston compositor smoke test",
+      "source": "debian",
+      "icon": "test",
+      "packages": [
+        "weston"
+      ],
+      "command": [
+        "weston-simple-shm"
+      ],
+      "wine": false
+    },
+    {
+      "id": "notepadpp",
+      "name": "Notepad++",
+      "summary": "Windows text editor (ARM64 Wine)",
+      "source": "winget",
+      "icon": "text",
+      "packages": [
+        "wine",
+        "wine64",
+        "libwine",
+        "unzip",
+        "ca-certificates",
+        "curl"
+      ],
+      "command": [
+        "wine64",
+        "/opt/hatch/npp/notepad++.exe"
+      ],
+      "wine": true,
+      "windowsPayload": {
+        "url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.8.1/npp.8.9.8.1.portable.arm64.zip",
+        "sha256": "43bf78c7569fd43b03d4f86a1073ac4306b31099e4487bdbf536c42d16d03f48",
+        "extractTo": "/opt/hatch/npp"
+      }
+    }
+  ]
+}
