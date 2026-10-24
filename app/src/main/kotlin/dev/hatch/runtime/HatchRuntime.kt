@@ -12,6 +12,10 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
+/** Integer Wayland output scale from Android density (2.625 on Fold/Pixel → 2), or a user override 1..3. */
+fun outputScale(density: Float, override: Int = 0): Int =
+    if (override in 1..3) override else Math.round(density * 0.85f).coerceIn(1, 3)
+
 class HatchRuntime(private val app: Context) : WindowHost {
     @Volatile var server: WaylandServer? = null
         private set
@@ -27,9 +31,10 @@ class HatchRuntime(private val app: Context) : WindowHost {
             Native.eventfd().also { Native.close(it) }
             val keymap = app.assets.open("keymap.xkb").bufferedReader().readText()
             val s = WaylandServer(this, sockDir.absolutePath, keymap)
-            s.scale = 2
-            s.outputWidth = 1920
-            s.outputHeight = 1080
+            val dm = app.resources.displayMetrics
+            s.scale = outputScale(dm.density, app.getSharedPreferences("hatch", Context.MODE_PRIVATE).getInt("ui_scale", 0))
+            s.outputWidth = maxOf(dm.widthPixels, dm.heightPixels)
+            s.outputHeight = minOf(dm.widthPixels, dm.heightPixels)
             s.start()
             val sock = File(sockDir, "wayland-0").absolutePath
             File(sock).delete()

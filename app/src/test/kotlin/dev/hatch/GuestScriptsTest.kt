@@ -44,3 +44,12 @@ class GuestUserTest {
         org.junit.Assert.assertEquals("a\nhatch:x:1000:\n", dev.hatch.guest.GuestScripts.withUser("group", "a"))
     }
 }
+
+class OutputScaleTest {
+    @Test fun scales() {
+        org.junit.Assert.assertEquals(2, dev.hatch.runtime.outputScale(2.625f))
+        org.junit.Assert.assertEquals(1, dev.hatch.runtime.outputScale(1.0f))
+        org.junit.Assert.assertEquals(3, dev.hatch.runtime.outputScale(4.0f))
+        org.junit.Assert.assertEquals(1, dev.hatch.runtime.outputScale(2.625f, 1))
+    }
+}
