@@ -232,7 +232,7 @@ jobs:
   emu-blender:
     # Bently: Blender as a floating window on the Fold-sized emulator (software GL = llvmpipe; slow, so generous limits).
     needs: [android-assemble]
-    if: needs.android-assemble.result == 'success'
+    if: needs.android-assemble.result == 'success' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[blender]'))
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
