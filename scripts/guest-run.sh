@@ -13,12 +13,14 @@ export PROOT_TMP_DIR="$HATCH_PTMP" PROOT_L2S_DIR="$L2S"
 # Stock distro proot's link2symlink ignores PROOT_L2S_DIR and corrupts dpkg's status on re-link, and
 # hard links work on CI hosts anyway, so -l is opt-in here (HATCH_L2S=1).
 l2s=(); [ "${HATCH_L2S:-0}" = 1 ] && l2s=(-l)
-exec "$PROOT" -0 "${l2s[@]}" -r "$R" "${binds[@]}" -w /root \
+# HATCH_AS_USER=1 mirrors app launches (proot -i 1000:1000, user "hatch"); default is fake root like installs.
+if [ "${HATCH_AS_USER:-0}" = 1 ]; then id=(-i 1000:1000); H=/home/hatch; U=hatch; else id=(-0); H=/root; U=root; fi
+exec "$PROOT" "${id[@]}" "${l2s[@]}" -r "$R" "${binds[@]}" -w "$H" \
   /usr/bin/env -i \
-  HOME=/root USER=root LOGNAME=root LANG=C.UTF-8 TERM=xterm-256color TMPDIR=/tmp \
+  HOME=$H USER=$U LOGNAME=$U LANG=C.UTF-8 TERM=xterm-256color TMPDIR=/tmp \
   PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games \
   DEBIAN_FRONTEND=noninteractive \
   XDG_RUNTIME_DIR=/run/hatch WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
   GDK_BACKEND=wayland QT_QPA_PLATFORM=wayland SDL_VIDEODRIVER=wayland \
-  WINEPREFIX=/root/.wine LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+  WINEPREFIX=$H/.wine LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
   "$@"

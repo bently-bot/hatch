@@ -13,7 +13,36 @@ object GuestScripts {
     const val ASSET_DIR = "guest-bin"
     const val BIN = "/usr/local/bin"
 
+    /** Apps run as this normal desktop user (proot -i), installs as fake root (proot -0). */
+    const val USER = "hatch"
+    const val UID = 1000
+    const val HOME = "/home/hatch"
+
+    /** Add the desktop user to passwd/group/shadow text (idempotent). Pure, for tests. */
+    fun withUser(file: String, text: String): String {
+        val line = when (file) {
+            "passwd" -> "$USER:x:$UID:$UID:Hatch:$HOME:/bin/bash"
+            "group" -> "$USER:x:$UID:"
+            "shadow" -> "$USER:!:20000:0:99999:7:::"
+            else -> return text
+        }
+        if (text.lineSequence().any { it.startsWith("$USER:") }) return text
+        val base = if (text.isEmpty() || text.endsWith("\n")) text else text + "\n"
+        return base + line + "\n"
+    }
+
+    fun ensureUser(root: File) {
+        for (f in listOf("passwd", "group", "shadow")) runCatching {
+            val file = File(root, "etc/$f")
+            if (!file.exists()) return@runCatching
+            val old = file.readText(); val new = withUser(f, old)
+            if (new != old) { file.setWritable(true, true); file.writeText(new) }
+        }.onFailure { Log.w(TAG, "ensureUser $f: ${it.message}") }
+        File(root, HOME.removePrefix("/")).mkdirs()
+    }
+
     fun install(context: Context, root: File) {
+        ensureUser(root)
         val bin = File(root, "usr/local/bin").apply { mkdirs() }
         val names = context.assets.list(ASSET_DIR) ?: emptyArray()
         for (n in names) {

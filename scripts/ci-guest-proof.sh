@@ -64,7 +64,14 @@ mkdir -p "$R/etc/apt/apt.conf.d" "$R/etc/dpkg/dpkg.cfg.d" "$R/run/hatch" "$R/tmp
 printf 'APT::Sandbox::User "root";\nAcquire::Retries "3";\nAPT::Install-Recommends "false";\nAcquire::Languages "none";\n' > "$R/etc/apt/apt.conf.d/99hatch"
 printf 'force-unsafe-io\npath-exclude=/usr/share/doc/*\npath-exclude=/usr/share/man/*\n' > "$R/etc/dpkg/dpkg.cfg.d/01-hatch"
 cp app/src/main/assets/guest-bin/* "$R/usr/local/bin/"; chmod +x "$R"/usr/local/bin/hatch-*
+# Mirror GuestScripts.ensureUser: apps run as "hatch" (uid 1000), installs as fake root
+grep -q '^hatch:' "$R/etc/passwd" || {
+  chmod u+w "$R/etc/passwd" "$R/etc/group" "$R/etc/shadow" 2>/dev/null || true
+  echo 'hatch:x:1000:1000:Hatch:/home/hatch:/bin/bash' >> "$R/etc/passwd"; echo 'hatch:x:1000:' >> "$R/etc/group"
+  echo 'hatch:!:20000:0:99999:7:::' >> "$R/etc/shadow"; }
+mkdir -p "$R/home/hatch"
 G=(bash "$ROOT/scripts/guest-run.sh")
+GU=(env HATCH_AS_USER=1 bash "$ROOT/scripts/guest-run.sh")
 stamp "guest: $("${G[@]}" sh -c '. /etc/os-release; echo $PRETTY_NAME; uname -m')"
 
 png_ok() {
@@ -127,7 +134,7 @@ for app in $APPS; do
   T=$(title_for "$app"); topt=(); [ -n "$T" ] && topt=(--title="$T")
   secs=90; [ "$app" = notepadpp ] && secs=420
   minu=12; [ "$app" = xterm ] && minu=2   # xterm's core bitmap font really is 2 colours
-  if capture "$app" "$secs" "${topt[@]}" --settle=3000 -- "${G[@]}" bash -c "$LAUNCH" && png_ok "$PROOF/$app.png" "$minu"; then
+  if capture "$app" "$secs" "${topt[@]}" --settle=3000 -- "${GU[@]}" bash -c "$LAUNCH" && png_ok "$PROOF/$app.png" "$minu"; then
     stamp "$app OK"
   else
     FAILED+=("$app")
@@ -136,7 +143,7 @@ done
 
 if [[ " $APPS " == *" mousepad "* ]]; then
   stamp "== mousepad input inject =="
-  if capture mousepad-inject 90 --title=Mousepad --inject -- "${G[@]}" bash -c "$(python3 scripts/catalogue-args.py launch mousepad)" && png_ok "$PROOF/mousepad-inject.png"; then
+  if capture mousepad-inject 90 --title=Mousepad --inject -- "${GU[@]}" bash -c "$(python3 scripts/catalogue-args.py launch mousepad)" && png_ok "$PROOF/mousepad-inject.png"; then
     stamp "inject OK"; else FAILED+=(mousepad-inject); fi
 fi
 
@@ -144,7 +151,7 @@ if [[ " $APPS " == *" mousepad "* ]]; then
   stamp "== mousepad menu (xdg_popup) + hover + dismiss + typing =="
   rm -f "$PROOF"/mousepad-menu*.png
   if JAVA_TOOL_OPTIONS="-Dhatch.inject=script -Dhatch.script=s:before;c:19,48;w:1500;s:open;m:40,103;w:800;s:hover;c:900,600;w:1000;s:dismissed;c:640,400;k:35,23;w:1000" \
-     capture mousepad-menu 90 --title=Mousepad --settle=2000 --inject -- "${G[@]}" bash -c "$(python3 scripts/catalogue-args.py launch mousepad)" \
+     capture mousepad-menu 90 --title=Mousepad --settle=2000 --inject -- "${GU[@]}" bash -c "$(python3 scripts/catalogue-args.py launch mousepad)" \
      && python3 - "$PROOF" <<'PY'
 import sys
 from PIL import Image, ImageChops

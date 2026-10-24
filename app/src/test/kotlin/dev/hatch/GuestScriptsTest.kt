@@ -34,3 +34,13 @@ class RootfsCatalogTest {
         assertEquals("arm64", dev.hatch.guest.RootfsCatalog.lxcArch(arrayOf("arm64-v8a")))
     }
 }
+
+class GuestUserTest {
+    @Test fun addsUserOnce() {
+        val p = "root:x:0:0:root:/root:/bin/bash\n"
+        val once = dev.hatch.guest.GuestScripts.withUser("passwd", p)
+        org.junit.Assert.assertTrue(once.endsWith("hatch:x:1000:1000:Hatch:/home/hatch:/bin/bash\n"))
+        org.junit.Assert.assertEquals(once, dev.hatch.guest.GuestScripts.withUser("passwd", once))
+        org.junit.Assert.assertEquals("a\nhatch:x:1000:\n", dev.hatch.guest.GuestScripts.withUser("group", "a"))
+    }
+}

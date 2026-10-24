@@ -48,7 +48,9 @@ object LinuxRuntime {
     fun isInstalled(context: Context): Boolean =
         rootfsLooksComplete(context) && installMarker(context).exists()
 
-    fun prootEnv(context: Context, extra: Map<String, String> = emptyMap()): Array<String> {
+    fun prootEnv(context: Context, extra: Map<String, String> = emptyMap(), asUser: Boolean = false): Array<String> {
+        val home = if (asUser) GuestScripts.HOME else "/root"
+        val user = if (asUser) GuestScripts.USER else "root"
         val nativeLib = nativeLibDir(context)
         val base = linkedMapOf(
             "LD_LIBRARY_PATH" to nativeLib.absolutePath,
@@ -58,9 +60,9 @@ object LinuxRuntime {
             "PROOT_TMP_DIR" to prootTmpDir(context).absolutePath,
             "PROOT_L2S_DIR" to l2sDir(context).absolutePath,
             "TERM" to "xterm-256color",
-            "HOME" to "/root",
-            "USER" to "root",
-            "LOGNAME" to "root",
+            "HOME" to home,
+            "USER" to user,
+            "LOGNAME" to user,
             "LANG" to "C.UTF-8",
             "PATH" to "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games",
             "TMPDIR" to "/tmp",
@@ -70,7 +72,7 @@ object LinuxRuntime {
             "GDK_BACKEND" to "wayland",
             "QT_QPA_PLATFORM" to "wayland",
             "SDL_VIDEODRIVER" to "wayland",
-            "WINEPREFIX" to "/root/.wine",
+            "WINEPREFIX" to "$home/.wine",
             // Default: LLVMpipe/softpipe (correct). Set HATCH_GPU=1 after /dev/kgsl-3d0 verified on device
             // to prefer Turnip (venus/kgsl) + Zink for GLES→Vulkan.
             "LIBGL_ALWAYS_SOFTWARE" to "1",
@@ -113,11 +115,14 @@ object LinuxRuntime {
         guestCommand: List<String>,
         workingDir: String = "/root",
         waylandHostDir: String? = null,
+        asUser: Boolean = false,
     ): Array<String> {
         val binds = bindCandidates(context, waylandHostDir)
         return buildList {
             add(prootBinary(context).absolutePath)
-            add("-0"); add("-l")
+            // Installs need fake root; apps run as a normal user so they don't show root warnings.
+            if (asUser) { add("-i"); add("${GuestScripts.UID}:${GuestScripts.UID}") } else add("-0")
+            add("-l")
             add("-r"); add(rootfsDir(context).absolutePath)
             for (b in binds) { add("-b"); add(b) }
             add("-w"); add(workingDir)
@@ -141,9 +146,10 @@ object LinuxRuntime {
         waylandHostDir: String? = null,
         extraEnv: Map<String, String> = emptyMap(),
         usePty: Boolean = false,
+        asUser: Boolean = false,
     ): Session? {
-        val argv = prootArgv(context, guestCommand, workingDir, waylandHostDir)
-        val env = prootEnv(context, extraEnv)
+        val argv = prootArgv(context, guestCommand, workingDir, waylandHostDir, asUser)
+        val env = prootEnv(context, extraEnv, asUser)
         val r = Native.spawn(argv[0], argv, env, context.filesDir.absolutePath, usePty) ?: return null
         return Session(r[0], r[1])
     }

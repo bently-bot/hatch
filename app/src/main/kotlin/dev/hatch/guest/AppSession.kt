@@ -24,10 +24,11 @@ object AppSession {
         val s = LinuxRuntime.spawn(
             context,
             command,
-            workingDir = "/root",
+            workingDir = GuestScripts.HOME,
             waylandHostDir = waylandHostDir,
             extraEnv = extraEnv,
             usePty = false,
+            asUser = true,
         ) ?: return false
         sessions[appId] = s
         // Drain stdout in background so pipe doesn't block
