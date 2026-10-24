@@ -64,6 +64,7 @@ mkdir -p "$R/etc/apt/apt.conf.d" "$R/etc/dpkg/dpkg.cfg.d" "$R/run/hatch" "$R/tmp
 printf 'APT::Sandbox::User "root";\nAcquire::Retries "3";\nAPT::Install-Recommends "false";\nAcquire::Languages "none";\n' > "$R/etc/apt/apt.conf.d/99hatch"
 printf 'force-unsafe-io\npath-exclude=/usr/share/doc/*\npath-exclude=/usr/share/man/*\n' > "$R/etc/dpkg/dpkg.cfg.d/01-hatch"
 cp app/src/main/assets/guest-bin/* "$R/usr/local/bin/"; chmod +x "$R"/usr/local/bin/hatch-*
+sh scripts/build-guest-libs.sh "$WORK/guest-lib" && mkdir -p "$R/usr/local/lib/hatch" && cp "$WORK/guest-lib/arm64-v8a/"*.so "$R/usr/local/lib/hatch/" || echo "WARN: guest libs not built"
 # Mirror GuestScripts.ensureUser: apps run as "hatch" (uid 1000), installs as fake root
 grep -q '^hatch:' "$R/etc/passwd" || {
   chmod u+w "$R/etc/passwd" "$R/etc/group" "$R/etc/shadow" 2>/dev/null || true

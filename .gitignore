@@ -32,3 +32,4 @@ keystore.properties
 *.p12
 !app/src/main/assets/stub-keystore.p12
 app/src/main/assets/gpu/
+/app/src/main/assets/guest-lib/

@@ -12,6 +12,8 @@ object GuestScripts {
     private const val TAG = "HatchScripts"
     const val ASSET_DIR = "guest-bin"
     const val BIN = "/usr/local/bin"
+    const val LIB_ASSET_DIR = "guest-lib"
+    const val LIB = "/usr/local/lib/hatch"
 
     /** Apps run as this normal desktop user (proot -i), installs as fake root (proot -0). */
     const val USER = "hatch"
@@ -52,6 +54,13 @@ object GuestScripts {
                 dst.setExecutable(true, false)
             }.onFailure { Log.w(TAG, "install $n: ${it.message}") }
         }
+        // Prebuilt glibc helper libs for this ABI (e.g. the Wine execmod shim) → /usr/local/lib/hatch.
+        val abi = android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: return
+        val libs = context.assets.list("$LIB_ASSET_DIR/$abi") ?: return
+        val lib = File(root, LIB.removePrefix("/")).apply { mkdirs() }
+        for (n in libs) runCatching {
+            context.assets.open("$LIB_ASSET_DIR/$abi/$n").use { inp -> File(lib, n).outputStream().use { inp.copyTo(it) } }
+        }.onFailure { Log.w(TAG, "install lib $n: ${it.message}") }
     }
 
     /** argv for launching an installed app through hatch-launch. */

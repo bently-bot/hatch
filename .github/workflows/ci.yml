@@ -114,6 +114,11 @@ jobs:
         with:
           name: turnip-kgsl
           path: app/src/main/assets/gpu
+      - name: Build guest libs (execmod shim for Wine)
+        run: |
+          sudo apt-get install -y -qq gcc-aarch64-linux-gnu >/dev/null
+          sh scripts/build-guest-libs.sh app/src/main/assets/guest-lib
+          ls -R app/src/main/assets/guest-lib
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
