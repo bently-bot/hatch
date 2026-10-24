@@ -6,7 +6,7 @@
   ui.py dump                         print visible texts"""
 import re, subprocess, sys, time, xml.etree.ElementTree as ET
 
-def dump():
+def _raw_dump():
     for _ in range(3):
         out = subprocess.run(["adb", "exec-out", "uiautomator", "dump", "/dev/tty"], capture_output=True, text=True).stdout
         i = out.find("<?xml"); j = out.rfind("</hierarchy>")
@@ -14,6 +14,21 @@ def dump():
             return ET.fromstring(out[i:j + len("</hierarchy>")])
         time.sleep(1)
     return None
+
+def dump():
+    """Dump the UI, first dismissing emulator noise ("X isn't responding" ANR dialogs) with Wait."""
+    for _ in range(3):
+        root = _raw_dump()
+        if root is None: return None
+        texts = [n.get("text", "") or "" for n in root.iter("node")]
+        if not any("isn't responding" in t or "keeps stopping" in t for t in texts): return root
+        for n in root.iter("node"):
+            if (n.get("text") or "") in ("Wait", "Close app", "Close"):
+                x1, y1, x2, y2 = map(int, re.findall(r"\d+", n.get("bounds")))
+                print(f"dismissing system dialog via {n.get('text')!r}", file=sys.stderr)
+                subprocess.run(["adb", "shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2)]); break
+        time.sleep(1.5)
+    return _raw_dump()
 
 def find(rx, pkg=None):
     root = dump()
