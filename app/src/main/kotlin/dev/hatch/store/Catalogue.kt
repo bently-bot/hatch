@@ -2,10 +2,7 @@ package dev.hatch.store
 
 import android.content.Context
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 @Serializable
 data class AptRepo(
@@ -68,37 +65,21 @@ data class CatalogueFile(
 )
 
 object Catalogue {
-    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
     @Volatile private var memo: CatalogueFile? = null
+
+    fun cacheFile(context: Context) = File(context.filesDir, "catalogue.json")
+    fun invalidate() { memo = null }
 
     fun loadFile(context: Context): CatalogueFile = memo ?: loadUncached(context).also { memo = it }
 
+    /** Verified remote copy (written only by [RemoteCatalogue]) unless the bundled one is newer or the cache is bad. */
     private fun loadUncached(context: Context): CatalogueFile {
-        val cached = File(context.filesDir, "catalogue.json")
-        val text = when {
-            cached.exists() -> cached.readText()
-            else -> runCatching {
-                context.assets.open("catalogue.json").bufferedReader().readText()
-            }.getOrElse { "{\"apps\":[]}" }
-        }
-        return runCatching { json.decodeFromString<CatalogueFile>(text) }
-            .getOrElse { CatalogueFile(apps = emptyList()) }
+        val cached = runCatching { cacheFile(context).takeIf { it.exists() }?.readText() }.getOrNull()
+        val bundled = runCatching { context.assets.open("catalogue.json").bufferedReader().readText() }.getOrElse { "{\"apps\":[]}" }
+        return CatalogueCodec.choose(cached, bundled)
     }
 
     fun load(context: Context): List<StoreApp> = loadFile(context).apps
-
-    fun refreshFromUrl(context: Context, url: String): Boolean = runCatching {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15000; readTimeout = 30000
-        }
-        conn.inputStream.bufferedReader().use { r ->
-            val body = r.readText()
-            json.decodeFromString<CatalogueFile>(body)
-            File(context.filesDir, "catalogue.json").writeText(body)
-            memo = null
-        }
-        true
-    }.getOrDefault(false)
 }
 
 /** The Windows payload to install on a guest of [arch] ("arm64" | "amd64"). */

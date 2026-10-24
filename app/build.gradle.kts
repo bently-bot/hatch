@@ -16,6 +16,10 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0-dev"
+        // Remote store catalogue (bently-bot/hatch-catalogue). The URL is overridable at runtime (Settings → developer)
+        // and via -PcatalogueUrl; the repo is private for now, so until it's public the app keeps its bundled copy.
+        buildConfigField("String", "CATALOGUE_URL", "\"${(project.findProperty("catalogueUrl") as String?) ?: "https://github.com/bently-bot/hatch-catalogue/releases/latest/download/catalogue.json.gz"}\"")
+        buildConfigField("String", "CATALOGUE_PUBKEY", "\"IQTIjVRzu2yJB2iJwpwm0K58b2+47ubHJ6MBTm7kqhg=\"")
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {
             cmake { cppFlags += listOf("-std=c11"); arguments += listOf("-DANDROID_STL=none") }
@@ -91,6 +95,8 @@ dependencies {
     implementation(libs.apksig)
     implementation(libs.tukaani.xz)
     implementation(libs.okhttp)
+    implementation(libs.bcprov)
+    implementation(libs.androidx.work)
     testImplementation(libs.junit)
 }
 

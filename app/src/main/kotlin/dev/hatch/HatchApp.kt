@@ -20,6 +20,7 @@ class HatchApp : Application() {
             )
         }
         runtime = HatchRuntime(this)
+        dev.hatch.store.RemoteCatalogue.schedule(this)   // remote store catalogue: on launch + every 12 h
     }
 
     companion object {
