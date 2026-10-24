@@ -15,14 +15,25 @@ fail() { stamp "FAIL: $*"; shot zz-fail; $UI dump || true; adb logcat -d -s Hatc
 
 # Hide the soft keyboard only if it's showing (BACK with no IME would leave Hatch, e.g. on large screens).
 hide_ime() { for k in 1 2 3; do adb shell dumpsys input_method | grep -q 'mInputShown=true' || return 0; adb shell input keyevent 4; sleep 1; done; }
+# Type into the store search field and verify it (keystrokes can race the field's focus: "omusepad").
+type_search() {
+  for t in 1 2 3 4; do
+    $UI tap 'Search apps|Search' dev.hatch || true; sleep 2
+    adb shell input keyevent $(printf '67 %.0s' $(seq 1 20)); sleep 0.5
+    adb shell input text "$1"; sleep 2
+    $UI has "^$1\$" dev.hatch && return 0
+    stamp "search field mistyped (try $t), retrying"
+  done
+  return 1
+}
 # Install a catalogue app through the store UI (search → result → detail → Install → stub prompt). $1 = app id.
 store_install() {
   local id=$1 name stub=dev.hatch.app.${1//-/_}
   name=$(python3 -c 'import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])' "$ROOT/catalogue/catalogue.json" "$id")
   adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 3
   $UI tap 'Get apps' dev.hatch || true; sleep 1
-  $UI tap 'Search apps' dev.hatch || $UI tap 'Search' dev.hatch || return 1
-  adb shell input text "$id"; sleep 2; hide_ime; sleep 1
+  type_search "$id" || return 1
+  hide_ime; sleep 1
   for t in 1 2 3 4; do $UI has '^Install$' dev.hatch && break; $UI tap "^$name\$" dev.hatch || true; sleep 2; done
   $UI tap '^Install$' dev.hatch || return 1
   for i in $(seq 1 240); do
@@ -112,7 +123,7 @@ guest_probe
 shot 03-store
 
 stamp "search + install $APP"
-$UI tap 'Search apps' && adb shell input text "$APP" && sleep 2
+type_search "$APP" || fail "could not type the search"
 adb shell input keyevent 111 || true   # hide IME
 shot 04-search
 APPNAME=$(python3 -c 'import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])' "$ROOT/catalogue/catalogue.json" "$APP")
