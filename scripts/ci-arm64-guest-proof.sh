@@ -86,7 +86,7 @@ echo "== weston-flower =="
 capture flower 20 weston-flower || echo "flower soft-fail"
 [ -f "$PROOF/flower.png" ] && png_ok "$PROOF/flower.png" 2000 || true
 
-echo "== mousepad (REQUIRED) =="
+echo "== mousepad render (REQUIRED) =="
 set +e
 capture mousepad 45 mousepad
 mp_rc=$?
@@ -94,20 +94,19 @@ set -e
 if [ "$mp_rc" -ne 0 ] || [ ! -f "$PROOF/mousepad.png" ]; then
   echo "mousepad retry with WAYLAND_DEBUG=1…"
   set +e
-  env WAYLAND_DEBUG=1 HATCH_INJECT=0 capture mousepad-debug 45 mousepad
+  env WAYLAND_DEBUG=1 capture mousepad-debug 45 mousepad
   set -e
   echo "==== mousepad-debug host ===="; tail -80 "$PROOF/mousepad-debug-host.log" || true
   echo "==== mousepad-debug client ===="; tail -120 "$PROOF/mousepad-debug-client.log" || true
-  # Prefer debug png if main failed
   if [ ! -f "$PROOF/mousepad.png" ] && [ -f "$PROOF/mousepad-debug.png" ]; then
     cp "$PROOF/mousepad-debug.png" "$PROOF/mousepad.png"
   fi
 fi
 png_ok "$PROOF/mousepad.png" 6000
-# Separate interactive inject pass (soft)
-set +e
-HATCH_INJECT=1 capture mousepad-inject 30 mousepad || echo "mousepad-inject soft-fail"
-set -e
+
+echo "== mousepad interactive inject (REQUIRED) =="
+HATCH_INJECT=1 capture mousepad-inject 40 mousepad
+png_ok "$PROOF/mousepad-inject.png" 6000
 
 echo "== galculator (REQUIRED) =="
 capture galculator 35 galculator
@@ -157,6 +156,7 @@ fi
 echo "Proof artifacts:"; ls -la "$PROOF"/*.png
 test -f "$PROOF/simple-shm.png"
 test -f "$PROOF/mousepad.png"
+test -f "$PROOF/mousepad-inject.png"
 test -f "$PROOF/galculator.png"
 png_ok "$PROOF/mousepad.png" 6000
 png_ok "$PROOF/galculator.png" 4000
