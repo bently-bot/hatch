@@ -46,10 +46,8 @@ fun main(args: Array<String>) {
     pb.environment()["NO_AT_BRIDGE"] = "1"
     pb.environment()["GTK_A11Y"] = "none"
     pb.environment()["GSETTINGS_BACKEND"] = "memory"
-    pb.environment()["DCONF_PROFILE"] = "/dev/null"
     pb.environment()["LC_ALL"] = "C.UTF-8"
     pb.environment().remove("DISPLAY")
-    // Keep WAYLAND_DEBUG if caller set it
 
     pb.redirectErrorStream(true)
     val logFile = File(png.parent, "client.log")
@@ -62,27 +60,39 @@ fun main(args: Array<String>) {
     var injected = false
     while (System.currentTimeMillis() < deadline && !captured) {
         Thread.sleep(200)
-        if (!proc.isAlive) {
-            println("[host] client exited code=${proc.exitValue()}")
-        }
+        if (!proc.isAlive) println("[host] client exited code=${proc.exitValue()}")
         val w = synchronized(windows) { windows.firstOrNull { it.surface.store != 0L && it.surface.storeW > 8 } } ?: continue
 
         if (inject && !injected) {
             injected = true
+            val mode = System.getProperty("hatch.inject", "all")
             server.call(1000) {
-                // Click center, type "Hatch", verify app still alive
-                server.seat.pointerMotion(w, 640, 400)
-                server.seat.pointerButton(w, 0x110, true)
-                server.seat.pointerButton(w, 0x110, false)
-                // KEY_H=35 KEY_A=30 KEY_T=20 KEY_C=46 KEY_H=35
-                for (k in intArrayOf(35, 30, 20, 46, 35)) {
-                    server.seat.key(w, k, true)
-                    server.seat.key(w, k, false)
+                when (mode) {
+                    "enter" -> server.seat.pointerMotion(w, 640, 400)
+                    "click" -> {
+                        server.seat.pointerMotion(w, 640, 400)
+                        server.seat.pointerButton(w, 0, true)
+                        server.seat.pointerButton(w, 0, false)
+                    }
+                    "keys" -> {
+                        server.seat.focusWindow(w)
+                        for (k in intArrayOf(43, 38, 28, 54, 43)) {
+                            server.seat.key(w, k, true); server.seat.key(w, k, false)
+                        }
+                    }
+                    else -> {
+                        server.seat.pointerMotion(w, 640, 400)
+                        server.seat.pointerButton(w, 0, true)
+                        server.seat.pointerButton(w, 0, false)
+                        for (k in intArrayOf(43, 38, 28, 54, 43)) {
+                            server.seat.key(w, k, true); server.seat.key(w, k, false)
+                        }
+                    }
                 }
                 true
             }
-            println("[host] injected click+keys")
-            Thread.sleep(800)
+            println("[host] injected mode=$mode")
+            Thread.sleep(600)
         }
 
         val img = BufferedImage(1280, 800, BufferedImage.TYPE_INT_ARGB)
@@ -92,12 +102,10 @@ fun main(args: Array<String>) {
             Native.targetBegin(t, 0xff2a2a2a.toInt())
             if (w.surface.store != 0L)
                 Native.targetBlit(t, w.surface.store, 0, 0, 1280, 800, 0, 0, w.surface.storeW, w.surface.storeH, w.surface.opaque)
-            // Also blit popups if any
             for (p in w.popups) {
                 val s = p.surface
-                if (s.store != 0L) {
+                if (s.store != 0L)
                     Native.targetBlit(t, s.store, p.x, p.y, s.storeW, s.storeH, 0, 0, s.storeW, s.storeH, s.opaque)
-                }
             }
             Native.targetEnd(t)
             Native.targetRead(t, px)

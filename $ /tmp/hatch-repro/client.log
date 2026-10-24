@@ -1,0 +1,434 @@
+
+(process:28245): Mousepad-WARNING **: 13:12:19.048: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(process:28245): Mousepad-WARNING **: 13:12:19.048: Invalid encoding '(null)': falling back to default UTF-8
+Mousepad-Message: 13:12:19.084: Plugin directory '/usr/lib/x86_64-linux-gnu/mousepad/plugins' not found
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.084: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.084: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.084: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:108):mousepad_setting_connect: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:377):mousepad_setting_get_enum: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:182):mousepad_setting_reset: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:244):mousepad_setting_set: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:108):mousepad_setting_connect: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:396):mousepad_setting_set_enum: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:108):mousepad_setting_connect: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:182):mousepad_setting_reset: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:182):mousepad_setting_reset: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:108):mousepad_setting_connect: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:377):mousepad_setting_get_enum: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.085: (mousepad-settings.c:377):mousepad_setting_get_enum: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.086: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.086: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.086: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.086: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.086: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.086: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.086: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.086: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.086: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.087: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.093: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.093: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.093: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.093: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.093: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.093: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.096: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.096: (mousepad-settings.c:413):mousepad_setting_get_variant: code should not be reached
+
+(mousepad:28245): GLib-GIO-CRITICAL **: 13:12:19.096: g_action_group_change_action_state: assertion 'value != NULL' failed
+
+(mousepad:28245): GLib-CRITICAL **: 13:12:19.096: g_variant_unref: assertion 'value != NULL' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.096: (mousepad-settings.c:377):mousepad_setting_get_enum: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.096: (mousepad-settings.c:377):mousepad_setting_get_enum: code should not be reached
+
+(mousepad:28245): Gtk-CRITICAL **: 13:12:19.096: gtk_toolbar_set_icon_size: assertion 'icon_size != GTK_ICON_SIZE_INVALID' failed
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.096: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.096: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.096: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.096: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.096: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): GtkSourceView-WARNING **: 13:12:19.097: No match style defined nor 'search-match' style available.
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: Invalid encoding '(null)': falling back to default UTF-8
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.097: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:74):mousepad_setting_bind: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.098: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:144):mousepad_setting_connect_object: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:166):mousepad_setting_disconnect: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:166):mousepad_setting_disconnect: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:212):mousepad_setting_get: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:377):mousepad_setting_get_enum: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.099: (mousepad-settings.c:377):mousepad_setting_get_enum: code should not be reached
+
+(mousepad:28245): Mousepad-WARNING **: 13:12:19.140: (mousepad-settings.c:377):mousepad_setting_get_enum: code should not be reached
+Gdk-Message: 13:12:19.256: Error reading events from display: Invalid argument

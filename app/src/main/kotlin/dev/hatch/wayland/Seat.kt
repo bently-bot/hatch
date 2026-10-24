@@ -108,24 +108,34 @@ class SeatRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
 
 class PointerRes(c: Client, id: Int, val seat: SeatRes, v: Int) : Res(c, id, v) {
     override val iface = "wl_pointer"
+    /**
+     * Do NOT send wl_pointer.frame for now. Some guest libwayland/GTK stacks
+     * (Debian mousepad via custom ld path; also seen on Ubuntu CI) return
+     * EINVAL from wl_display_read_events when they receive frame (opcode 6),
+     * even at pointer version >= 5. Enter/motion/button without frame work.
+     * Re-enable once we verify guest libwayland >= 1.22 on device + CI.
+     */
+    private fun frameIfNeeded() { /* intentionally empty — see above */ }
     fun enter(s: SurfaceRes, x: Double, y: Double) {
         event(0).uint(client.server.nextSerial()).obj(s.id).fixed(x).fixed(y).end()
-        event(6).end() // frame
+        frameIfNeeded()
     }
-    fun leave(s: SurfaceRes) { event(1).uint(client.server.nextSerial()).obj(s.id).end(); event(6).end() }
-    fun motion(x: Double, y: Double) { event(2).uint(client.server.timeMs()).fixed(x).fixed(y).end(); event(6).end() }
+    fun leave(s: SurfaceRes) { event(1).uint(client.server.nextSerial()).obj(s.id).end(); frameIfNeeded() }
+    fun motion(x: Double, y: Double) { event(2).uint(client.server.timeMs()).fixed(x).fixed(y).end(); frameIfNeeded() }
     fun button(button: Int, state: Int) {
         event(3).uint(client.server.nextSerial()).uint(client.server.timeMs()).uint(button).uint(state).end()
-        event(6).end()
+        frameIfNeeded()
     }
     fun axis(dx: Double, dy: Double) {
-        if (dy != 0.0) event(4).uint(client.server.timeMs()).uint(0 /* vertical */).fixed(dy).end()
-        if (dx != 0.0) event(4).uint(client.server.timeMs()).uint(1 /* horizontal */).fixed(dx).end()
-        event(6).end()
+        if (dy != 0.0) event(4).uint(client.server.timeMs()).uint(0).fixed(dy).end()
+        if (dx != 0.0) event(4).uint(client.server.timeMs()).uint(1).fixed(dx).end()
+        frameIfNeeded()
     }
     override fun request(op: Int, a: Args) {
         when (op) {
-            0 -> { a.uint(); a.obj(); a.obj(); a.int(); a.int() /* set_cursor */ }
+            0 -> { // set_cursor(serial, surface?, hotspot_x, hotspot_y)
+                a.uint(); a.obj(); a.int(); a.int()
+            }
             1 -> destroy()
             else -> {}
         }
