@@ -39,3 +39,4 @@
 17. **First-capital-letter glitch** (to watch): type "Hello" into Mousepad with the Samsung keyboard.
 18. **DOOM on the Fold**: plays the shareware episode out of the box (window ⋮ → Touch controls shows the pad if a keyboard is attached); D-pad + FIRE with thumbs; Import WAD with a real DOOM2.WAD from Downloads; a Bluetooth/DeX keyboard and a game controller work.
 19. **SDL / Qt / Tk apps under X11** (DOSBox, ScummVM, SuperTux, Luanti, Krita, VLC, Thonny after catalogue PR #4): the ✕ closes them in one tap (WM_DELETE_WINDOW via the WM).
+20. **Focus hand-back** (to watch): type in a floating Wine window (Notepad++), then tap the store's search field. The keystrokes must go to the store, not the window (in emu run 40195834036 "doom" landed in Notepad++).
