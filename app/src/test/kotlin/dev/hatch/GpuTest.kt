@@ -33,4 +33,10 @@ class GpuTest {
         assertTrue(Gpu.describe(Gpu.Mode.AUTO, info(check = "ok Turnip Adreno (TM) 830")).startsWith("GPU accelerated"))
         assertTrue(Gpu.describe(Gpu.Mode.AUTO, info(check = "fail x")).contains("self-test failed"))
     }
+
+    @Test fun llvmpipeUsesEveryCore() {
+        assertEquals("8", dev.hatch.gpu.Gpu.env(false, cores = 8)["LP_NUM_THREADS"])
+        assertEquals("16", dev.hatch.gpu.Gpu.env(false, cores = 64)["LP_NUM_THREADS"])
+        assertEquals(null, dev.hatch.gpu.Gpu.env(true, cores = 8)["LP_NUM_THREADS"])
+    }
 }

@@ -53,9 +53,11 @@ object Gpu {
     fun useGpu(mode: Mode, info: Info) = mode == Mode.AUTO && info.kgsl && info.check.startsWith("ok")
 
     /** Pure: guest env overrides for a launch. */
-    fun env(gpu: Boolean): Map<String, String> =
+    fun env(gpu: Boolean, cores: Int = Runtime.getRuntime().availableProcessors()): Map<String, String> =
         if (!gpu) mapOf(
             "LIBGL_ALWAYS_SOFTWARE" to "1", "GALLIUM_DRIVER" to "llvmpipe", "MESA_LOADER_DRIVER_OVERRIDE" to "llvmpipe",
+            // One rasteriser thread per core (all big.LITTLE clusters); Mesa's own probe can see fewer CPUs under proot.
+            "LP_NUM_THREADS" to cores.coerceIn(1, 16).toString(),
         ) else mapOf(
             "LIBGL_ALWAYS_SOFTWARE" to "0",
             "GALLIUM_DRIVER" to "zink",
