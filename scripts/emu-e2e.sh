@@ -405,9 +405,11 @@ read ML MT MR MB <<<"$(float_frame Mousepad)" || fail "Mousepad not on screen fo
 adb shell input tap $(( (ML + MR) / 2 )) $(( (MT + MB) / 2 )); sleep 1     # focused
 read CX CY <<<"$(close_xy $ML $MT $MR)"
 adb logcat -c; T0=$(date +%s%N); adb shell input tap $CX $CY
-if GONE=$(wait_gone Mousepad 3000 $T0); then
-  stamp "focused Mousepad: window gone ${GONE} ms after one tap on ✕"
-elif adb logcat -d -s HatchFloat | grep -q "close mousepad called off"; then
+# The window hides at once; an app with unsaved work answers within ~0.5 s with a dialog, which brings it back.
+GONE=$(wait_gone Mousepad 3000 $T0) || GONE=""
+sleep 1.5
+if adb logcat -d -s HatchFloat | grep -q "close mousepad called off"; then
+  stamp "focused Mousepad: hidden ${GONE:-?} ms after one tap, then answered with its own dialog"
   # Unsaved text from the typing check: Mousepad answered with its own "Save changes?" dialog, which Hatch shows.
   sleep 1; shot 15c-close-save-changes-dialog
   stamp "focused Mousepad answered ✕ with its own dialog (kept on screen, as intended)"
@@ -424,6 +426,8 @@ print(*best[1])')"
   T0=$(date +%s%N); adb shell input tap $CX $CY
   GONE=$(wait_gone Mousepad 3000 $T0) || { shot 15d-close-failed; fail "Mousepad still on screen 3 s after ✕ with its dialog up"; }
   stamp "Mousepad (dialog up): closed ${GONE} ms after ✕"
+elif [ -n "$GONE" ] && ! float_frame Mousepad >/dev/null; then
+  stamp "focused Mousepad: window gone ${GONE} ms after one tap on ✕"
 else
   shot 15d-close-failed; adb logcat -d -s HatchFloat HatchRuntime | tail -20
   fail "Mousepad still on screen 3 s after ONE tap on ✕ (focused window)"
