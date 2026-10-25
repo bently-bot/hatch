@@ -35,7 +35,7 @@ export HATCH_L2S="${HATCH_L2S:-1}"   # termux proot honours PROOT_L2S_DIR, like 
 KLIB="$(dirname "$(dirname "$(readlink -f "$(command -v kotlinc)")")")/lib"
 stamp "build compositor harness"
 gcc -shared -fPIC -O2 -DHATCH_HOST -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
-  -o build/host/libhatchnative.so app/src/main/cpp/hatchnative.c -lpthread
+  -o build/host/libhatchnative.so app/src/main/cpp/hatchnative.c -lpthread -lm
 kotlinc -d build/host/classes -jvm-target 17 app/src/main/kotlin/dev/hatch/wayland/*.kt harness/src/dev/hatch/harness/Main.kt > "$WORK/kotlinc.log" 2>&1 \
   || { grep -v '^warning' "$WORK/kotlinc.log"; echo "FATAL: compositor harness does not compile (wayland/*.kt must stay Android-free)"; exit 1; }
 CP="build/host/classes:$KLIB/kotlin-stdlib.jar"; NAT="$ROOT/build/host/libhatchnative.so"
@@ -121,6 +121,7 @@ capture() { # name seconds harness-opts... -- cmd...
   return $rc
 }
 title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender|steam) echo "Xwayland";; cursor) echo "Cursor";; hdrview) echo "HDRView";; brave-browser) echo "Brave";; org.darktable.Darktable) echo "darktable";; hdrview) echo "HDRView";; *) echo "";; esac; }
+if [ "${SWEEP:-0}" = 1 ]; then . "$ROOT/scripts/app-sweep.sh"; fi
 
 FAILED=()
 for app in $APPS; do

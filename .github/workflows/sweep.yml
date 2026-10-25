@@ -1,0 +1,79 @@
+name: app-sweep
+# Every app visible in the store (Featured, Windows apps, Flathub, Classics, Steam) installed and launched through the
+# real Hatch path on arm64, walking each app's GPU-first renderer ladder; pass/fail table with reasons.
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: "Space-separated app ids (empty = every visible app)"
+        required: false
+        default: ""
+
+jobs:
+  sweep:
+    timeout-minutes: 180
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - name: Free runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift 2>/dev/null || true
+          sudo docker image prune -af >/dev/null 2>&1 || true
+          df -h / | tail -1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/rootfs.tar.zst
+          key: rootfs-zst-${{ hashFiles('app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt') }}
+      - name: Sweep shard ${{ matrix.shard }}
+        env:
+          PROOF_DIR: harness-out
+          SWEEP: "1"
+          SHARD: ${{ matrix.shard }}
+          NSHARDS: "4"
+          SWEEP_APPS: ${{ inputs.apps }}
+          APPS: ""
+        run: bash scripts/ci-guest-proof.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sweep-${{ matrix.shard }}
+          path: |
+            harness-out/sweep-*.tsv
+            harness-out/sweep/
+
+  table:
+    needs: sweep
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sweep-*
+          path: shards
+      - name: Pass/fail table
+        run: |
+          cat shards/*/sweep-*.tsv | sort > sweep.tsv
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY" > sweep.md
+          rows = [l.rstrip("\n").split("\t") for l in open("sweep.tsv") if l.strip()]
+          ok = sum(1 for r in rows if r[4] == "PASS")
+          print(f"### App sweep: {ok}/{len(rows)} pass\n")
+          print("| App | Name | Kind | Rungs tried | Result | Detail |")
+          print("|---|---|---|---|---|---|")
+          for r in rows:
+              r += [""] * (6 - len(r))
+              print("| " + " | ".join(x.replace("|", "/") for x in r[:6]) + " |")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sweep-table
+          path: |
+            sweep.tsv
+            sweep.md
