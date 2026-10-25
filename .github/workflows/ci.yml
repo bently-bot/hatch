@@ -71,7 +71,8 @@ jobs:
       - name: Guest apps (Linux + Wine + X11) rendered by Hatch compositor
         env:
           PROOF_DIR: harness-out
-          APPS: mousepad galculator gnome-mines xterm featherpad gnome-chess notepadpp blender cursor brave-browser org.darktable.Darktable
+          APPS: mousepad galculator gnome-mines xterm featherpad gnome-chess notepadpp blender cursor brave-browser org.darktable.Darktable steam
+          SOFT_APPS: steam   # Experimental: reported, never fails the build
           TURNIP_TAR: ${{ runner.temp }}/turnip/turnip.tar.xz
           GPU_PROXY: "1"
         run: bash scripts/ci-guest-proof.sh

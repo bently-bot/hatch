@@ -15,6 +15,7 @@ Galaxy Z Fold profile (pixel_fold, 2208×1840) Android emulator, from CI (`andro
 
 ![Blender on Zink](docs/screenshots/blender-zink-gpu-path.jpg)
 ![Notepad++ (Windows, via Wine) floating over the store](docs/screenshots/wine-notepadpp-floating.jpg)
+![Steam (Experimental): Valve's native ARM64 client, no container, in the arm64 guest](docs/screenshots/steam-native-arm64-login.jpg)
 Blender on the GPU path (GL → Zink → Vulkan → software present → Xwayland → Hatch), with lavapipe standing in for Turnip on the arm64 CI runner.
 
 ## What it does
