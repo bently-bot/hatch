@@ -179,7 +179,9 @@ class KeyboardRes(c: Client, id: Int, val seat: SeatRes, v: Int) : Res(c, id, v)
         event(0).uint(1 /* xkb_v1 */).fd(fd).uint(km.size).end() // keymap
         // modifiers: serial, depressed, latched, locked, group
         event(4).uint(0).uint(0).uint(0).uint(0).uint(0).end()
-        if (version >= 4) event(5).int(1000).int(50).end() // repeat_info
+        // repeat_info rate 0 = clients must not auto-repeat. Android already repeats held keys (KeyEvent.repeatCount),
+        // and client-side timers misfire when the guest lags (Wine on a slow device typed "Winnnnnnnne").
+        if (version >= 4) event(5).int(0).int(600).end()
     }
     fun enter(s: SurfaceRes) { event(1).uint(client.server.nextSerial()).obj(s.id).array(ByteArray(0)).end() }
     fun leave(s: SurfaceRes) { event(2).uint(client.server.nextSerial()).obj(s.id).end() }

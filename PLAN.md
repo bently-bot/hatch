@@ -9,7 +9,7 @@ Proof locations: proofs/ci-arm64/*, proofs/emu/*, proofs/local/*. "Fold-8-only" 
 - [x] Wine arm64 (Notepad++ ARM64 build, winewayland.drv) — arm64 CI; Win32 frame drawn by Wine itself
 - [x] X11-only apps via Xwayland; Qt5/Qt6 apps; audio (PulseAudio → AudioTrack)
 - [x] Emulator E2E green: setup → store → install → stub prompt → drawer icon → window → typing → fold-resize (run 40109105637)
-- [~] Emulator Wine leg (Notepad++ x64 on the x86_64 emulator) — pushed, in CI
+- [x] Emulator Wine leg: Notepad++ x64 floating over the store on the x86_64 emulator, typing reaches it (run 40158202310). Fixes: execmod/seccomp shim, /run/user, window-close double free, host-owned key repeat
 - [~] GPU: Turnip (KGSL) bundled + self-test + Zink env, llvmpipe fallback; the real Adreno run is Fold-8-only
 
 ## B. Windows float over everything (video: Blender over the home screen, Notepad++ over Firefox)

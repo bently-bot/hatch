@@ -14,6 +14,7 @@ Galaxy Z Fold profile (pixel_fold, 2208×1840) Android emulator, from CI (`andro
 | ![Minimised to bubble](docs/screenshots/minimised-to-bubble.jpg) Minimised to the edge bubble | ![Bubble menu](docs/screenshots/bubble-menu.jpg) Bubble menu: windows, Open Hatch |
 
 ![Blender on Zink](docs/screenshots/blender-zink-gpu-path.jpg)
+![Notepad++ (Windows, via Wine) floating over the store](docs/screenshots/wine-notepadpp-floating.jpg)
 Blender on the GPU path (GL → Zink → Vulkan → software present → Xwayland → Hatch), with lavapipe standing in for Turnip on the arm64 CI runner.
 
 ## What it does

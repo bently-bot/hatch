@@ -215,7 +215,8 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
         if (isNavBack(keyCode, event) || toplevel == null) return super.onKeyDown(keyCode, event)
         if (event.isCtrlPressed && keyCode == KeyEvent.KEYCODE_V) syncClipboardToGuest()
         val sc = linuxCode(event); if (sc == 0) return super.onKeyDown(keyCode, event)
-        post { s, w -> s.seat.key(w, sc, true) }
+        if (event.repeatCount > 0) post { s, w -> s.seat.key(w, sc, false); s.seat.key(w, sc, true) } // host-side repeat
+        else post { s, w -> s.seat.key(w, sc, true) }
         return true
     }
 
