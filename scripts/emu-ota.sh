@@ -68,7 +68,7 @@ stamp "Later hides the card"
 
 stamp "start a Linux app so the update has something to stop"
 store_install galculator || fail "install galculator"
-launch_intent galculator Galculator
+launch_intent galculator "$(app_name galculator)"
 $UI wait 'Window handle: Galculator' 60 dev.hatch || fail "galculator window didn't open"
 shot ota-02-running-app
 # Minimise it to the edge bubble: still running, but no longer covering the store.
@@ -109,7 +109,7 @@ if ! $UI wait 'Close apps and update' 20 dev.hatch; then
   tab Settings; $UI tap '^Check for updates$' dev.hatch; $UI wait 'is available' 30 dev.hatch && $UI tap '^Update$' dev.hatch
   $UI wait 'Close apps and update' 120 dev.hatch || fail "no stop-apps prompt"
 fi
-$UI has 'Galculator' dev.hatch || fail "running app not named"
+$UI has "$(app_name galculator)" dev.hatch || fail "running app not named"
 shot ota-09-confirm-stop
 $UI tap '^Close apps and update$' dev.hatch || fail "tap Close apps and update"
 sleep 1; shot ota-10-installing
