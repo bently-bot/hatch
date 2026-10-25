@@ -627,7 +627,8 @@ $UI tap 'DELETE' dev.hatch; adb shell input text DELETE; sleep 1; hide_ime; shot
 $UI tap '^Remove everything$' dev.hatch || fail "no Remove everything button"
 $UI wait '^Set up Hatch$' 180 dev.hatch || { shot 29-reset-failed; fail "did not return to onboarding after the reset"; }
 shot 29-after-reset-onboarding
-LEFT=$(adb shell run-as dev.hatch sh -c 'find files cache no_backup -mindepth 1 \( -type f -o -type l \) 2>/dev/null' | tr -d '\r')
+# adb shell joins its args into one remote command line, so the whole find goes in one quoted string.
+LEFT=$(adb shell "run-as dev.hatch find files cache no_backup -mindepth 1 \\( -type f -o -type l \\) 2>/dev/null" | tr -d '\r')
 [ -z "$LEFT" ] || { echo "$LEFT" | head -20; fail "files left after Remove Linux and all apps"; }
 adb shell run-as dev.hatch ls shared_prefs | grep -q hatch.xml || stamp "WARN: prefs not found after reset"
 adb shell dumpsys activity services dev.hatch | grep -q HatchRuntimeService && fail "runtime service running after the reset"
