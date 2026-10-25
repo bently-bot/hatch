@@ -96,6 +96,11 @@ for app in "${LIST[@]}"; do
         "$PROOF/$n-client.log" 2>/dev/null | grep -av 'VERBOSE2' | tail -60 > "$PROOF/sweep/$n-gpu.txt" || true
     fi
     tail -c 6000 "$PROOF/$n-client.log" > "$PROOF/sweep/$n-client-tail.txt" 2>/dev/null || true
+    # The tail is often only the aftermath of the rung's kill (proot gone → every syscall ENOSYS): keep the start and
+    # the distinct errors too.
+    head -c 5000 "$PROOF/$n-client.log" > "$PROOF/sweep/$n-client-head.txt" 2>/dev/null || true
+    grep -aE 'ERROR|FATAL|rror:|cannot|failed' "$PROOF/$n-client.log" 2>/dev/null | grep -avE 'zygote_linux|Function not implemented' \
+      | sed -E 's/^\[[0-9:./]+:[A-Z]+:/[/' | awk '!seen[$0]++' | head -60 > "$PROOF/sweep/$n-errors.txt" || true
     cp "$PROOF/$n-host.log" "$PROOF/sweep/$n-host.txt" 2>/dev/null || true
     [ -f "$PROOF/$n.png" ] && python3 -c "
 from PIL import Image; im=Image.open('$PROOF/$n.png'); im.thumbnail((480,480)); im.save('$PROOF/sweep/$n.png')" 2>/dev/null || true
