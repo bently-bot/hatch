@@ -1,0 +1,186 @@
+#!/bin/sh
+# Hatch guest uninstaller. Same script is used by the Android app and by CI.
+# usage: hatch-uninstall-app --id APP-ID [--packages "a b"] [--keep "c d"] [--dirs "/opt/hatch/x ~/.local/share/X"]
+#                            [--dry-run]
+#        hatch-uninstall-app --repair
+#
+# Removes only what the app itself added:
+#   * its install record (/var/lib/hatch/apps/APP-ID.pkgs, written by hatch-install-app --id): packages that weren't
+#     installed before the app was. Apps installed by Hatch 0.2.0 or older have no record; --packages (the catalogue
+#     list) stands in for it.
+#   * minus the base system (hatch-base-packages), Essential / Priority required|important packages, and --keep
+#     (packages other installed apps list).
+# Those are marked as automatically installed and apt's autoremove decides which nothing else needs any more; only
+# those are purged, and only if apt would remove nothing else with them. A package another app (or the base system)
+# depends on just stays. Then its files (--dirs) go. If apt fails, the files still go and the exit code is 10
+# ("removed, with a warning"), never a half-uninstalled app.
+# --dry-run prints "hatch: frees-kb N" and changes nothing. --repair (run on store start) fixes an interrupted or
+# broken package state: dpkg --configure -a, apt-get -f install, and base packages an older uninstall removed.
+# Exit: 0 ok, 10 ok with warnings, 2 bad usage.
+set -u
+export DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8
+ID=""; FALLBACK=""; KEEP=""; DIRS=""; DRY=0; REPAIR=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --id) ID="$2"; shift 2 ;;
+    --packages) FALLBACK="$2"; shift 2 ;;
+    --keep) KEEP="$2"; shift 2 ;;
+    --dirs) DIRS="$2"; shift 2 ;;
+    --dry-run) DRY=1; shift ;;
+    --repair) REPAIR=1; shift ;;
+    *) echo "unknown arg $1" >&2; exit 2 ;;
+  esac
+done
+case "$ID" in *[!A-Za-z0-9._-]*) echo "hatch: bad app id" >&2; exit 2 ;; esac
+[ "$REPAIR" = 1 ] || [ -n "$ID" ] || { echo "hatch: --id needed" >&2; exit 2; }
+APPS_DIR=/var/lib/hatch/apps; T="/tmp/hatch-uninst.$$"; mkdir -p "$T"; trap 'rm -rf "$T"' EXIT
+APT="apt-get -y -q -o DPkg::Lock::Timeout=120 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+WARN=""
+warn() { echo "hatch: warning: $*"; WARN="${WARN}$*. "; }
+lines() { tr ' ' '\n' | sed 's/:[a-z0-9]*$//' | awk 'NF' | sort -u; }
+installed() { dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 2>/dev/null | awk '$1=="ii"{print $2}' | sort -u; }
+# Packages apt would remove ("Purg pkg [ver]" / "Remv pkg [ver]") in a simulation
+sim_removed() { awk '/^(Purg|Remv) /{print $2}' | sed 's/:[a-z0-9]*$//' | sort -u; }
+
+base_ok() { apt-get check >/dev/null 2>&1 && [ -z "$(dpkg --audit 2>/dev/null)" ] \
+  && dpkg-query -W -f='${db:Status-Abbrev}\n' apt util-linux dpkg 2>/dev/null | grep -c '^ii' | grep -qx 3; }
+
+repair() {
+  # Base packages an older Hatch uninstall removed (dpkg.log says removed/purged, now missing)
+  hatch-base-packages 2>/dev/null | lines > "$T/base"
+  installed > "$T/inst"
+  cat /var/log/dpkg.log* 2>/dev/null | awk '$3=="remove"||$3=="purge"{print $4}' | lines | comm -12 - "$T/base" \
+    | comm -23 - "$T/inst" > "$T/gone"
+  if base_ok && [ ! -s "$T/gone" ]; then return 0; fi
+  echo "hatch: repairing the Linux package database"
+  dpkg --configure -a 2>&1 || true
+  $APT -f install 2>&1 || { apt-get update -q 2>&1; $APT -f install 2>&1; } || true
+  if [ -s "$T/gone" ]; then
+    gone=$(tr '\n' ' ' < "$T/gone")
+    echo "hatch: putting back base packages: $gone"
+    # Only names this architecture's archive has (the shipped list covers arm64 + amd64)
+    avail=$(apt-cache show $gone 2>/dev/null | awk '/^Package:/{print $2}' | sort -u | tr '\n' ' ')
+    [ -n "$avail" ] || { apt-get update -q 2>&1; avail=$(apt-cache show $gone 2>/dev/null | awk '/^Package:/{print $2}' | sort -u | tr '\n' ' '); }
+    # shellcheck disable=SC2086
+    [ -z "$avail" ] || $APT install --no-install-recommends $avail 2>&1 || { apt-get update -q 2>&1; $APT install --no-install-recommends $avail 2>&1; } || true
+    # Base packages stay for good: manual, so no autoremove ever takes them
+    apt-mark manual $avail >/dev/null 2>&1 || true
+  fi
+  base_ok || { echo "hatch: the package database still has problems (apt-get check)"; return 1; }
+  echo "hatch: package database OK"
+}
+
+# Packages an uninstall couldn't remove (apt failed) are remembered in $APPS_DIR/leftovers; tidy up the ones that
+# are still unneeded (autoremove lists them) and whose removal takes nothing else along.
+tidy() {
+  [ -s "$APPS_DIR/leftovers" ] && base_ok || return 0
+  lines < "$APPS_DIR/leftovers" | comm -12 - "$T/inst" > "$T/left"
+  apt-get -s autoremove --purge 2>/dev/null | sim_removed | comm -12 - "$T/left" > "$T/lrm"
+  if [ -s "$T/lrm" ] && ! apt-get -s purge $(tr '\n' ' ' < "$T/lrm") 2>/dev/null | sim_removed | comm -23 - "$T/lrm" | grep -q .; then
+    echo "hatch: tidying up packages a past uninstall left: $(tr '\n' ' ' < "$T/lrm")"
+    $APT purge $(tr '\n' ' ' < "$T/lrm") 2>&1 || return 0
+  fi
+  installed > "$T/inst"
+  lines < "$APPS_DIR/leftovers" | comm -12 - "$T/inst" | comm -23 - "$T/lrm" > "$T/left2"
+  if [ -s "$T/left2" ]; then mv -f "$T/left2" "$APPS_DIR/leftovers"; else rm -f "$APPS_DIR/leftovers"; fi
+}
+
+if [ "$REPAIR" = 1 ]; then repair || exit 1; installed > "$T/inst"; tidy; exit 0; fi
+
+# ---- 1. never start from a broken state (killed dpkg, or damage from an older uninstall) ----
+[ "$DRY" = 1 ] || repair || warn "the package database needed repairs that didn't all work"
+
+# ---- 2. what this app may remove ----
+installed > "$T/inst"
+if [ -f "$APPS_DIR/$ID.pkgs" ]; then
+  SRC=record; lines < "$APPS_DIR/$ID.pkgs" > "$T/cand0"
+else
+  SRC="catalogue list (no install record: installed by an older Hatch)"; echo "$FALLBACK" | lines > "$T/cand0"
+fi
+{ hatch-base-packages 2>/dev/null | lines
+  echo "$KEEP" | lines
+  dpkg-query -W -f='${Package} ${Essential} ${Priority}\n' 2>/dev/null | awk '$2=="yes"||$3=="required"||$3=="important"{print $1}'
+} | sort -u > "$T/protect"
+comm -12 "$T/cand0" "$T/inst" | comm -23 - "$T/protect" > "$T/cand"
+echo "hatch: $ID: $(grep -c . "$T/cand") package(s) it added, from its $SRC"
+
+FREED=0
+if [ -s "$T/cand" ]; then
+  cand=$(tr '\n' ' ' < "$T/cand")
+  # What was already orphaned before (not ours to judge), to tell apart what this uninstall orphans
+  apt-get -s autoremove --purge 2>/dev/null | sim_removed > "$T/orphans0"
+  apt-mark showmanual 2>/dev/null | lines | comm -12 - "$T/cand" > "$T/wasmanual"
+  # shellcheck disable=SC2086
+  apt-mark auto $cand >/dev/null 2>&1 || warn "apt-mark auto failed"
+  # Let autoremove decide which of them nothing needs any more…
+  apt-get -s autoremove --purge 2>/dev/null | sim_removed | comm -12 - "$T/cand" > "$T/rm"
+  # …and only purge those if that takes nothing else with it (a package outside this app's own set, or protected)
+  if [ -s "$T/rm" ]; then
+    apt-get -s purge $(tr '\n' ' ' < "$T/rm") 2>/dev/null | sim_removed | comm -23 - "$T/cand" > "$T/extra"
+    if [ -s "$T/extra" ]; then
+      echo "hatch: removing all of them would also remove $(tr '\n' ' ' < "$T/extra"); checking one by one"
+      : > "$T/rm2"
+      for p in $(cat "$T/rm"); do
+        apt-get -s purge "$p" 2>/dev/null | sim_removed | comm -23 - "$T/cand" | grep -q . || echo "$p" >> "$T/rm2"
+      done
+      mv -f "$T/rm2" "$T/rm"
+    fi
+  fi
+  if [ -s "$T/rm" ]; then
+    # Its packages + the dependencies they orphan (what autoremove would take along), not older orphans
+    { cat "$T/rm"; apt-get -s purge --autoremove $(tr '\n' ' ' < "$T/rm") 2>/dev/null | sim_removed | comm -23 - "$T/orphans0" | comm -23 - "$T/protect"; } | sort -u > "$T/gonelist"
+    FREED=$(dpkg-query -W -f='${Installed-Size}\n' $(tr '\n' ' ' < "$T/gonelist") 2>/dev/null | awk '{s+=$1} END{print s+0}')
+  fi
+  if [ "$DRY" = 1 ]; then
+    # Put the marks back exactly as they were
+    [ ! -s "$T/wasmanual" ] || apt-mark manual $(tr '\n' ' ' < "$T/wasmanual") >/dev/null 2>&1 || true
+  elif [ -s "$T/rm" ]; then
+    rm_list=$(tr '\n' ' ' < "$T/rm")
+    echo "hatch: apt purge $rm_list"
+    # shellcheck disable=SC2086
+    if ! $APT purge $rm_list 2>&1; then
+      warn "apt couldn't remove some of its Linux packages; they stay, marked as no longer needed"
+      mkdir -p "$APPS_DIR"; { cat "$APPS_DIR/leftovers" 2>/dev/null; cat "$T/rm"; } | sort -u > "$T/lo"; mv -f "$T/lo" "$APPS_DIR/leftovers"
+      repair || true
+      # apt drops the auto mark of what it meant to remove; put it back on what's still there
+      left=$(installed | comm -12 - "$T/cand" | tr '\n' ' ')
+      [ -z "$left" ] || apt-mark auto $left >/dev/null 2>&1 || true
+    else
+      # Dependencies only this app needed (automatically installed, now orphaned by it): autoremove's call.
+      apt-get -s autoremove --purge 2>/dev/null | sim_removed | comm -23 - "$T/orphans0" | comm -23 - "$T/protect" > "$T/orph"
+      if [ -s "$T/orph" ] && ! apt-get -s purge $(tr '\n' ' ' < "$T/orph") 2>/dev/null | sim_removed | comm -23 - "$T/orph" | grep -q .; then
+        echo "hatch: apt purge (no longer needed) $(tr '\n' ' ' < "$T/orph")"
+        $APT purge $(tr '\n' ' ' < "$T/orph") 2>&1 || warn "apt couldn't remove some packages nothing needs any more"
+      fi
+    fi
+  fi
+  [ "$DRY" = 1 ] || echo "hatch: $(comm -23 "$T/cand" "$T/rm" | grep -c .) package(s) kept (still needed by something else)"
+fi
+
+# ---- 3. the app's own files ----
+DKB=0
+for d in $DIRS; do
+  case "$d" in "~/"*) d="/home/hatch/${d#\~/}" ;; esac
+  case "$d" in
+    /opt/hatch/?*|/home/hatch/?*|/root/?*|/var/lib/hatch/flatpak/?*) ;;
+    *) warn "skipped $d (not an app directory)"; continue ;;
+  esac
+  case "$d" in *..*) warn "skipped $d"; continue ;; esac
+  [ -e "$d" ] || [ -L "$d" ] || continue
+  k=$(du -sk "$d" 2>/dev/null | awk '{print $1}'); DKB=$((DKB + ${k:-0}))
+  if [ "$DRY" = 0 ]; then
+    echo "hatch: delete $d"; rm -rf "$d" 2>&1 || warn "couldn't delete $d"
+  fi
+done
+
+if [ "$DRY" = 1 ]; then echo "hatch: frees-kb $((FREED + DKB))"; exit 0; fi
+
+# ---- 4. leftovers + final check ----
+# Conffiles of packages this app added that are gone now ("rc")
+rc=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 2>/dev/null | awk '$1=="rc"{print $2}' | sort -u | comm -12 - "$T/cand0" | tr '\n' ' ')
+[ -z "$rc" ] || dpkg --purge $rc >/dev/null 2>&1 || true
+# What it added but another app still needs stays installed, marked auto: the last app needing it takes it along.
+rm -f "$APPS_DIR/$ID.pkgs"
+base_ok || { repair || true; base_ok || warn "Linux's package database reports problems (apt-get check)"; }
+if [ -n "$WARN" ]; then echo "hatch: uninstall finished with warnings: $WARN"; exit 10; fi
+echo "hatch: uninstall ok"

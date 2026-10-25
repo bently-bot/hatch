@@ -21,18 +21,7 @@ object Apt {
         LinuxRuntime.run(context, script, timeoutMs = 1_200_000, onLine = onLine, waylandHostDir = waylandHostDir)?.ok == true
     }
 
-    suspend fun remove(
-        context: Context,
-        packages: List<String>,
-        onLine: ((String) -> Unit)? = null,
-    ): Boolean = withContext(Dispatchers.IO) {
-        LinuxRuntime.run(
-            context,
-            "apt-get remove -y --purge ${packages.joinToString(" ")} 2>&1 || true",
-            timeoutMs = 600_000,
-            onLine = onLine,
-        )?.ok == true
-    }
+    // No remove(): uninstalling goes through guest-bin/hatch-uninstall-app (Uninstall.command), never a raw purge.
 
     suspend fun isInstalled(context: Context, pkg: String): Boolean {
         val r = LinuxRuntime.run(
