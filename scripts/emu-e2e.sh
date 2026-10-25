@@ -490,6 +490,16 @@ from PIL import Image, ImageChops
 a = Image.open(sys.argv[1]).convert("RGB"); b = Image.open(sys.argv[2]).convert("RGB")
 bbox = ImageChops.difference(a, b).getbbox(); print("diff bbox", bbox); sys.exit(0 if bbox else 1)
 PY
+  # One-tap close for a Wine window too (it has unsaved text, so a "Save?" dialog may answer: ✕ again closes anyway).
+  # This also hands keyboard focus back to the store for the next leg.
+  if [ -n "${NF:-}" ]; then
+    read CX CY <<<"$(close_xy $NL $NT $NR)"
+    T0=$(date +%s%N); adb shell input tap $CX $CY; sleep 2.5
+    if float_frame "Notepad++" >/dev/null; then stamp "Notepad++ answered ✕ with a dialog; ✕ again"; adb shell input tap $CX $CY; fi
+    for i in $(seq 1 40); do float_frame "Notepad++" >/dev/null || break; sleep 0.1; done
+    float_frame "Notepad++" >/dev/null && { shot 14b-notepadpp-close-failed; fail "Notepad++ still on screen after ✕"; }
+    stamp "Notepad++ closed $(ms_since $T0) ms after the first ✕"
+  fi
   stamp "wine leg OK"
 fi
 
