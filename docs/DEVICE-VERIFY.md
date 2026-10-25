@@ -33,7 +33,9 @@
 11. **Home screen shortcuts on One UI**: Install → One UI's "Add to Home screen" sheet → icon opens the app in a floating window; no Play Protect scan or "Install unknown apps" prompt at any point (fresh install of 0.2.0).
 12. **Legacy stubs from 0.1.0**: after updating, Hatch offers to remove each old stub (Android's uninstall dialog); declining never breaks uninstalling the guest app.
 13. **One tap on ✕**: closes the window immediately (focused and unfocused); Mousepad with unsaved text shows its "Save changes?" dialog instead.
-14. **Renderer ladder on Adreno**: VS Code, Cursor, Brave and Steam draw (no black window). Window ⋮ shows the renderer they settled on; expected the first rung ("GPU (Zink, X11 + ANGLE/GL)") for Chromium apps. If a window is black for ~25 s, Hatch moves on by itself; the error card's Report shares logs.
+14. **Renderer ladder on Adreno**: VS Code, Cursor, Brave and Steam draw (no black window). Window ⋮ shows the renderer they settled on; expected the first rung ("GPU (Zink, X11 + ANGLE/GL)") for Chromium apps. If a window is black for ~25 s, Hatch moves on by itself; the error card's Report shares logs. A uniform white/grey window counts as blank for Chromium/Steam too (sweep 40189319533: with no GPU the X11 rung paints flat luma 245). Watch for: an app stuck on the problem card when it would have painted after a slow start.
 15. **Stop all** from the "Hatch runtime" notification on One UI; the notification disappears ~10 s after the last window closes.
 16. **Insets on the real Fold 8**, folded and unfolded (cutout, taskbar): onboarding, store, detail top bar, Settings.
 17. **First-capital-letter glitch** (to watch): type "Hello" into Mousepad with the Samsung keyboard.
+18. **DOOM on the Fold**: plays the shareware episode out of the box (window ⋮ → Touch controls shows the pad if a keyboard is attached); D-pad + FIRE with thumbs; Import WAD with a real DOOM2.WAD from Downloads; a Bluetooth/DeX keyboard and a game controller work.
+19. **SDL / Qt / Tk apps under X11** (DOSBox, ScummVM, SuperTux, Luanti, Krita, VLC, Thonny after catalogue PR #4): the ✕ closes them in one tap (WM_DELETE_WINDOW via the WM).
