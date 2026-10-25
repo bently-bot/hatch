@@ -360,6 +360,7 @@ if [ "${E2E_WINE:-1}" = 1 ]; then
   done
   adb shell pm list packages | grep -q "package:$WSTUB$" || fail "stub $WSTUB not installed"
   stamp "Notepad++ stub installed"
+  guest 'mkdir -p /etc/hatch && echo "+timestamp,+loaddll,+process,err" > /etc/hatch/winedebug' >/dev/null 2>&1 || true
   adb logcat -c
   adb shell monkey -p "$WSTUB" -c android.intent.category.LAUNCHER 1 >/dev/null
   # First run creates the Wine prefix (wineboot) under proot, which is slow on the emulator: allow 20 min, log progress.
@@ -376,7 +377,8 @@ if [ "${E2E_WINE:-1}" = 1 ]; then
   adb logcat -d -s HatchRuntime HatchWindow HatchSession > "$OUT/wine-logcat.txt" 2>&1
   adb shell run-as dev.hatch cat files/logs/notepadpp.log > "$OUT/wine-app-output.txt" 2>&1 || true
   if ! grep -qE "$NPP" "$OUT/wine-logcat.txt"; then
-    adb shell ps -A -o PID,TIME,ARGS 2>/dev/null | grep -iE 'wine|proot|\.exe' > "$OUT/wine-ps.txt" || true
+    { adb shell ps -A; adb shell 'for p in /proc/[0-9]*; do c=$(tr "\0" " " < $p/cmdline 2>/dev/null); case "$c" in *wine*|*.exe*) echo "${p#/proc/} $(cut -d" " -f3 $p/stat) $c";; esac; done'; } 2>/dev/null | grep -iE 'wine|\.exe|proot| [RSD] ' > "$OUT/wine-ps.txt" || true
+    adb shell run-as dev.hatch ls -la files/linux/home/hatch/.wine files/linux/home/hatch/.wine/drive_c/windows 2>&1 | head -40 > "$OUT/wine-prefix.txt" || true
     tail -30 "$OUT/wine-app-output.txt"; cat "$OUT/wine-ps.txt"
     fail "no Notepad++ window (see wine-app-output.txt, wine-logcat.txt, wine-ps.txt)"
   fi

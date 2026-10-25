@@ -33,6 +33,8 @@ if [ "$WINE" = 1 ]; then
   # Android forbids execmod (mprotect +X on written file pages) for API 29+ apps; Wine does exactly that when loading PE images.
   # The shim retries those as anonymous executable memory, which is allowed.
   [ -f /usr/local/lib/hatch/libhatch-execmod.so ] && export LD_PRELOAD="/usr/local/lib/hatch/libhatch-execmod.so${LD_PRELOAD:+:$LD_PRELOAD}"
+  # Diagnostics hook: /etc/hatch/winedebug (e.g. "+timestamp,+loaddll,err") overrides the quiet default.
+  [ -z "${WINEDEBUG:-}" ] && [ -s /etc/hatch/winedebug ] && WINEDEBUG=$(cat /etc/hatch/winedebug)
   export WINEDEBUG="${WINEDEBUG:--all}"
   export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-mscoree,mshtml=}"
   if [ ! -f "$WINEPREFIX/system.reg" ]; then
