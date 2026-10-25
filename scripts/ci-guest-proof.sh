@@ -190,6 +190,20 @@ PY
     || { stamp "GPU proxy FAILED: Zink not active"; FAILED+=(gpu-proxy-zink); }
 fi
 
+if [[ " $APPS " == *" doom "* ]]; then
+  # DOOM: title → Enter ×4 (menu, New Game, episode 1, "Hurt me plenty") → E1M1; walk forward, turn, fire; the
+  # gameplay frame must not be black. Also reports which IWAD crispy-doom picked (shareware doom1.wad or Freedoom).
+  stamp "== doom gameplay =="
+  grep -hE 'doom1.wad|optional download' /tmp/hatch-install-doom.log 2>/dev/null | sed 's/^/  install: /' || true
+  "${G[@]}" bash -c 'ls -la /opt/hatch/doom /usr/share/games/doom 2>/dev/null; sha256sum /opt/hatch/doom/*.wad 2>/dev/null' | sed 's/^/  /' || true
+  if JAVA_TOOL_OPTIONS="-Dhatch.inject=script -Dhatch.script=w:3000;s:title;k:28;w:700;s:menu;k:28;w:700;k:28;w:700;k:28;w:2500;s:e1m1;kd:103;w:1200;ku:103;kd:106;w:500;ku:106;kd:29;w:400;ku:29;w:300;kd:103;w:800;ku:103;w:500;s:gameplay" \
+     capture doom-play 120 --settle=4000 --inject -- "${GU[@]}" bash -c "$(python3 scripts/catalogue-args.py launch doom)" \
+     && png_ok "$PROOF/doom-play-gameplay.png" 12 && png_ok "$PROOF/doom-play-e1m1.png" 12; then
+    stamp "doom gameplay OK"
+  else FAILED+=(doom-gameplay); fi
+  grep -hiE 'iwad|W_Init|doom1.wad|freedoom|Game mode' "$PROOF/doom-play-client.log" 2>/dev/null | head -8 | sed 's/^/  doom: /' || true
+fi
+
 if [[ " $APPS " == *" mousepad "* ]]; then
   stamp "== mousepad input inject =="
   if capture mousepad-inject 90 --title=Mousepad --inject -- "${GU[@]}" bash -c "$(python3 scripts/catalogue-args.py launch mousepad)" && png_ok "$PROOF/mousepad-inject.png"; then

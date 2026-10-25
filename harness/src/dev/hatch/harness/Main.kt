@@ -100,7 +100,7 @@ fun main(args: Array<String>) {
             injected = true
             val mode = System.getProperty("hatch.inject", "all")
             if (mode == "script") {
-                // -Dhatch.script="m:x,y;c:x,y;k:30,31;w:500;s:name" (move, click, keys, wait ms, snapshot)
+                // -Dhatch.script="m:x,y;c:x,y;k:30,31;kd:103;ku:103;w:500;s:name" (move, click, tap/hold/release keys, wait ms, snapshot)
                 for (step in System.getProperty("hatch.script", "").split(';').filter { it.isNotBlank() }) {
                     val op = step.substringBefore(':'); val arg = step.substringAfter(':')
                     when (op) {
@@ -123,6 +123,8 @@ fun main(args: Array<String>) {
                                     "m" -> server.seat.pointerMotion(w, n[0], n[1])
                                     "c" -> { server.seat.pointerMotion(w, n[0], n[1]); server.seat.pointerButton(w, 0, true); server.seat.pointerButton(w, 0, false) }
                                     "k" -> for (k in n) { server.seat.key(w, k, true); server.seat.key(w, k, false) }
+                                    "kd" -> for (k in n) server.seat.key(w, k, true)    // hold (games sample keys per tic)
+                                    "ku" -> for (k in n) server.seat.key(w, k, false)
                                 }
                                 true
                             }

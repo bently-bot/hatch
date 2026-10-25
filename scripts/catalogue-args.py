@@ -18,6 +18,7 @@ elif mode == "install":
     if a.get("desktopId"): argv += ["--desktop", a["desktopId"]]
     p = a.get("windowsPayload")
     if p: argv += ["--payload", p["url"], p.get("sha256", ""), p["extractTo"]]
+    for e in a.get("extras") or []: argv += ["--extra", e["url"], e.get("sha256", ""), e["dest"], e.get("member", "")]
 else:
     argv = ["/usr/local/bin/hatch-launch"]
     if a.get("wine"): argv.append("--wine")
