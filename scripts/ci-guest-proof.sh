@@ -36,7 +36,8 @@ KLIB="$(dirname "$(dirname "$(readlink -f "$(command -v kotlinc)")")")/lib"
 stamp "build compositor harness"
 gcc -shared -fPIC -O2 -DHATCH_HOST -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
   -o build/host/libhatchnative.so app/src/main/cpp/hatchnative.c -lpthread
-kotlinc -d build/host/classes -jvm-target 17 app/src/main/kotlin/dev/hatch/wayland/*.kt harness/src/dev/hatch/harness/Main.kt 2>&1 | grep -v '^warning' || true
+kotlinc -d build/host/classes -jvm-target 17 app/src/main/kotlin/dev/hatch/wayland/*.kt harness/src/dev/hatch/harness/Main.kt > "$WORK/kotlinc.log" 2>&1 \
+  || { grep -v '^warning' "$WORK/kotlinc.log"; echo "FATAL: compositor harness does not compile (wayland/*.kt must stay Android-free)"; exit 1; }
 CP="build/host/classes:$KLIB/kotlin-stdlib.jar"; NAT="$ROOT/build/host/libhatchnative.so"
 
 # ---- rootfs (same source the app downloads on arm64) ----

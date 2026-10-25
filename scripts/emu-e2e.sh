@@ -365,7 +365,7 @@ if [ "${E2E_WINE:-1}" = 1 ]; then
   # First run creates the Wine prefix (wineboot) under proot, which is slow on the emulator: allow 20 min, log progress.
   NPP="bound target.*Notepad\+\+|title '[^']*Notepad\+\+"
   for i in $(seq 1 400); do
-    adb logcat -d -s HatchWindow | grep -qE "$NPP" && break
+    adb logcat -d -s HatchWindow HatchRuntime | grep -qE "$NPP" && break
     adb logcat -d -s HatchSession | grep -q "notepadpp exited" && break
     if [ $((i % 40)) -eq 0 ]; then
       stamp "waiting for Notepad++ ($((i * 3 / 60)) min): $(adb shell run-as dev.hatch tail -c 300 files/logs/notepadpp.log 2>/dev/null | tr '\n' ' ' | tail -c 200)"
