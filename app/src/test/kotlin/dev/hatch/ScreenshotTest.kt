@@ -2,6 +2,9 @@ package dev.hatch
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.hatch.guest.RootfsInstaller.Stage
 import dev.hatch.store.InstallManager
@@ -28,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
  * unfolded = Fold inner screen (841×701 dp).
  */
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-abstract class ScreenshotBase(private val form: String) {
+abstract class ScreenshotBase(protected val form: String) {
     @get:Rule val compose = createComposeRule()
 
     private fun shot(name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
@@ -76,6 +79,33 @@ abstract class ScreenshotBase(private val form: String) {
         AppDetailScreen(vscode, HatchUiState(listOf(vscode), emptyList(), setOf("code"),
             InstallManager.Progress.Failed("code", "Another install or update is running. Try again in a moment.", listOf("E: Could not get lock"), "Couldn't uninstall Visual Studio Code")),
             actions, onBack = {})
+    }
+
+    private val doom = StoreApp(id = "doom", name = "DOOM", summary = "The 1993 classic, ready to play", source = "debian", category = "games",
+        packages = listOf("crispy-doom", "freedoom"), command = listOf("crispy-doom"), controls = "doom",
+        screenshots = listOf("https://example.invalid/dead-1.png", "https://example.invalid/dead-2.png"),
+        import = dev.hatch.store.ImportSpec("Import WAD", "/opt/hatch/doom", listOf("wad")))
+
+    /** Every screenshot is dead: the carousel is gone (no spinners); the Import WAD button shows for DOOM. */
+    @Test fun detailDeadScreenshots() {
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(dev.hatch.ui.LocalImageLoader provides dev.hatch.ui.ImageLoader { _, _ -> null }) {
+                HatchTheme { androidx.compose.material3.Surface {
+                    AppDetailScreen(doom, HatchUiState(listOf(doom), emptyList(), setOf("doom"), InstallManager.Progress.Idle), actions, onBack = {})
+                } }
+            }
+        }
+        compose.onNodeWithTag("screenshots").assertDoesNotExist()
+        compose.onNodeWithTag("import-files").assertExists()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/detail-dead-screenshots-$form.png")
+    }
+
+    @Test fun imageStates() = shot("image-states") {
+        androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.padding(16.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+            val m = androidx.compose.ui.Modifier.height(120.dp).width(180.dp)
+            dev.hatch.ui.ImageFrame(dev.hatch.ui.ImageState.Loading, m)
+            dev.hatch.ui.ImageFrame(dev.hatch.ui.ImageState.Failed, m)
+        }
     }
 }
 

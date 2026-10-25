@@ -61,6 +61,9 @@ class FloatingWindow(
     private val handleH = dp(34f)
     private val minW = dp(240f); private val minH = dp(160f)
     private val sv = GuestSurfaceView(ctx)
+    private val controls = dev.hatch.ui.TouchPads.controlsFor(ctx, appId)
+    private val touchPad: dev.hatch.ui.TouchPad? =
+        if (controls.isEmpty()) null else dev.hatch.ui.TouchPad(ctx) { code, down -> sv.sendKey(code, down) }
     private val statusBox: LinearLayout
     private val statusText: TextView
     private val problemBox: LinearLayout
@@ -135,6 +138,11 @@ class FloatingWindow(
         column.addView(caption, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, handleH))
         val content = FrameLayout(ctx)
         content.addView(sv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        sv.controls = controls
+        touchPad?.let {
+            it.visibility = if (dev.hatch.ui.TouchPads.shown(ctx, appId)) View.VISIBLE else View.GONE
+            content.addView(it, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
         statusText = TextView(ctx).apply {
             text = "Starting $label…"; setTextColor(Color.LTGRAY); textSize = 15f; gravity = Gravity.CENTER; setPadding(24, 16, 24, 0)
         }
@@ -572,6 +580,13 @@ class FloatingWindow(
             item(if (sw) "✓ Use software rendering" else "Use software rendering") {
                 Renderers.setSoftwareForced(ctx, appId, !sw); autoRetries = 0
                 relaunch(if (!sw) "Restarting $label with software rendering…" else "Restarting $label with GPU rendering…")
+            }
+        }
+        touchPad?.let { pad ->
+            val on = pad.visibility == View.VISIBLE
+            item(if (on) "✓ Touch controls" else "Touch controls") {
+                pad.visibility = if (on) View.GONE else View.VISIBLE
+                dev.hatch.ui.TouchPads.setShown(ctx, appId, !on)
             }
         }
         item("Show log") { showProblem("$label log", "Latest launch (${cfg?.label ?: "unknown renderer"}).").also { main.post { problemLog.text = logTail(); problemLog.visibility = View.VISIBLE } } }

@@ -40,6 +40,36 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val notifPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private var importFor: StoreApp? = null
+    private val pickFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> importFiles(uris) }
+
+    /** "Import WAD" etc.: copy picked files into the app's guest directory (catalogue `import` spec). */
+    private fun importFiles(uris: List<android.net.Uri>) {
+        val app = importFor ?: return; val spec = app.import ?: return
+        if (uris.isEmpty()) return
+        val ctx = this
+        Thread({
+            val msgs = uris.map { uri ->
+                val name = runCatching {
+                    contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) c.getString(0) else null
+                    }
+                }.getOrNull() ?: uri.lastPathSegment ?: "file"
+                runCatching {
+                    val input = contentResolver.openInputStream(uri) ?: error("can't open")
+                    dev.hatch.store.FileImport.import(name, input, LinuxRuntime.rootfsDir(ctx), spec)
+                }.getOrElse { dev.hatch.store.FileImport.Result.Rejected(name, it.message ?: "copy failed") }
+            }
+            val ok = msgs.filterIsInstance<dev.hatch.store.FileImport.Result.Imported>()
+            val bad = msgs.filterIsInstance<dev.hatch.store.FileImport.Result.Rejected>()
+            val text = buildString {
+                if (ok.isNotEmpty()) append("Imported ${ok.joinToString { it.name }}. ${app.name} uses it from the next launch.")
+                if (bad.isNotEmpty()) { if (isNotEmpty()) append("\n"); append(bad.joinToString("\n") { "${it.name}: ${it.reason}" }) }
+            }
+            android.util.Log.i("HatchImport", "${app.id}: $text")
+            runOnUiThread { android.widget.Toast.makeText(ctx, text, android.widget.Toast.LENGTH_LONG).show() }
+        }, "hatch-import").start()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -145,6 +175,7 @@ class MainActivity : ComponentActivity() {
                                 softwareRendering = { app -> dev.hatch.gpu.Renderers.softwareForced(this@MainActivity, app.id) },
                                 setSoftwareRendering = { app, on -> dev.hatch.gpu.Renderers.setSoftwareForced(this@MainActivity, app.id, on) },
                                 shareLogs = { dev.hatch.runtime.LogShare.share(this@MainActivity) },
+                                importFiles = { app -> importFor = app; pickFiles.launch(arrayOf("*/*")) },
                                 stubsEnabled = { dev.hatch.launcher.Launchers.stubsEnabled(this@MainActivity) },
                                 setStubsEnabled = { on -> dev.hatch.launcher.Launchers.setStubsEnabled(this@MainActivity, on) },
                                 versionName = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "",

@@ -28,6 +28,12 @@ data class WindowsPayload(
 data class CatalogueCategory(val id: String, val name: String)
 
 @Serializable
+data class Extra(val url: String, val sha256: String = "", val dest: String, val member: String = "")
+
+@Serializable
+data class ImportSpec(val label: String, val dest: String, val extensions: List<String> = emptyList(), val lowercase: Boolean = true)
+
+@Serializable
 data class StoreApp(
     val id: String,
     val name: String,
@@ -59,6 +65,12 @@ data class StoreApp(
     val experimental: Boolean = false,
     /** Guest arches this entry works on ("arm64", "amd64"); empty = all. */
     val arches: List<String> = emptyList(),
+    /** Optional verified downloads at install time (e.g. DOOM's shareware IWAD); a failure never fails the install. */
+    val extras: List<Extra> = emptyList(),
+    /** "Import …" on the detail page: copy the user's own files (e.g. DOOM.WAD) from Android storage into the guest. */
+    val import: ImportSpec? = null,
+    /** Control preset for games ("doom"): gamepad → keys and an on-screen D-pad/fire overlay for touch. */
+    val controls: String = "",
 )
 
 @Serializable

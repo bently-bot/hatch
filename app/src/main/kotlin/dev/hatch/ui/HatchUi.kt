@@ -112,7 +112,7 @@ private val CHIPS = listOf(
     "All" to emptySet(), "Develop" to setOf("dev", "editors"), "Productivity" to setOf("office", "internet", "utilities", "education", "science", "system"),
     "Create" to setOf("graphics"), "Media" to setOf("media"), "Games" to setOf("games"), "Windows" to setOf("windows"),
 )
-private val CLASSICS = listOf("emacs", "geany", "dosbox", "scummvm", "kate", "qtcreator", "thonny", "bluefish", "xterm")
+private val CLASSICS = listOf("doom", "emacs", "geany", "dosbox", "scummvm", "kate", "qtcreator", "thonny", "bluefish", "xterm")
 
 @Composable
 fun SourcePill(app: StoreApp) {
@@ -502,6 +502,18 @@ internal fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreA
                 if (pinned) Text("On your Home screen", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else OutlinedButton(onClick = { actions.addToHome(app) }, Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(24.dp)) {
                     Icon(Icons.Default.Add, null); Spacer(Modifier.width(8.dp)); Text("Add to home screen")
+                }
+                app.import?.let { spec ->
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { actions.importFiles(app) }, Modifier.fillMaxWidth().height(48.dp).testTag("import-files"), shape = RoundedCornerShape(24.dp)) {
+                        Text(spec.label)
+                    }
+                    if (app.controls == "doom") Text(
+                        "Plays the shareware episode (or Freedoom) out of the box. Own DOOM or DOOM II? Import DOOM.WAD / DOOM2.WAD from your phone. " +
+                            "Keyboard, gamepad, or the on-screen pad (window menu → Touch controls).",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
                 }
             }
             if (failed != null) {

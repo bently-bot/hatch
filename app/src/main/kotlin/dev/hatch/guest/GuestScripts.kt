@@ -82,6 +82,7 @@ object GuestScripts {
         desktopId: String? = null,
         repo: dev.hatch.store.AptRepo? = null,
         flatpak: String? = null,
+        extras: List<dev.hatch.store.Extra> = emptyList(),
     ): String = if (!flatpak.isNullOrEmpty()) "$BIN/hatch-flatpak install ${sq(flatpak)} 2>&1" else buildList {
         add("$BIN/hatch-install-app")
         if (packages.isNotEmpty()) { add("--packages"); add(sq(packages.joinToString(" "))) }
@@ -93,5 +94,6 @@ object GuestScripts {
         if (!payloadUrl.isNullOrEmpty() && !payloadDest.isNullOrEmpty()) {
             add("--payload"); add(sq(payloadUrl)); add(sq(payloadSha ?: "")); add(sq(payloadDest))
         }
+        for (e in extras) { add("--extra"); add(sq(e.url)); add(sq(e.sha256)); add(sq(e.dest)); add(sq(e.member)) }
     }.joinToString(" ") + " 2>&1"
 }

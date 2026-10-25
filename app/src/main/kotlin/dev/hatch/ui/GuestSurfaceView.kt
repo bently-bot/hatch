@@ -31,6 +31,12 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
     private val rt get() = HatchApp.instance.runtime
     @Volatile var toplevel: Toplevel? = null
         private set
+    /** Catalogue `controls` preset ("doom"…) for game controllers; see [GamepadKeys]. */
+    var controls: String = ""
+    private val stickHeld = HashSet<Int>()
+
+    /** Press/release one Linux key in the guest window (touch pad, controllers). */
+    fun sendKey(code: Int, pressed: Boolean) = post { s, w -> s.seat.key(w, code, pressed) }
     private var target: Long = 0
     var surfaceW = 0; private set
     var surfaceH = 0; private set
@@ -205,6 +211,14 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
         if (toplevel != null && event.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) return onMouse(event)
+        if (toplevel != null && event.isFromSource(InputDevice.SOURCE_JOYSTICK) && event.actionMasked == MotionEvent.ACTION_MOVE) {
+            val want = GamepadKeys.axes(event.getAxisValue(MotionEvent.AXIS_X), event.getAxisValue(MotionEvent.AXIS_Y),
+                event.getAxisValue(MotionEvent.AXIS_HAT_X), event.getAxisValue(MotionEvent.AXIS_HAT_Y))
+            for (k in stickHeld - want) sendKey(k, false)
+            for (k in want - stickHeld) sendKey(k, true)
+            stickHeld.clear(); stickHeld.addAll(want)
+            return true
+        }
         return super.onGenericMotionEvent(event)
     }
 
@@ -213,6 +227,9 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (isNavBack(keyCode, event) || toplevel == null) return super.onKeyDown(keyCode, event)
+        if (GamepadKeys.isGamepad(event.source)) GamepadKeys.map(controls, keyCode).takeIf { it != 0 }?.let { c ->
+            if (event.repeatCount == 0) sendKey(c, true); return true
+        }
         if (event.isCtrlPressed && keyCode == KeyEvent.KEYCODE_V) syncClipboardToGuest()
         val sc = linuxCode(event); if (sc == 0) return super.onKeyDown(keyCode, event)
         if (event.repeatCount > 0) post { s, w -> s.seat.key(w, sc, false); s.seat.key(w, sc, true) } // host-side repeat
@@ -222,6 +239,7 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (isNavBack(keyCode, event) || toplevel == null) return super.onKeyUp(keyCode, event)
+        if (GamepadKeys.isGamepad(event.source)) GamepadKeys.map(controls, keyCode).takeIf { it != 0 }?.let { c -> sendKey(c, false); return true }
         val sc = linuxCode(event); if (sc == 0) return super.onKeyUp(keyCode, event)
         post { s, w -> s.seat.key(w, sc, false) }
         return true

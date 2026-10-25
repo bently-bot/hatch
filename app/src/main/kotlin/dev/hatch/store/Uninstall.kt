@@ -31,7 +31,8 @@ object Uninstall {
 
     /** Payload directories (AppImage / Windows release extracts) to delete for [app]. */
     fun payloadDirs(app: StoreApp): List<String> =
-        (listOfNotNull(app.windowsPayload) + app.payloads.values).map { it.extractTo }.filter { it.startsWith("/opt/hatch/") }.distinct()
+        ((listOfNotNull(app.windowsPayload) + app.payloads.values).map { it.extractTo } + app.extras.map { it.dest } +
+            listOfNotNull(app.import?.dest)).filter { it.startsWith("/opt/hatch/") }.distinct()
 
     private val FREED = Regex("""After this operation, ([\d.,]+) ([kKMG]?B) disk space will be freed""")
 

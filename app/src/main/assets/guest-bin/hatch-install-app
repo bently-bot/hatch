@@ -1,14 +1,19 @@
 #!/bin/sh
 # Hatch guest installer. Same script is used by the Android app and by CI.
 # usage: hatch-install-app [--packages "a b"] [--repo ID KEYURL URIS SUITES COMPONENTS] [--payload URL SHA256 DEST] [--wine]
+#        [--extra URL SHA256 DEST MEMBER]...  optional downloads (e.g. DOOM's shareware IWAD): a failure only warns.
+#        MEMBER = path inside a .deb/.zip/.tar to take (empty: the file itself), saved as DEST/<basename>.
 set -eu
-PKGS=""; URL=""; SHA=""; DEST=""; WINE=0; DESKTOP=""; REPO=""
+PKGS=""; URL=""; SHA=""; DEST=""; WINE=0; DESKTOP=""; REPO=""; EXTRAS=""
+NL='
+'
 while [ $# -gt 0 ]; do
   case "$1" in
     --packages) PKGS="$2"; shift 2 ;;
     --payload) URL="$2"; SHA="$3"; DEST="$4"; shift 4 ;;
     --repo) REPO="$2"; RKEY="$3"; RURIS="$4"; RSUITES="$5"; RCOMP="$6"; shift 6 ;;
     --wine) WINE=1; shift ;;
+    --extra) EXTRAS="$EXTRAS$2|$3|$4|$5$NL"; shift 5 ;;
     --desktop) DESKTOP="$2"; shift 2 ;;
     *) echo "unknown arg $1" >&2; exit 2 ;;
   esac
@@ -88,9 +93,33 @@ if [ -n "$URL" ]; then
       ( cd "$DEST" && "$TMP" --appimage-extract >/dev/null ) || { echo "hatch: could not unpack the AppImage" >&2; rm -f "$TMP"; exit 4; }
       mv "$DEST/squashfs-root" "$DEST/app"; chmod -R a+rX "$DEST/app" ;;
     *.tar.*|*.tgz) tar -xf "$TMP" -C "$DEST" ;;
-    *) cp "$TMP" "$DEST/" ;;
+    *) cp "$TMP" "$DEST/${URL##*/}" ;;
   esac
   rm -f "$TMP"
+fi
+# Optional extras: verified downloads that improve the app but must never fail the install.
+extra() { # url sha dest member
+  x="/tmp/hatch-extra.$$"; rm -rf "$x" "$x.d"; mkdir -p "$x.d"
+  echo "hatch: download ${1##*/}"
+  curl -fsSL --retry 3 --max-time 300 -o "$x" "$1" || return 1
+  [ -z "$2" ] || echo "$2  $x" | sha256sum -c - >/dev/null || { echo "hatch: sha256 mismatch for ${1##*/}" >&2; return 1; }
+  src="$x"
+  if [ -n "$4" ]; then
+    case "$1" in
+      *.deb) dpkg-deb -x "$x" "$x.d" ;;
+      *.zip) unzip -qo "$x" -d "$x.d" ;;
+      *) tar -xf "$x" -C "$x.d" ;;
+    esac || return 1
+    src="$x.d/${4#/}"; [ -f "$src" ] || { echo "hatch: ${4} not found in ${1##*/}" >&2; return 1; }
+  fi
+  mkdir -p "$3" && cp "$src" "$3/$(basename "${4:-${1##*/}}")" && chmod a+r "$3/$(basename "${4:-${1##*/}}")"
+  rm -rf "$x" "$x.d"
+}
+if [ -n "$EXTRAS" ]; then
+  printf '%s' "$EXTRAS" | while IFS='|' read -r eu es ed em; do
+    [ -n "$eu" ] || continue
+    extra "$eu" "$es" "$ed" "$em" || { echo "hatch: optional download ${eu##*/} skipped (the app still works without it)"; rm -rf /tmp/hatch-extra.*; }
+  done
 fi
 if [ -n "$DESKTOP" ]; then
   # Per-toolkit extras: Qt needs its Wayland platform plugin; X11-only toolkits / terminal apps need Xwayland.

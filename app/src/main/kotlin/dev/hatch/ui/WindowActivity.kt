@@ -128,6 +128,22 @@ class WindowActivity : ComponentActivity(), HatchRuntime.WindowSlot {
         }
         root.addView(kb, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
             Gravity.BOTTOM or Gravity.END).apply { setMargins(0, 0, 24, 24) })
+        val controls = TouchPads.controlsFor(this, appId)
+        sv.controls = controls
+        if (controls.isNotEmpty()) {
+            val pad = TouchPad(this) { code, down -> sv.sendKey(code, down) }
+            pad.visibility = if (TouchPads.shown(this, appId)) View.VISIBLE else View.GONE
+            root.addView(pad, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            root.addView(TextView(this).apply {
+                text = "🎮"; textSize = 20f; alpha = 0.55f; contentDescription = "Touch controls"
+                setBackgroundColor(Color.argb(140, 30, 30, 30)); setPadding(24, 10, 24, 10)
+                setOnClickListener {
+                    val on = pad.visibility != View.VISIBLE
+                    pad.visibility = if (on) View.VISIBLE else View.GONE; TouchPads.setShown(this@WindowActivity, appId, on)
+                }
+            }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.START).apply { setMargins(24, 24, 0, 0) })
+        }
         setContentView(root)
         sv.requestFocus()
 

@@ -71,6 +71,7 @@ object InstallManager {
                     desktopId = app.desktopId,
                     repo = app.repo,
                     flatpak = app.flatpak,
+                    extras = app.extras,
                 )
                 val tail = ArrayDeque<String>()
                 val apt = AptProgress()
