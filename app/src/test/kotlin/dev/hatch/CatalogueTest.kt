@@ -67,7 +67,8 @@ class CatalogueTest {
         assertEquals(listOf("org.gimp.GIMP", "gimp"), dev.hatch.ui.buildsOf(all[2], all).map { it.id })
         assertEquals(listOf("firefox-esr"), dev.hatch.ui.buildsOf(all[0], all).map { it.id })
         val real = load().apps
-        assertEquals(listOf("org.darktable.Darktable"), dev.hatch.ui.buildsOf(real.first { it.id == "org.darktable.Darktable" }, real).map { it.id })
+        // Live DEP-11 lists Debian's darktable for arm64 too; the tested Flathub build stays recommended (first).
+        assertEquals(listOf("org.darktable.Darktable", "darktable"), dev.hatch.ui.buildsOf(real.first { it.id == "org.darktable.Darktable" }, real).map { it.id })
     }
 
     @Test

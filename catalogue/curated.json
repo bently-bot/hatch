@@ -32,6 +32,7 @@
     "gnome-sudoku",
     "supertux",
     "wesnoth",
+    "doom",
     "scummvm",
     "dosbox",
     "luanti",
@@ -483,6 +484,45 @@
       "arches": [
         "arm64"
       ]
+    },
+    {
+      "id": "doom",
+      "name": "DOOM",
+      "source": "debian",
+      "category": "games",
+      "standalone": true,
+      "summary": "The 1993 classic, ready to play: shareware episode or Freedoom",
+      "description": "Rip and tear on your phone. Hatch installs Crispy Doom, a faithful native ARM64 source port, and sets it up to play straight away:\n\n• Knee-Deep in the Dead, the original shareware episode (id Software's DOOM1.WAD, checksum-verified), with the free Freedoom game data as a fallback.\n• Own DOOM or DOOM II? Tap Import WAD and pick DOOM.WAD or DOOM2.WAD from your phone; it's used from the next launch.\n• Play with a keyboard (DeX or Bluetooth), any game controller, or the on-screen D-pad and FIRE/USE buttons.\n\nControls: arrows move, Ctrl fires, Space opens doors, Shift runs, Tab shows the map, Esc opens the menu.",
+      "packages": [
+        "crispy-doom",
+        "freedoom"
+      ],
+      "command": [
+        "env",
+        "DOOMWADPATH=/opt/hatch/doom:/usr/share/games/doom",
+        "SDL_VIDEODRIVER=x11",
+        "crispy-doom",
+        "-window"
+      ],
+      "extras": [
+        {
+          "url": "https://deb.debian.org/debian/pool/non-free/d/doom-wad-shareware/doom-wad-shareware_1.9.fixed-5_all.deb",
+          "sha256": "5802f176c0303e228095b5312def53de602781cf4c53e79842257484a0d9e938",
+          "dest": "/opt/hatch/doom",
+          "member": "usr/share/games/doom/doom1.wad"
+        }
+      ],
+      "import": {
+        "label": "Import WAD",
+        "dest": "/opt/hatch/doom",
+        "extensions": [
+          "wad"
+        ]
+      },
+      "controls": "doom",
+      "screenshotsFrom": "io.github.fabiangreffrath.doom",
+      "license": "GPL-2.0+",
+      "x11": true
     }
   ]
 }
