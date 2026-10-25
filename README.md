@@ -2,7 +2,19 @@
 
 **A store for Linux and Windows apps on Android.** Search, tap Install, and the app gets its own launcher icon and opens in a floating window over whatever you're doing. Hatch is built for arm64 phones and foldables (developed against the Galaxy Z Fold 8). No root, no Termux and no VNC desktop.
 
-<!-- SCREENSHOTS -->
+## Screenshots
+
+Galaxy Z Fold profile (pixel_fold, 2208×1840) Android emulator, from CI (`android-emu-e2e`, `emu-blender`, `arm64-guest-proof`).
+
+| | |
+|---|---|
+| ![Floating window over the home screen](docs/screenshots/floating-over-home.jpg) Mousepad floating over the home screen | ![Two windows over another app](docs/screenshots/two-windows-over-another-app.jpg) Two windows at once over another app |
+| ![Store with floating windows](docs/screenshots/store-with-floating-windows.jpg) The store open while both keep running | ![Maximised](docs/screenshots/maximised.jpg) Maximised (restore returns to the exact frame) |
+| ![Blender floating](docs/screenshots/blender-floating.jpg) Blender (X11 via Xwayland) floating | ![Store](docs/screenshots/store.jpg) Get apps |
+| ![Minimised to bubble](docs/screenshots/minimised-to-bubble.jpg) Minimised to the edge bubble | ![Bubble menu](docs/screenshots/bubble-menu.jpg) Bubble menu: windows, Open Hatch |
+
+![Blender on Zink](docs/screenshots/blender-zink-gpu-path.jpg)
+Blender on the GPU path (GL → Zink → Vulkan → software present → Xwayland → Hatch), with lavapipe standing in for Turnip on the arm64 CI runner.
 
 ## What it does
 
@@ -25,7 +37,7 @@
   - A chat-head **edge bubble** collects minimised windows and opens the store.
   - Windows belong to a foreground service, so programs keep running while the store is open on top. An Activity-per-window (freeform) mode remains as a Settings option.
 - **Hatch's own Wayland compositor** covers touch, mouse, keyboard + IME, popups and menus, clipboard both ways, output scale and fold resizes. X11-only apps (Blender, xterm) go through Xwayland. Audio goes guest PulseAudio → AudioTrack.
-- **Graphics**: llvmpipe everywhere; Blender renders its full UI on it. On Adreno, Hatch bundles Mesa **Turnip (KGSL)**, self-tests it on first run, and uses Zink when the test passes.
+- **Graphics**: llvmpipe everywhere (one thread per core); Blender renders its full UI on it. On Adreno, Hatch bundles Mesa **Turnip (KGSL)**, self-tests it on first run, and uses Zink when the test passes. X11 apps reach Zink through Xwayland without DRI3 (drisw/kopper).
 
 ## How it works
 
@@ -40,12 +52,12 @@
 
 | Layer | What runs | Where |
 |---|---|---|
-| Unit | catalogue and payloads per arch, vendor repo argv, Flatpak spec, Docker Hub index parsing, apt progress parsing, failure reasons, window geometry, keymaps, popup placement, GPU selection | `./gradlew :app:testDebugUnitTest` |
+| Unit (67) | catalogue and payloads per arch, signed remote catalogue (Ed25519 verify, fallback, schema skip), vendor repo argv, Flatpak spec, Docker Hub index parsing, apt progress parsing, failure reasons, window geometry, keymaps, popup placement, GPU selection, per-phone stub signing (apksig-verified) | `./gradlew :app:testDebugUnitTest` |
 | Host compositor | `weston-simple-shm` against the Hatch compositor | CI `host-wayland-proof` |
-| arm64 guest | Each catalogue app is installed with the real guest scripts in Debian 13 arm64 and rendered by the Hatch compositor (screenshot + colour check). Coverage: mousepad, galculator, gnome-mines, xterm, featherpad, gnome-chess, Notepad++ (Wine), Blender, Cursor, Brave, Darktable (Flathub), HDRView (release). Also input injection, menus, clipboard both ways, audio PCM, and the GPU driver path. | CI `arm64-guest-proof` |
-| Emulator E2E | Setup → store → search → detail → Install → stub prompt → drawer icon → floating window over the home screen → drag-move, corner resize, typing, fold resize → store opened alongside → Wine program | CI `android-emu-e2e` (x86_64 emulator) |
+| arm64 guest | Each catalogue app is installed with the real guest scripts in Debian 13 arm64 and rendered by the Hatch compositor (screenshot + colour check). Coverage: mousepad, galculator, gnome-mines, xterm, featherpad, gnome-chess, Notepad++ (Wine), Blender, Cursor, Brave, Darktable (Flathub). Also input injection, menus, clipboard both ways, audio PCM, and the GPU path proxy: glxgears and Blender on Zink over Vulkan (lavapipe for Turnip) vs llvmpipe, with viewport FPS. | CI `arm64-guest-proof` |
+| Emulator E2E | Setup → store → search → detail → Install → stub prompt → drawer icon → floating window over the home screen → drag-move, corner resize, typing, fold resize → two windows over another app → minimise to bubble and restore → store on top → maximise/restore → Wine program | CI `android-emu-e2e` (x86_64 emulator, pixel_fold) |
 
-Device-only checks (Adreno Turnip, Samsung IME, real fold hinge) are listed in [docs/DEVICE-VERIFY.md](docs/DEVICE-VERIFY.md).
+Blender floating has its own job, CI `emu-blender`. Device-only checks (Adreno Turnip, Samsung IME, real fold hinge) are listed in [docs/DEVICE-VERIFY.md](docs/DEVICE-VERIFY.md).
 
 ## Building
 
