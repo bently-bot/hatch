@@ -20,7 +20,7 @@ class StubKeysTest {
     @Test fun noSharedKeyShipsInTheApp() {
         assertFalse("bundled stub keystore must not exist", File("src/main/assets/stub-keystore.p12").exists())
         val src = File("src/main/kotlin/dev/hatch/stub").walk().filter { it.isFile }.joinToString("\n") { it.readText() }
-        assertFalse(src.contains("***REMOVED***"))
+        assertFalse("no hard-coded keystore password", Regex("""KS_PASS\s*=""").containsMatchIn(src))
     }
 
     @Test fun fileSignerIsCreatedOnceAndReused() {
@@ -48,7 +48,7 @@ class StubKeysTest {
     @Test fun wrongPasswordDoesNotLoad() {
         val dir = tmp.newFolder()
         StubKeys.FileSigner.loadOrCreate(dir)
-        File(dir, StubKeys.PASS_FILE).writeText("***REMOVED***")
+        File(dir, StubKeys.PASS_FILE).writeText("not-the-password")
         assertNull(StubKeys.FileSigner.load(dir))
     }
 
