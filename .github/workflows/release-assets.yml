@@ -1,0 +1,39 @@
+name: release-assets
+# Hatch's in-app updater only offers a release whose hatch-<version>.apk has a matching hatch-<version>.apk.sha256.
+# Safety net for releases made by hand: when one is published or edited, add any missing .sha256.
+# (GitHub doesn't run workflows for draft releases; scripts/make-release-draft.sh attaches the .sha256 up front.)
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to check
+        required: true
+permissions:
+  contents: write
+jobs:
+  sha256:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add missing .sha256 assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          names=$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')
+          echo "$names"
+          mkdir -p work && cd work
+          for apk in $(echo "$names" | grep -E '\.apk$' || true); do
+            if echo "$names" | grep -qx "$apk.sha256"; then
+              gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "$apk" -p "$apk.sha256" --clobber
+              sha256sum -c "$apk.sha256" || { echo "::error::$apk.sha256 doesn't match $apk"; exit 1; }
+            else
+              gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "$apk" --clobber
+              sha256sum "$apk" > "$apk.sha256"; cat "$apk.sha256"
+              gh release upload "$TAG" -R "$GITHUB_REPOSITORY" "$apk.sha256"
+            fi
+          done
+          V="${TAG#v}"
+          echo "$names" | grep -qx "hatch-$V.apk" || echo "::warning::no hatch-$V.apk on $TAG: the in-app updater won't offer this release"

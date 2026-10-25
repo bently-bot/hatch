@@ -208,6 +208,19 @@ jobs:
           path: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
+      - name: OTA test builds (0.3.0 → 0.3.1 → 0.3.2, fake feed on the emulator host)
+        run: |
+          mkdir -p ota
+          for v in 0.3.0:4:old 0.3.1:5:new 0.3.2:6:newer; do
+            IFS=: read -r name code tag <<< "$v"
+            ./gradlew :app:assembleDebug -q -PupdateFeed=http://10.0.2.2:8765/latest.json -PversionNameOverride=$name -PversionCodeOverride=$code
+            cp app/build/outputs/apk/debug/app-debug.apk "ota/hatch-$tag.apk"
+          done
+          ls -la ota
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ota-test-apks
+          path: ota/*.apk
 
 
   android-emu-e2e:
@@ -269,6 +282,63 @@ jobs:
           path: |
             harness-out/emu/*.png
             harness-out/emu/*.txt
+
+  emu-ota:
+    # In-app update end-to-end against a fake local release feed (never the real repo's releases).
+    needs: [android-assemble]
+    if: needs.android-assemble.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ota-test-apks
+          path: ota
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules /usr/share/swift || true
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Pre-install emulator + system image
+        run: |
+          SDKM=$(ls "$ANDROID_HOME"/cmdline-tools/latest/bin/sdkmanager 2>/dev/null || command -v sdkmanager)
+          for i in 1 2 3 4; do
+            yes | "$SDKM" --install emulator 'system-images;android-34;google_apis;x86_64' platform-tools > /tmp/sdk.log 2>&1 && break
+            tail -3 /tmp/sdk.log; echo "retry $i"; sleep 20
+          done
+          C="$ANDROID_HOME/cmdline-tools"
+          for i in 1 2 3; do yes | "$SDKM" --install 'cmdline-tools;latest' > /tmp/ct.log 2>&1 && break; sleep 15; done
+          N=$(ls -d "$C"/latest-* 2>/dev/null | sort -V | tail -1)
+          if [ -n "$N" ]; then sudo rm -rf "$C/latest" && sudo mv "$N" "$C/latest"; fi
+          P=pixel_6
+          for d in pixel_fold pixel_tablet pixel_c; do
+            "$C/latest/bin/avdmanager" list device -c 2>/dev/null | grep -qx "$d" && { P=$d; break; }
+          done
+          echo "EMU_PROFILE=$P" >> "$GITHUB_ENV"
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: ${{ env.EMU_PROFILE }}
+          force-avd-creation: true
+          disk-size: 6G
+          ram-size: 4096M
+          emulator-options: -no-metrics -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: PROOF_DIR=harness-out/ota bash scripts/emu-ota.sh ota/hatch-old.apk ota/hatch-new.apk ota/hatch-newer.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emu-ota-proofs
+          path: |
+            harness-out/ota/*.png
+            harness-out/ota/*.txt
+            harness-out/ota/*.log
 
   emu-blender:
     # Bently: Blender as a floating window on the Fold-sized emulator (software GL = llvmpipe; slow, so generous limits).
@@ -348,7 +418,9 @@ jobs:
         run: |
           TAG="v0.1.0-dev.${GITHUB_SHA::7}"
           mkdir -p upload
-          find arts -name '*.apk' -exec cp {} upload/ \;
+          find arts -path '*ota-test-apks*' -prune -o -name '*.apk' -exec cp {} upload/ \;
+          # Every APK on a release carries its .sha256 (Hatch's in-app updater refuses an APK without one).
+          (cd upload && for f in *.apk; do sha256sum "$f" > "$f.sha256"; done)
           find arts -name '*.png' -exec cp {} upload/ \;
           cp catalogue/catalogue.json upload/
           ls -la upload/

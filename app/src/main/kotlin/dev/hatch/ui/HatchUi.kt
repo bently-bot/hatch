@@ -149,6 +149,8 @@ data class HatchUiState(
     val categories: List<CatalogueCategory>,
     val installed: Set<String>,
     val progress: InstallManager.Progress,
+    /** Hatch's own update (SelfUpdater): the card at the top and Settings → Updates. */
+    val update: dev.hatch.update.SelfUpdater.State = dev.hatch.update.SelfUpdater.State.Idle,
 )
 
 @Composable
@@ -182,11 +184,12 @@ fun HatchHome(state: HatchUiState, actions: StoreActions) {
             owner.lifecycle.addObserver(obs); onDispose { owner.lifecycle.removeObserver(obs) }
         }
         Column(Modifier.padding(pad).fillMaxSize()) {
+        UpdateBanner(state.update, actions.updates)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 0 -> AppsTab(state, actions, onDetail = { detailId = it })
                 1 -> GetAppsTab(state, actions, onDetail = { detailId = it })
-                else -> SettingsTab(actions)
+                else -> SettingsTab(actions, state.update)
             }
         }
         }
@@ -561,7 +564,7 @@ internal fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreA
 
 // ---------- Settings tab ----------
 @Composable
-private fun SettingsTab(actions: StoreActions) {
+private fun SettingsTab(actions: StoreActions, update: dev.hatch.update.SelfUpdater.State = dev.hatch.update.SelfUpdater.State.Idle) {
     var floatOn by remember { mutableStateOf(actions.floatingEnabled()) }
     var bubble by remember { mutableStateOf(actions.bubbleEnabled()) }
     var gpu by remember { mutableStateOf(actions.gpuEnabled()) }
@@ -569,6 +572,7 @@ private fun SettingsTab(actions: StoreActions) {
     val storage by produceState("…") { value = runCatching { actions.storageUsed() }.getOrDefault("") }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        UpdatesSettings(update, actions.updates) { t, c -> SettingCard(t, c) }
         SettingCard("Windows") {
             SwitchRow("Floating windows over other apps", floatOn) { floatOn = actions.setFloatingEnabled(it) && it }
             Hint(if (floatOn) "Programs open as movable, resizable windows above everything." else "Each program window opens as its own Android app window (Recents, split screen, DeX).")
