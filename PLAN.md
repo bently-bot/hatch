@@ -39,7 +39,7 @@ Proof locations: proofs/ci-arm64/*, proofs/emu/*, proofs/local/*. "Fold-8-only" 
 - [x] D1 Debian 13 (AppStream catalogue, 1952 apps)
 - [x] D2 Vendor apt repos (signed keyring + sources.list.d): Cursor (Anysphere) arm64, VS Code (Microsoft) arm64; Chrome has no Linux arm64 build, so it maps to Chromium (Debian) with a note — Cursor, VS Code, Brave: installs + runs on the compositor locally (proofs/local/vendor-*.png); arm64 CI: Cursor + Brave + Darktable OK (run 40158202310); VS Code verified locally only
 - [x] D3 Flathub arm64 source (feasibility: ostree pull + checkout of app + runtime, run under proot with /app bound, no bwrap) — popular-on-Flathub row — flatpak deploys under proot; Hatch runs apps from a spec (no bwrap); Darktable runs locally (proofs/local/flathub-darktable-proot.png); arm64 CI: Cursor + Brave + Darktable OK (run 40158202310); VS Code verified locally only
-- [ ] D4 Releases (GitHub release .deb/.AppImage-extract) for items like HDRView
+- [x] D4 Releases (GitHub release .deb/.AppImage-extract) for items like HDRView — HDRView back (fresh-rootfs fix: GLFW dlopens libwayland-cursor; run 40163068803, proofs/hdrview/40163068803/hdrview.png)
 
 ## E. Blender + performance
 - [x] E1 Blender (Debian arm64) in the catalogue (featured) and in arm64 CI: window renders via llvmpipe GL, plus a screenshot — arm64 CI run 40111368518 (Xwayland + llvmpipe, 910 colours)
@@ -55,4 +55,4 @@ Proof locations: proofs/ci-arm64/*, proofs/emu/*, proofs/local/*. "Fold-8-only" 
 - [~] F2 (only for the Box64 fallback; not needed for F0) Steam needs i386 libs: armhf multiarch for Box86, or an x86 rootfs for FEX. Prototype in the arm64 CI guest (proot), install `steam-installer`/the bootstrap, reach the login window.
 - [x] F3 DONE: catalogue entry "steam" (vendor Valve, Experimental badge, arches [arm64], hidden on x86-64); hatch-catalogue entry staged on branch steam-experimental (merging publishes a catalogue release). Original: Store entry "Steam (Experimental)" with source badge "Experimental", own install script (hatch-install-app --emu box64|fex), floating window like any app.
 - [ ] F4 Verify on device (Fold 8); document the limits (anti-cheat, Proton under emulation = slow).
-- [ ] Re-add HDRView (GitHub-release AppImage): renders in CI after other apps, but on a fresh rootfs its first frame never commits; deps + ENOSYS fixed, root cause open.
+- [x] Re-add HDRView (GitHub-release AppImage) — DONE: root cause was the runtime-loaded libwayland-cursor0 (+ libdecor) missing on a fresh rootfs;: renders in CI after other apps, but on a fresh rootfs its first frame never commits; deps + ENOSYS fixed, root cause open.
