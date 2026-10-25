@@ -1,0 +1,41 @@
+{
+  "apps": [
+    {
+      "id": "hdrview",
+      "name": "HDRView",
+      "summary": "Examine and compare high-dynamic range images",
+      "description": "A simple research-oriented image viewer with an emphasis on examining and comparing high-dynamic range (HDR) images: exposure, gamma, channels, pixel statistics and side-by-side comparison. Installed from the developer's own GitHub release (AppImage).",
+      "category": "graphics",
+      "source": "release",
+      "packages": [
+        "libgl1",
+        "libegl1",
+        "libgl1-mesa-dri",
+        "libwayland-egl1",
+        "libxkbcommon0",
+        "libgpg-error0",
+        "libstdc++6",
+        "zlib1g"
+      ],
+      "command": [
+        "/opt/hatch/hdrview/app/AppRun"
+      ],
+      "wine": false,
+      "license": "BSD-3-Clause",
+      "windowsPayload": {
+        "url": "https://github.com/wkjarosz/hdrview/releases/download/v3.0.2/HDRView-3.0.2-aarch64.appimage",
+        "sha256": "1fb14e6bbc101e6dfae8a1eff2cfb9d22fdb98497b7451467740e02c76294b14",
+        "extractTo": "/opt/hatch/hdrview",
+        "kind": "appimage"
+      },
+      "payloads": {
+        "amd64": {
+          "url": "https://github.com/wkjarosz/hdrview/releases/download/v3.0.2/HDRView-3.0.2-x86_64.appimage",
+          "sha256": "3393b2161a152dc303bdd3ac5e04f7595eb4eebadea8f2018cfaf15ae005a55c",
+          "extractTo": "/opt/hatch/hdrview",
+          "kind": "appimage"
+        }
+      }
+    }
+  ]
+}

@@ -1,13 +1,17 @@
 name: steam-experiment
-# Experimental: Valve's native ARM64 Steam client in the real Debian 13 guest under proot (same flags as the app),
-# rendered by Hatch's compositor. Quick loop for hatch-steam; the full arm64-guest-proof also covers it (soft).
+# Quick arm64 loop on a FRESH Debian 13 guest under proot (same flags as the app), rendered by Hatch's compositor:
+# Steam (Experimental) by default; workflow_dispatch can run other apps, incl. entries from
+# scripts/experiments/entries.json (merged into this runner's catalogue copy only, never bundled).
 on:
   workflow_dispatch:
+    inputs:
+      apps: { description: "App ids", required: false, default: "steam" }
+      debug_apps: { description: "Apps to run with WAYLAND_DEBUG=client", required: false, default: "" }
   push:
     branches: [main]
-    paths: [app/src/main/assets/guest-bin/hatch-steam, .github/workflows/steam-experiment.yml, catalogue/curated.json]
+    paths: [app/src/main/assets/guest-bin/hatch-steam, .github/workflows/steam-experiment.yml, catalogue/curated.json, scripts/experiments/**]
 jobs:
-  steam-arm64:
+  guest-arm64:
     timeout-minutes: 60
     runs-on: ubuntu-24.04-arm
     steps:
@@ -20,18 +24,26 @@ jobs:
         with:
           path: ${{ runner.temp }}/rootfs.tar.xz
           key: rootfs-${{ hashFiles('app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt') }}
-      - name: Steam (native ARM64, no container) in the guest
+      - name: Merge experiment entries (runner copy only)
+        run: |
+          python3 - <<'PY'
+          import json
+          c = json.load(open("catalogue/catalogue.json")); x = json.load(open("scripts/experiments/entries.json"))["apps"]
+          ids = {a["id"] for a in x}; c["apps"] = [a for a in c["apps"] if a["id"] not in ids] + x
+          json.dump(c, open("catalogue/catalogue.json", "w"))
+          PY
+      - name: Apps in a fresh guest
         env:
           PROOF_DIR: harness-out
-          APPS: steam
-          SOFT_APPS: steam clipboard audio
+          APPS: ${{ github.event.inputs.apps || 'steam' }}
+          DEBUG_APPS: ${{ github.event.inputs.debug_apps || '' }}
+          SOFT_APPS: steam hdrview clipboard audio
         run: bash scripts/ci-guest-proof.sh
       - name: Steam logs
         if: always()
         run: |
-          R="${RUNNER_TEMP}/hatch-ci/rootfs"; [ -d "$R" ] || R=$(ls -d "${RUNNER_TEMP}"/hatch-ci/*/ 2>/dev/null | head -1)
-          for f in $(find / -path '*/home/hatch/.local/share/Steam/logs/*.txt' 2>/dev/null | head -20); do cp "$f" harness-out/steamlog-$(basename "$f") 2>/dev/null; done
-          ls harness-out
+          for f in $(find / -path '*/home/hatch/.local/share/Steam/logs/*.txt' 2>/dev/null | head -20); do tail -c 30000 "$f" > harness-out/steamlog-$(basename "$f"); done
+          for f in harness-out/*-client.log; do [ -f "$f" ] && [ $(stat -c%s "$f") -gt 400000 ] && { head -c 200000 "$f"; echo ...; tail -c 200000 "$f"; } > "$f.t" && mv "$f.t" "$f"; done; ls -la harness-out
       - uses: actions/upload-artifact@v4
         if: always()
         with:

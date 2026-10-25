@@ -102,7 +102,7 @@ capture() { # name seconds harness-opts... -- cmd...
   [ $rc -eq 0 ] || { echo "--- $name client log ---"; tail -30 "$PROOF/$name-client.log" 2>/dev/null || true; }
   return $rc
 }
-title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender|steam) echo "Xwayland";; cursor) echo "Cursor";; brave-browser) echo "Brave";; org.darktable.Darktable) echo "darktable";; hdrview) echo "HDRView";; *) echo "";; esac; }
+title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender|steam) echo "Xwayland";; cursor) echo "Cursor";; hdrview) echo "HDRView";; brave-browser) echo "Brave";; org.darktable.Darktable) echo "darktable";; hdrview) echo "HDRView";; *) echo "";; esac; }
 
 FAILED=()
 for app in $APPS; do
@@ -124,6 +124,8 @@ for app in $APPS; do
   minu=12; [ "$app" = xterm ] && minu=2   # xterm's core bitmap font really is 2 colours
   # Flathub apps run from their spec on the host side (own root), not inside the Debian guest's shell.
   case "$LAUNCH" in hatch-flatpak-run*) RUNARGS=(${LAUNCH}) ;; *) RUNARGS=(bash -c "$LAUNCH") ;; esac
+  # DEBUG_APPS: trace the Wayland protocol of these apps (client side) into <app>-client.log
+  [[ " ${DEBUG_APPS:-} " == *" $app "* ]] && RUNARGS=(env WAYLAND_DEBUG=client "${RUNARGS[@]}")
   if [ "$app" = steam ]; then "${GU[@]}" bash -c 'tail -60 ~/.local/share/Steam/logs/bootstrap_log.txt ~/.local/share/Steam/logs/stderr.txt 2>/dev/null' > "$PROOF/steam-logs-pre.log" 2>&1 || true; fi
   if capture "$app" "$secs" "${topt[@]}" --settle=$settle -- "${GU[@]}" "${RUNARGS[@]}" && png_ok "$PROOF/$app.png" "$minu"; then
     stamp "$app OK"
