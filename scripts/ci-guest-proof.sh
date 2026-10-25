@@ -13,7 +13,7 @@ t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
 
 if [ "${SKIP_HOST_DEPS:-0}" != 1 ]; then
   sudo apt-get update -qq
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make libtalloc-dev curl xz-utils python3-pil unzip
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make libtalloc-dev curl xz-utils zstd python3-pil unzip
   curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
   sudo unzip -qo /tmp/kotlin.zip -d /opt
   export PATH="/opt/kotlinc/bin:$PATH"
@@ -40,7 +40,25 @@ kotlinc -d build/host/classes -jvm-target 17 app/src/main/kotlin/dev/hatch/wayla
   || { grep -v '^warning' "$WORK/kotlinc.log"; echo "FATAL: compositor harness does not compile (wayland/*.kt must stay Android-free)"; exit 1; }
 CP="build/host/classes:$KLIB/kotlin-stdlib.jar"; NAT="$ROOT/build/host/libhatchnative.so"
 
-# ---- rootfs (same source the app downloads on arm64) ----
+# ---- rootfs: the prebuilt image the app streams on first run (RootfsCatalog.PREBAKED); LEGACY_ROOTFS=1 → old source ----
+ARCH=$([ "$(uname -m)" = aarch64 ] && echo arm64 || echo amd64)
+PRE=$(python3 - "$ARCH" <<'PY'
+import re,sys
+s=open("app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt").read()
+m=re.search(r'"%s" to Prebaked\(\s*"([^"]+)",\s*"([0-9a-f]{64})"' % sys.argv[1], s)
+print(f"{m.group(1)} {m.group(2)}" if m else "")
+PY
+)
+if [ ! -f "$HATCH_ROOTFS/etc/os-release" ] && [ -n "$PRE" ] && [ "${LEGACY_ROOTFS:-0}" != 1 ]; then
+  read PURL PSHA <<<"$PRE"
+  stamp "prebuilt rootfs $PURL"
+  [ -s "$WORK/rootfs.tar.zst" ] && echo "$PSHA  $WORK/rootfs.tar.zst" | sha256sum -c - >/dev/null 2>&1 && stamp "cached prebuilt rootfs" \
+    || curl -fL --retry 3 -o "$WORK/rootfs.tar.zst" "$PURL"
+  echo "$PSHA  $WORK/rootfs.tar.zst" | sha256sum -c -
+  mkdir -p "$HATCH_ROOTFS"
+  zstd -dc "$WORK/rootfs.tar.zst" | tar -x -C "$HATCH_ROOTFS" --no-same-owner --exclude='dev/*' 2>/dev/null || true
+  stamp "prebuilt rootfs unpacked ($(du -sh "$HATCH_ROOTFS" | cut -f1))"
+fi
 if [ ! -f "$HATCH_ROOTFS/etc/os-release" ]; then
   RF=app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt
   URL=$(grep -A1 'ROOTFS_URL' "$RF" | grep -o 'https://[^"]*'); SHA=$(grep -A1 'ROOTFS_SHA256 =' "$RF" | grep -o '[0-9a-f]\{64\}')

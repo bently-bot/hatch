@@ -66,8 +66,8 @@ jobs:
           java-version: '17'
       - uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/rootfs.tar.xz
-          key: rootfs-${{ hashFiles('app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt') }}
+          path: ${{ runner.temp }}/rootfs.tar.zst
+          key: rootfs-zst-${{ hashFiles('app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt') }}
       - name: Guest apps (Linux + Wine + X11) rendered by Hatch compositor
         env:
           PROOF_DIR: harness-out
