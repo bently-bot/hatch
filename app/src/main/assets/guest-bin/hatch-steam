@@ -1,0 +1,70 @@
+#!/bin/bash
+# hatch-steam (Experimental): Valve's native ARM64 Linux Steam client, run directly, without the Steam Runtime
+# container (pressure-vessel needs user namespaces, which proot on Android can't provide).
+#   hatch-steam [--fetch|--diag|--box64] [steam args...]
+# --fetch  only download/verify the client;  --diag  list unresolved libs;  --box64  x86_64 client via Box64 (fallback)
+set -eu
+ST="${HATCH_STEAM_ROOT:-$HOME/.local/share/Steam}"
+MAN="steam_client_linuxarm64"; [ "${HATCH_STEAM_BETA:-0}" = 1 ] && MAN="steam_client_publicbeta_linuxarm64"
+BASE="https://client-update.steamstatic.com"
+say() { echo "hatch-steam: $*" >&2; }
+
+fetch() {
+  mkdir -p "$ST/package"; cd "$ST/package"
+  curl -fsSL --retry 3 -o "$MAN.new" "$BASE/$MAN"
+  local ver; ver=$(awk -F'"' '$2=="version"{print $4; exit}' "$MAN.new")
+  if [ -x "$ST/steamrtarm64/steam" ] && [ "$(cat "$ST/package/.hatch-version" 2>/dev/null)" = "$ver" ]; then rm -f "$MAN.new"; return; fi
+  say "fetching Steam client $ver"
+  # Native ARM64 client = the *_all (UI, resources) + *_linuxarm64_linuxarm64 packages; skip the bootstrapper,
+  # the x86 bins and the container runtimes.
+  awk '
+    /^\t"[^"]+"$/ { gsub(/[\t"]/, ""); pkg=$0; next }
+    /^\t\t"file"/ { split($0, a, "\""); file[pkg]=a[4] }
+    /^\t\t"sha2"/ { split($0, a, "\""); sha[pkg]=a[4] }
+    END { for (p in file) if (p ~ /_all$/ || p ~ /_linuxarm64_linuxarm64$/) print p, file[p], sha[p] }' "$MAN.new" |
+  sort | while read -r p f s; do
+    say "  $p"; curl -fsSL --retry 3 -o "$f" "$BASE/$f"
+    echo "$s  $f" | sha256sum -c --status - || { say "checksum mismatch: $f"; rm -f "$f"; exit 1; }
+    unzip -oq "$f" -d "$ST" || [ $? -le 1 ]   # 1 = warnings (e.g. backslash separators, converted by unzip)
+    rm -f "$f"
+  done
+  # Some zips use Windows separators for a few entries
+  if [ -d "$ST" ]; then
+    find "$ST" -maxdepth 1 -name 'steamrtarm64\\*' | while read -r x; do
+      d="$ST/$(echo "${x#"$ST"/}" | tr '\\' '/')"; mkdir -p "$(dirname "$d")"; mv -f "$x" "$d"; done
+  fi
+  mv -f "$MAN.new" "$MAN.installed"; echo "$ver" > .hatch-version
+  chmod +x "$ST"/steamrtarm64/steam "$ST"/steamrtarm64/steamwebhelper* "$ST"/steamrtarm64/*.sh 2>/dev/null || true
+}
+
+libenv() {
+  export LD_LIBRARY_PATH="$ST/steamrtarm64:$ST/steamrtarm64/libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export STEAM_RUNTIME=0 STEAM_RUNTIME_LOGGER=0 STEAMROOT="$ST" STEAMSCRIPT="$0"
+  mkdir -p "$HOME/.steam"; ln -sfn "$ST" "$HOME/.steam/root"; ln -sfn "$ST" "$HOME/.steam/steam"
+  mkdir -p "$HOME/.steam/sdk64"; ln -sfn "$ST/steamrtarm64/steamclient.so" "$HOME/.steam/sdk64/steamclient.so"
+}
+
+case "${1:-}" in
+  --fetch) fetch; exit 0 ;;
+  --diag)
+    fetch; libenv
+    for f in "$ST"/steamrtarm64/steam "$ST"/steamrtarm64/steamwebhelper "$ST"/steamrtarm64/*.so; do
+      ldd "$f" 2>/dev/null | awk -v f="${f##*/}" '/not found/{print f": "$1}'
+    done | sort -u
+    exit 0 ;;
+  --box64)
+    shift
+    command -v box64 >/dev/null || { say "box64 not installed"; exit 1; }
+    BX="${HATCH_STEAM_X86_ROOT:-$HOME/.local/share/Steam-x86}"; mkdir -p "$BX"
+    if [ ! -x "$BX/steam.sh" ]; then
+      say "fetching x86_64 Steam bootstrap"
+      curl -fsSL --retry 3 https://repo.steampowered.com/steam/archive/stable/steam_latest.tar.gz | tar -xz -C "$BX" --strip-components=1
+      tar -xJf "$BX/bootstraplinux_ubuntu12_32.tar.xz" -C "$BX"
+    fi
+    export STEAM_RUNTIME=0 BOX64_LOG=${BOX64_LOG:-1}
+    exec box64 "$BX/ubuntu12_64/steam" -no-cef-sandbox "$@" ;;
+esac
+
+fetch; libenv; cd "$ST"
+say "starting $(cat "$ST/package/.hatch-version") (native ARM64, no container)"
+exec "$ST/steamrtarm64/steam" -no-cef-sandbox -nobootstrapupdate -noverifyfiles "$@"

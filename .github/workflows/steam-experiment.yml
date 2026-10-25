@@ -1,0 +1,42 @@
+name: steam-experiment
+# Experimental: Valve's native ARM64 Steam client in the real Debian 13 guest under proot (same flags as the app),
+# rendered by Hatch's compositor. Quick loop for hatch-steam; the full arm64-guest-proof also covers it (soft).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [app/src/main/assets/guest-bin/hatch-steam, .github/workflows/steam-experiment.yml]
+jobs:
+  steam-arm64:
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/rootfs.tar.xz
+          key: rootfs-${{ hashFiles('app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt') }}
+      - name: Steam (native ARM64, no container) in the guest
+        env:
+          PROOF_DIR: harness-out
+          APPS: steam
+          SOFT_APPS: steam clipboard audio
+        run: bash scripts/ci-guest-proof.sh
+      - name: Steam logs
+        if: always()
+        run: |
+          R="${RUNNER_TEMP}/hatch-ci/rootfs"; [ -d "$R" ] || R=$(ls -d "${RUNNER_TEMP}"/hatch-ci/*/ 2>/dev/null | head -1)
+          for f in $(find / -path '*/home/hatch/.local/share/Steam/logs/*.txt' 2>/dev/null | head -20); do cp "$f" harness-out/steamlog-$(basename "$f") 2>/dev/null; done
+          ls harness-out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: steam-arm64-proofs
+          path: |
+            harness-out/*.png
+            harness-out/*.log
+            harness-out/*.txt

@@ -68,4 +68,12 @@ class CatalogueTest {
         val real = load().apps
         assertEquals(listOf("org.darktable.Darktable"), dev.hatch.ui.buildsOf(real.first { it.id == "org.darktable.Darktable" }, real).map { it.id })
     }
+
+    @Test
+    fun steamIsAnExperimentalValveClientNotATestedApp() {
+        val steam = load().apps.single { it.id == "steam" }
+        assertTrue(steam.experimental)
+        assertTrue(!steam.verified && steam.repo == null && steam.vendorName == "Valve")
+        assertTrue(steam.command == listOf("hatch-steam") && steam.x11)
+    }
 }

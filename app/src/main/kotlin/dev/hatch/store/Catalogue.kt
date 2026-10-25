@@ -54,6 +54,8 @@ data class StoreApp(
     val featured: Boolean = false,
     /** Exercised end-to-end in CI (arm64 runner screenshots). */
     val verified: Boolean = false,
+    /** Works only partly or on some devices (e.g. Steam); badged "Experimental" in the store. */
+    val experimental: Boolean = false,
 )
 
 @Serializable

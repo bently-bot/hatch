@@ -80,7 +80,10 @@ data class SourceInfo(val label: String, val colour: Color, val subtitle: String
 fun sourceOf(app: StoreApp): SourceInfo = when (app.source) {
     "flathub" -> SourceInfo("Flathub", Color(0xFF7FB7FF), "Flathub", "Flathub",
         "Sandboxed build from Flathub, built for this device. Updates with Update all.")
-    "vendor" -> SourceInfo("Vendor", Color(0xFF6FD6C2), app.vendorName.ifEmpty { "Vendor repository" },
+    "vendor" -> if (app.repo == null) SourceInfo("Vendor", Color(0xFF6FD6C2), app.vendorName.ifEmpty { "Vendor" },
+        "${app.vendorName.ifEmpty { "Vendor" }} client",
+        "Native $deviceArch build downloaded from ${app.vendorName.ifEmpty { "the vendor" }}'s own update servers (checksum-verified); it keeps itself up to date.")
+    else SourceInfo("Vendor", Color(0xFF6FD6C2), app.vendorName.ifEmpty { "Vendor repository" },
         "${app.vendorName.ifEmpty { "Vendor" }} repository",
         "Native $deviceArch build from ${app.vendorName.ifEmpty { "the vendor" }}'s signed repository: the vendor's own build, which updates with Update all.")
     "release" -> if (app.wine) SourceInfo("Release", Color(0xFFFFB68A), "Windows · Wine", "Official release",
@@ -424,7 +427,7 @@ private fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreAc
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
             Column(Modifier.weight(1f)) {
                 Text(app.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                Text(src.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (app.experimental) "${src.subtitle} · Experimental" else src.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             SourcePill(app); Spacer(Modifier.width(12.dp))
         }

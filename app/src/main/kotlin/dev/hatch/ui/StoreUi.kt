@@ -292,7 +292,8 @@ private fun FeaturedCard(app: StoreApp, installed: Boolean, onClick: () -> Unit)
 
 private fun badge(app: StoreApp) = buildString {
     append(if (app.wine) "Windows" else "Linux")
-    if (app.verified) append(" · ✓ tested")
+    if (app.experimental) append(" · Experimental")
+    else if (app.verified) append(" · ✓ tested")
 }
 
 @Composable
