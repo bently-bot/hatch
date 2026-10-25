@@ -8,10 +8,12 @@ ST="${HATCH_STEAM_ROOT:-$HOME/.local/share/Steam}"
 MAN="steam_client_linuxarm64"; [ "${HATCH_STEAM_BETA:-0}" = 1 ] && MAN="steam_client_publicbeta_linuxarm64"
 BASE="https://client-update.steamstatic.com"
 say() { echo "hatch-steam: $*" >&2; }
+# Never let Steam's bundled libs (libcurl/libnghttp2 in steamrtarm64/libs) leak into the guest's own tools
+dl() { env -u LD_LIBRARY_PATH curl "$@"; }
 
 fetch() {
   mkdir -p "$ST/package"; cd "$ST/package"
-  curl -fsSL --retry 3 -o "$MAN.new" "$BASE/$MAN"
+  dl -fsSL --retry 3 -o "$MAN.new" "$BASE/$MAN"
   local ver; ver=$(awk -F'"' '$2=="version"{print $4; exit}' "$MAN.new")
   if [ -x "$ST/steamrtarm64/steam" ] && [ "$(cat "$ST/package/.hatch-version" 2>/dev/null)" = "$ver" ]; then rm -f "$MAN.new"; return; fi
   say "fetching Steam client $ver"
@@ -23,7 +25,7 @@ fetch() {
     /^\t\t"sha2"/ { split($0, a, "\""); sha[pkg]=a[4] }
     END { for (p in file) if (p ~ /_all$/ || p ~ /_linuxarm64_linuxarm64$/) print p, file[p], sha[p] }' "$MAN.new" |
   sort | while read -r p f s; do
-    say "  $p"; curl -fsSL --retry 3 -o "$f" "$BASE/$f"
+    say "  $p"; dl -fsSL --retry 3 -o "$f" "$BASE/$f"
     echo "$s  $f" | sha256sum -c --status - || { say "checksum mismatch: $f"; rm -f "$f"; exit 1; }
     unzip -oq "$f" -d "$ST" || [ $? -le 1 ]   # 1 = warnings (e.g. backslash separators, converted by unzip)
     rm -f "$f"
@@ -61,17 +63,18 @@ case "${1:-}" in
     BX="${HATCH_STEAM_X86_ROOT:-$HOME/.local/share/Steam-x86}"; mkdir -p "$BX"
     if [ ! -x "$BX/steam.sh" ]; then
       say "fetching x86_64 Steam bootstrap"
-      curl -fsSL --retry 3 https://repo.steampowered.com/steam/archive/stable/steam_latest.tar.gz | tar -xz -C "$BX" --strip-components=1
+      dl -fsSL --retry 3 https://repo.steampowered.com/steam/archive/stable/steam_latest.tar.gz | tar -xz -C "$BX" --strip-components=1
       tar -xJf "$BX/bootstraplinux_ubuntu12_32.tar.xz" -C "$BX"
     fi
     export STEAM_RUNTIME=0 BOX64_LOG=${BOX64_LOG:-1}
     exec box64 "$BX/ubuntu12_64/steam" -no-cef-sandbox "$@" ;;
 esac
 
-fetch; libenv; cd "$ST"
-# Steam's web helper wants a session bus; give it a private one (no systemd under proot)
+# Steam's web helper wants a session bus; give it a private one (no systemd under proot). Re-exec first,
+# before any Steam library path is exported.
 if [ -z "${HATCH_STEAM_DBUS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
   unset DBUS_SESSION_BUS_ADDRESS; export HATCH_STEAM_DBUS=1; exec dbus-run-session -- "$0" "$@"; fi
+fetch; libenv; cd "$ST"
 # Valve's ARM64 web helper draws with SDL3 on Wayland: straight onto Hatch's compositor (X11 stays for the rest)
 export SDL_VIDEO_DRIVER="${SDL_VIDEO_DRIVER:-wayland,x11}"
 say "starting $(cat "$ST/package/.hatch-version") (native ARM64, no container)"
