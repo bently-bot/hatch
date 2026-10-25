@@ -5,6 +5,7 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
@@ -29,3 +30,8 @@ int mprotect(void *addr, size_t len, int prot) {
     __builtin___clear_cache((char *)addr, (char *)addr + n);
     return real_mprotect(addr, n, prot);
 }
+
+// Android's app seccomp filter only allows syscalls bionic uses; on x86_64 glibc's creat() is the legacy `creat` syscall,
+// which is not among them (arm64 has no such syscall). Wine (Debian's tmpdir patch) uses it, so route it through openat.
+int creat(const char *path, mode_t mode) { return (int)syscall(SYS_openat, AT_FDCWD, path, O_CREAT | O_WRONLY | O_TRUNC, mode); }
+int creat64(const char *path, mode_t mode) { return creat(path, mode); }

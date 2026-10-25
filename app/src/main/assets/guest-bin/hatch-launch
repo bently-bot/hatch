@@ -27,6 +27,9 @@ if [ "$WINE" = 1 ]; then
   # Debian wine 10 bug: server_tmpdir.h free()s secure_getenv("TMPDIR") → "free(): invalid pointer" abort.
   unset TMPDIR
   export WINEPREFIX="${WINEPREFIX:-$HOME/.wine}"
+  # Debian's wine puts wineserver's socket dir in /run/user/<uid>/wine when that exists (else it creat()s a marker file
+  # in the prefix, which x86_64 Android's seccomp rejects).
+  RUN="/run/user/$(id -u)"; mkdir -p "$RUN" 2>/dev/null && chmod 700 "$RUN" 2>/dev/null || true
   # Android forbids execmod (mprotect +X on written file pages) for API 29+ apps; Wine does exactly that when loading PE images.
   # The shim retries those as anonymous executable memory, which is allowed.
   [ -f /usr/local/lib/hatch/libhatch-execmod.so ] && export LD_PRELOAD="/usr/local/lib/hatch/libhatch-execmod.so${LD_PRELOAD:+:$LD_PRELOAD}"
