@@ -413,19 +413,13 @@ if adb logcat -d -s HatchFloat | grep -q "close mousepad called off"; then
   # Unsaved text from the typing check: Mousepad answered with its own "Save changes?" dialog, which Hatch shows.
   sleep 1; shot 15c-close-save-changes-dialog
   stamp "focused Mousepad answered ✕ with its own dialog (kept on screen, as intended)"
-  read ML MT MR MB <<<"$(adb shell dumpsys window windows | python3 -c '
-import re,sys
-t=sys.stdin.read(); best=None
-for m in re.finditer(r"Hatch: Mousepad", t):
-    f=re.search(r"frame=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]", t[m.end():m.end()+6000])
-    if f:
-        b=tuple(map(int,f.groups())); a=(b[2]-b[0])*(b[3]-b[1])
-        if best is None or a>best[0]: best=(a,b)
-print(*best[1])')"
-  read CX CY <<<"$(close_xy $ML $MT $MR)"
+  # ✕ on the dialog's own window would just cancel the dialog (desktop behaviour); ✕ on the main window again
+  # means "close anyway". The main window is back in its old frame, so its ✕ is where we tapped before.
+  FIT=$(adb logcat -d -s HatchFloat | grep -m1 "fit 'Mousepad' to its dialog" | sed 's/^.*HatchFloat[^:]*: //')
+  [ -n "$FIT" ] && stamp "$FIT" || stamp "WARN: dialog window not fitted to the dialog"
   T0=$(date +%s%N); adb shell input tap $CX $CY
   GONE=$(wait_gone Mousepad 3000 $T0) || { shot 15d-close-failed; fail "Mousepad still on screen 3 s after ✕ with its dialog up"; }
-  stamp "Mousepad (dialog up): closed ${GONE} ms after ✕"
+  stamp "Mousepad (dialog up): ✕ on the main window again closed it ${GONE} ms after the tap"
 elif [ -n "$GONE" ] && ! float_frame Mousepad >/dev/null; then
   stamp "focused Mousepad: window gone ${GONE} ms after one tap on ✕"
 else
