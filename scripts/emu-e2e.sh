@@ -45,6 +45,8 @@ pin_confirm() { # [screenshot-name]
 wait_installed() {
   for i in $(seq 1 ${2:-300}); do
     $UI has '^Open$' dev.hatch && return 0
+    # Success also raises the launcher's pin sheet, which covers the store (the dump then has no Open button).
+    $UI has "$PINRX" 'launcher|nexus|systemui' && return 0
     if $UI has "Couldn.t install|Install failed" dev.hatch; then
       $UI tap '^Details$' dev.hatch || true; sleep 2; shot "$1-install-failed"
       adb logcat -d -s HatchInstall > "$OUT/$1-install-logcat.txt" 2>&1; return 1
