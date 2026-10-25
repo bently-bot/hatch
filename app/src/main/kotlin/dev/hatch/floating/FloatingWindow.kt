@@ -142,6 +142,9 @@ class FloatingWindow(
         touchPad?.let {
             it.visibility = if (dev.hatch.ui.TouchPads.shown(ctx, appId)) View.VISIBLE else View.GONE
             content.addView(it, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            it.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                if (v.visibility == View.VISIBLE) v.post { (v as dev.hatch.ui.TouchPad).targets().forEach { (d, xy) -> Log.i(TAG, "touch $d at ${xy[0]} ${xy[1]} for '$label'") } }
+            }
         }
         statusText = TextView(ctx).apply {
             text = "Starting $label…"; setTextColor(Color.LTGRAY); textSize = 15f; gravity = Gravity.CENTER; setPadding(24, 16, 24, 0)

@@ -484,6 +484,55 @@ PY
   stamp "wine leg OK"
 fi
 
+# DOOM (once the bundled catalogue has it): install from the store, reach E1M1 with keys, then play with the
+# on-screen pad (hold the D-pad, hold FIRE); frames must not be black; one tap on ✕ closes it.
+frame_ok() { # png l t r b → non-black, non-flat crop
+  python3 - "$@" <<'PY'
+import sys
+from PIL import Image, ImageStat
+p, l, t, r, b = sys.argv[1], *map(int, sys.argv[2:6])
+im = Image.open(p).convert("L").crop((l, t + 80, r, b))
+st = ImageStat.Stat(im); print(f"mean={st.mean[0]:.1f} stddev={st.stddev[0]:.1f}")
+sys.exit(0 if st.stddev[0] >= 8 and st.mean[0] >= 12 else 1)
+PY
+}
+touch_xy() { adb logcat -d -s HatchFloat | grep -F "touch Touch $1 at" | grep -F "for '$2'" | tail -1 | sed -E 's/.* at ([0-9]+) ([0-9]+) for.*/\1 \2/'; }
+if python3 -c 'import json,sys; sys.exit(0 if any(a["id"]=="doom" for a in json.load(open(sys.argv[1]))["apps"]) else 1)' "$ROOT/catalogue/catalogue.json"; then
+  stamp "DOOM: install from the store"
+  store_install doom || fail "DOOM install"
+  $UI has '^Import WAD$' dev.hatch && stamp "Import WAD button shown" || fail "no Import WAD button on DOOM's detail page"
+  shot 30-doom-detail
+  guest 'ls -la /opt/hatch/doom /usr/share/games/doom 2>&1; sha256sum /opt/hatch/doom/doom1.wad 2>&1' | sed 's/^/  /' | tee "$OUT/doom-wads.txt"
+  grep -q '^  1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771' "$OUT/doom-wads.txt" && stamp "shareware DOOM1.WAD installed (sha256 OK)" || stamp "WARN: no shareware WAD; Freedoom fallback"
+  adb logcat -c
+  launch_intent doom DOOM
+  for i in $(seq 1 60); do DF=$(float_frame DOOM) && break; sleep 2; done
+  [ -n "${DF:-}" ] || fail "DOOM window never appeared"
+  sleep 12; read DL DT DR DB <<<"$DF"; stamp "DOOM window $DF"
+  shot 31-doom-title
+  adb shell input tap $(( (DL + DR) / 2 )) $(( (DT + DB) / 2 )); sleep 1     # focus the window (keys go to the focused overlay)
+  for k in 1 2 3 4; do adb shell input keyevent KEYCODE_ENTER; sleep 1.2; done  # menu → New Game → episode → skill
+  sleep 3; shot 32-doom-e1m1
+  frame_ok "$OUT/32-doom-e1m1.png" $DL $DT $DR $DB || fail "DOOM E1M1 frame is black/flat"
+  if [ -z "$(touch_xy FIRE DOOM)" ]; then   # pad hidden (emulator reports a keyboard): window menu → Touch controls
+    tap_target "control Window menu" DOOM || fail "no window menu on DOOM"; sleep 1
+    tap_target "menu Touch controls" DOOM || fail "no Touch controls item in DOOM's window menu"; sleep 2
+  fi
+  PAD=$(touch_xy D-pad DOOM); FIRE=$(touch_xy FIRE DOOM)
+  [ -n "$PAD" ] && [ -n "$FIRE" ] || fail "touch controls not shown"
+  read PX PY <<<"$PAD"; read FX FY <<<"$FIRE"
+  stamp "touch pad: D-pad $PAD, FIRE $FIRE"
+  adb shell input swipe $PX $(( PY - $(dp 40) )) $PX $(( PY - $(dp 41) )) 1500   # hold up: walk forward
+  adb shell input swipe $FX $FY $FX $FY 700                                      # hold FIRE
+  adb shell input swipe $(( PX + $(dp 40) )) $PY $(( PX + $(dp 41) )) $PY 500     # turn right
+  sleep 1; shot 33-doom-touch-gameplay
+  frame_ok "$OUT/33-doom-touch-gameplay.png" $DL $DT $DR $DB || fail "DOOM gameplay frame is black/flat"
+  cmp -s "$OUT/32-doom-e1m1.png" "$OUT/33-doom-touch-gameplay.png" && fail "touch controls changed nothing"
+  T0=$(date +%s%N); read CX CY <<<"$(close_xy $DF)"; adb shell input tap $CX $CY
+  wait_gone DOOM 3000 $T0 >/dev/null || fail "DOOM still on screen 3 s after one tap on ✕"
+  stamp "DOOM leg OK"
+fi
+
 stamp "Stop all from the runtime notification"
 HUSER=$(adb shell ps -A -o USER,NAME | awk '$2=="dev.hatch"{print $1}' | tr -d '\r' | head -1)
 guest_procs() { adb shell ps -A -o USER,PID,NAME | tr -d '\r' | awk -v u="$HUSER" '$1==u && $3!="dev.hatch"'; }

@@ -38,6 +38,18 @@ class TouchPad(ctx: Context, private val send: (code: Int, pressed: Boolean) -> 
         }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END).apply { setMargins(0, dp(8f), dp(12f), 0) })
     }
 
+    /** On-screen centres of the pad's controls ("Touch FIRE" → x, y): overlays are invisible to uiautomator, so the
+     *  emulator E2E taps these from logcat. */
+    fun targets(): List<Pair<String, IntArray>> {
+        val out = ArrayList<Pair<String, IntArray>>()
+        fun walk(v: View) {
+            val d = v.contentDescription?.toString()
+            if (d != null && d.startsWith("Touch ")) { val xy = IntArray(2); v.getLocationOnScreen(xy); out += d to intArrayOf(xy[0] + v.width / 2, xy[1] + v.height / 2) }
+            if (v is android.view.ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
+        }
+        walk(this); return out
+    }
+
     private fun button(label: String, code: Int, size: Float) = TextView(context).apply {
         text = label; contentDescription = "Touch $label"; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
         textSize = if (size > 70f) 15f else 12f; isFocusable = false
