@@ -41,7 +41,14 @@ pg "$NEW" /bin/sh -c '
 grep -q 'MISSING' "$R" && { log "FAIL: base package missing in prebuilt rootfs"; exit 1; }
 HL=$(find "$NEW/.l2s" -name '.l2s.*' 2>/dev/null | wc -l); log "l2s entries from extraction: $HL"
 log "AFTER guest sanity ${s:+$(el $s)s}"
-pg "$NEW" /bin/sh -c 'apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq --no-install-recommends galculator >/dev/null 2>&1 && echo "apt install in prebuilt rootfs OK"' 2>&1 | tee -a "$R"
+guestcfg() { # what GuestConfig.apply writes on the device
+  rm -f "$1/etc/resolv.conf" "$1/etc/hosts"; printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > "$1/etc/resolv.conf"; printf '127.0.0.1 localhost\n::1 localhost\n' > "$1/etc/hosts"
+  printf 'APT::Sandbox::User "root";\nAPT::Install-Recommends "false";\nAcquire::Languages "none";\nAcquire::Retries "3";\n' > "$1/etc/apt/apt.conf.d/99hatch"
+}
+guestcfg "$NEW"
+s=$(now); if pg "$NEW" /bin/sh -c 'apt-get update -qq && apt-get install -y -qq --no-install-recommends galculator' > "$WORK/apt-new.log" 2>&1; then
+  log "apt update + install galculator in prebuilt rootfs OK: $(el $s)s"
+else log "FAIL: apt in prebuilt rootfs"; tail -15 "$WORK/apt-new.log" | tee -a "$R"; APT_FAIL=1; fi
 rm -rf "$NEW"
 
 # ---------- BEFORE ----------
@@ -53,7 +60,7 @@ s=$(now); $RUN xz "$WORK/old.tar.xz" "$WORK/old.tar" | tee -a "$R"; T_XZ=$(el $s
 s=$(now); PROOT_L2S_DIR="$OLD/.l2s" "$PROOT" -0 -l -r / tar -xf "$WORK/old.tar" -C "$OLD" --exclude='dev/*' 2>/dev/null || true; T_TAR=$(el $s)
 log "BEFORE proot tar: ${T_TAR}s"
 rm -f "$WORK/old.tar" "$WORK/old.tar.xz"
-printf 'nameserver 1.1.1.1\n' > "$OLD/etc/resolv.conf" 2>/dev/null || { rm -f "$OLD/etc/resolv.conf"; printf 'nameserver 1.1.1.1\n' > "$OLD/etc/resolv.conf"; }
+guestcfg "$OLD"
 OLDBASE="ca-certificates curl xz-utils libwayland-client0 libwayland-cursor0 libxkbcommon0 fontconfig fonts-dejavu-core"
 s=$(now); pg "$OLD" /bin/sh -c "apt-get update -qq && apt-get install -y -qq --no-install-recommends $OLDBASE" >/dev/null 2>&1 || log "WARN: old base install failed"; T_APT=$(el $s)
 log "BEFORE apt update + v0.1 base: ${T_APT}s"
@@ -69,3 +76,4 @@ open(r,"a").write(f"\nSUMMARY arm64 runner: BEFORE {before:.0f}s (download {dl:.
                   f"+{full:.0f}s for Xwayland/Mesa/audio later  |  AFTER {new:.0f}s with all of it baked in\n")
 print(open(r).read().splitlines()[-1])
 PY
+[ -z "${APT_FAIL:-}" ]
