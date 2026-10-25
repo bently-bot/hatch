@@ -617,7 +617,7 @@ if $UI tap 'Search apps' dev.hatch || $UI tap 'Search' dev.hatch; then
 else stamp "tour: search field not found (steam check skipped)"; fi
 stamp "Settings → Remove Linux and all apps (type-to-confirm) → back to onboarding"
 $UI tap '^Settings$' dev.hatch; sleep 2
-for k in 1 2 3 4 5 6; do $UI has '^Remove Linux and all apps$' dev.hatch && break; adb shell input swipe 500 1500 500 500 300; sleep 1; done
+for k in 1 2 3 4 5 6; do $UI has '^Remove Linux and all apps$' dev.hatch && break; adb shell input swipe $((WX / 2)) $((WY * 55 / 100)) $((WX / 2)) $((WY * 20 / 100)) 300; sleep 1; done   # inside the list, above the bottom bar
 shot 26-settings-storage
 $UI tap '^Remove Linux and all apps$' dev.hatch || fail "no Remove Linux button in Settings"
 $UI wait 'Frees about' 30 dev.hatch || fail "no first reset confirmation"; shot 27-reset-confirm-1
