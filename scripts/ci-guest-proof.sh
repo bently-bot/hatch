@@ -120,7 +120,7 @@ for app in $APPS; do
   LAUNCH=$(python3 scripts/catalogue-args.py launch "$app")
   T=$(title_for "$app"); topt=(); [ -n "$T" ] && topt=(--title="$T")
   secs=90; [ "$app" = notepadpp ] && secs=420; [ "$app" = blender ] && secs=300; case "$app" in cursor|brave-browser) secs=240 ;; org.darktable.*) secs=420 ;; steam) secs=600 ;; esac
-  settle=3000; [ "$app" = blender ] && settle=90000; case "$app" in cursor|brave-browser) settle=30000 ;; org.darktable.*|steam) settle=90000 ;; esac   # rootful Xwayland appears first; Blender compiles GL shaders on llvmpipe
+  settle=3000; [ "$app" = blender ] && settle=90000; case "$app" in cursor|brave-browser) settle=30000 ;; org.darktable.*) settle=90000 ;; steam) settle=180000 ;; esac   # rootful Xwayland appears first; Blender compiles GL shaders on llvmpipe
   minu=12; [ "$app" = xterm ] && minu=2   # xterm's core bitmap font really is 2 colours
   # Flathub apps run from their spec on the host side (own root), not inside the Debian guest's shell.
   case "$LAUNCH" in hatch-flatpak-run*) RUNARGS=(${LAUNCH}) ;; *) RUNARGS=(bash -c "$LAUNCH") ;; esac

@@ -418,9 +418,10 @@ tour 16-get-apps '^Get apps$'
 tour 17-installed-tab '^Installed$'
 tour 18-updates-tab '^Updates$'
 tour 19-settings '^Settings$'
-if $UI tap '^Get apps$' dev.hatch && $UI tap 'Search apps' dev.hatch; then
+$UI tap '^Get apps$' dev.hatch; sleep 2
+if $UI tap 'Search apps' dev.hatch || $UI tap 'Search' dev.hatch; then
   adb shell input text "steam"; sleep 2; adb shell input keyevent 111 || true; sleep 1; shot 20-search-steam
   # Steam's native client is ARM64-only ("arches": ["arm64"]), so an x86-64 emulator must not offer it
   if $UI has '^Steam$' dev.hatch; then stamp "WARN: Steam listed on x86-64 (should be arm64-only)"; else stamp "steam hidden on x86-64 OK"; fi
-fi
+else stamp "tour: search field not found (steam check skipped)"; fi
 stamp "emu-e2e OK"

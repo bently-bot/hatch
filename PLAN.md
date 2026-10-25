@@ -47,7 +47,7 @@ Proof locations: proofs/ci-arm64/*, proofs/emu/*, proofs/local/*. "Fold-8-only" 
 
 ## F. Final pass
 - [x] F1 README with screenshots; full test summary (unit, host compositor, arm64 guest, emulator E2E)
-- [ ] F2 Signed draft release (never published)
+- [x] F2 Signed draft release (never published): DRAFT "Hatch 0.1.0" (tag v0.1.0 → 9d76874, run 40163359650 all green); APK release-signed, cert SHA-256 273aef74…b29692 = hatch-release.jks
 
 ## F. Stretch (after the core checklist + GPU): Steam (Experimental)
 - [x] F0 DONE (run 40162368979): Valve's native ARM64 client reaches the Steam sign-in window in the Debian 13 guest under proot, no container, through Hatch (docs/screenshots/steam-native-arm64-login.jpg). hatch-steam fetches the *_all + *_linuxarm64_linuxarm64 packages from the manifest (sha256-checked), runs steamrtarm64/steam directly with a private session bus; needs lsof (UI IPC port lookup), gtk2/pipewire/libnm/ibus, Wayland client libs (SDL3). Original note: (found 2026-10-25) Valve now ships a native **Linux ARM64 Steam client** on the public beta (manifest `steam_client_publicbeta_linuxarm64`), an ARM64 Steam runtime and "Proton 11.0 (ARM64)" (app 4628740); community-verified on ARM64 Debian via Xwayland. Try this first: no x86 client emulation. Risk: the Steam runtime container (pressure-vessel) needs unprivileged user and mount namespaces, which Android apps lack under proot, so find a no-container mode. Debian 13 has box64 0.3.4 (arm64) as the fallback for x86-only bits. Requires an X11 server (Xwayland: we have it) and PulseAudio (we have it).
