@@ -1,5 +1,6 @@
 package dev.hatch
 
+import dev.hatch.store.forArch
 import dev.hatch.store.CatalogueFile
 import dev.hatch.store.payloadFor
 import kotlinx.serialization.json.Json
@@ -75,5 +76,13 @@ class CatalogueTest {
         assertTrue(steam.experimental)
         assertTrue(!steam.verified && steam.repo == null && steam.vendorName == "Valve")
         assertTrue(steam.command == listOf("hatch-steam") && steam.x11)
+    }
+
+    @Test
+    fun arm64OnlyEntriesAreHiddenOnX86() {
+        val cat = load()
+        assertTrue(cat.forArch("arm64").apps.any { it.id == "steam" })
+        assertTrue(cat.forArch("amd64").apps.none { it.id == "steam" })
+        assertTrue(cat.forArch("amd64").apps.any { it.id == "notepadpp" })
     }
 }

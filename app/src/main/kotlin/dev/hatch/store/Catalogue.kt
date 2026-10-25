@@ -1,5 +1,6 @@
 package dev.hatch.store
 
+import dev.hatch.guest.RootfsCatalog
 import android.content.Context
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -56,6 +57,8 @@ data class StoreApp(
     val verified: Boolean = false,
     /** Works only partly or on some devices (e.g. Steam); badged "Experimental" in the store. */
     val experimental: Boolean = false,
+    /** Guest arches this entry works on ("arm64", "amd64"); empty = all. */
+    val arches: List<String> = emptyList(),
 )
 
 @Serializable
@@ -78,11 +81,14 @@ object Catalogue {
     private fun loadUncached(context: Context): CatalogueFile {
         val cached = runCatching { cacheFile(context).takeIf { it.exists() }?.readText() }.getOrNull()
         val bundled = runCatching { context.assets.open("catalogue.json").bufferedReader().readText() }.getOrElse { "{\"apps\":[]}" }
-        return CatalogueCodec.choose(cached, bundled)
+        return CatalogueCodec.choose(cached, bundled).forArch(RootfsCatalog.lxcArch())
     }
 
     fun load(context: Context): List<StoreApp> = loadFile(context).apps
 }
+
+/** Only the entries that can run on a guest of [arch] (e.g. the native ARM64 Steam client is hidden on x86-64). */
+fun CatalogueFile.forArch(arch: String): CatalogueFile = copy(apps = apps.filter { it.arches.isEmpty() || arch in it.arches })
 
 /** The Windows payload to install on a guest of [arch] ("arm64" | "amd64"). */
 fun StoreApp.payloadFor(arch: String): WindowsPayload? = payloads[arch] ?: windowsPayload
