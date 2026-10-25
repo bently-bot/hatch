@@ -54,7 +54,9 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
     fun unbind(w: Toplevel): Boolean {
         if (toplevel !== w) return false
         toplevel = null
-        if (target != 0L) { Native.targetRelease(target); target = 0 }
+        // Toplevel.destroyWindow() already released the target via detachTarget() on the compositor thread;
+        // releasing it here too was a double free that aborted Hatch whenever a guest closed a window (e.g. wineboot's dialog).
+        target = 0
         return true
     }
 
