@@ -120,7 +120,7 @@ capture() { # name seconds harness-opts... -- cmd...
   [ $rc -eq 0 ] || { echo "--- $name client log ---"; tail -30 "$PROOF/$name-client.log" 2>/dev/null || true; }
   return $rc
 }
-title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender|steam) echo "Xwayland";; cursor) echo "Cursor";; hdrview) echo "HDRView";; brave-browser) echo "Brave";; org.darktable.Darktable) echo "darktable";; hdrview) echo "HDRView";; *) echo "";; esac; }
+title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender|steam|doom) echo "Xwayland";; cursor) echo "Cursor";; hdrview) echo "HDRView";; brave-browser) echo "Brave";; org.darktable.Darktable) echo "darktable";; hdrview) echo "HDRView";; *) echo "";; esac; }
 if [ "${SWEEP:-0}" = 1 ]; then . "$ROOT/scripts/app-sweep.sh"; fi
 
 FAILED=()
@@ -139,7 +139,7 @@ for app in $APPS; do
   LAUNCH=$(python3 scripts/catalogue-args.py launch "$app")
   T=$(title_for "$app"); topt=(); [ -n "$T" ] && topt=(--title="$T")
   secs=90; [ "$app" = notepadpp ] && secs=420; [ "$app" = blender ] && secs=300; case "$app" in cursor|brave-browser) secs=240 ;; org.darktable.*) secs=420 ;; steam) secs=600 ;; esac
-  settle=3000; [ "$app" = blender ] && settle=90000; case "$app" in cursor|brave-browser) settle=30000 ;; org.darktable.*) settle=90000 ;; steam) settle=180000 ;; esac   # rootful Xwayland appears first; Blender compiles GL shaders on llvmpipe
+  settle=3000; [ "$app" = blender ] && settle=90000; [ "$app" = doom ] && settle=15000; case "$app" in cursor|brave-browser) settle=30000 ;; org.darktable.*) settle=90000 ;; steam) settle=180000 ;; esac   # rootful Xwayland appears first; Blender compiles GL shaders on llvmpipe
   minu=12; [ "$app" = xterm ] && minu=2   # xterm's core bitmap font really is 2 colours
   # Flathub apps run from their spec on the host side (own root), not inside the Debian guest's shell.
   case "$LAUNCH" in hatch-flatpak-run*) RUNARGS=(${LAUNCH}) ;; *) RUNARGS=(bash -c "$LAUNCH") ;; esac
@@ -197,7 +197,7 @@ if [[ " $APPS " == *" doom "* ]]; then
   grep -hE 'doom1.wad|optional download' /tmp/hatch-install-doom.log 2>/dev/null | sed 's/^/  install: /' || true
   "${G[@]}" bash -c 'ls -la /opt/hatch/doom /usr/share/games/doom 2>/dev/null; sha256sum /opt/hatch/doom/*.wad 2>/dev/null' | sed 's/^/  /' || true
   if JAVA_TOOL_OPTIONS="-Dhatch.inject=script -Dhatch.script=w:3000;s:title;k:28;w:700;s:menu;k:28;w:700;k:28;w:700;k:28;w:2500;s:e1m1;kd:103;w:1200;ku:103;kd:106;w:500;ku:106;kd:29;w:400;ku:29;w:300;kd:103;w:800;ku:103;w:500;s:gameplay" \
-     capture doom-play 120 --settle=4000 --inject -- "${GU[@]}" bash -c "$(python3 scripts/catalogue-args.py launch doom)" \
+     capture doom-play 150 --title=Xwayland --settle=15000 --inject -- "${GU[@]}" bash -c "$(python3 scripts/catalogue-args.py launch doom)" \
      && png_ok "$PROOF/doom-play-gameplay.png" 12 && png_ok "$PROOF/doom-play-e1m1.png" 12; then
     stamp "doom gameplay OK"
   else FAILED+=(doom-gameplay); fi
