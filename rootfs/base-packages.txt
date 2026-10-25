@@ -5,7 +5,7 @@ ca-certificates curl xz-utils zstd unzip lsof procps dbus
 # Wayland clients (GLFW/SDL dlopen libwayland-cursor + libdecor), keyboard, fonts
 libwayland-client0 libwayland-cursor0 libwayland-egl1 libdecor-0-0 libxkbcommon0 fontconfig fonts-dejavu-core
 # X11 apps: rootful Xwayland + phone-style WM (hatch-x11)
-xwayland xfonts-base matchbox-window-manager xterm
+xwayland xfonts-base matchbox-window-manager wmctrl xterm
 # GL / Vulkan: Mesa (llvmpipe, Zink) + deps of the bundled Turnip driver (hatch-gpu-check)
 libegl1 libgl1 libgl1-mesa-dri libegl-mesa0 libgles2 libvulkan1 vulkan-tools libdrm2 libx11-xcb1 libxcb-dri3-0 libxcb-present0 libxshmfence1 libzstd1
 # Audio (hatch-audio)

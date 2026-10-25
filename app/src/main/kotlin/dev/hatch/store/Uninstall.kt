@@ -5,7 +5,7 @@ object BasePackages {
     val LIST: Set<String> = setOf(
         "ca-certificates", "curl", "xz-utils", "zstd", "unzip", "lsof", "procps", "dbus",
         "libwayland-client0", "libwayland-cursor0", "libwayland-egl1", "libdecor-0-0", "libxkbcommon0", "fontconfig", "fonts-dejavu-core",
-        "xwayland", "xfonts-base", "matchbox-window-manager", "xterm",
+        "xwayland", "xfonts-base", "matchbox-window-manager", "wmctrl", "xterm",
         "libegl1", "libgl1", "libgl1-mesa-dri", "libegl-mesa0", "libgles2", "libvulkan1", "vulkan-tools", "libdrm2", "libx11-xcb1",
         "libxcb-dri3-0", "libxcb-present0", "libxshmfence1", "libzstd1",
         "pulseaudio", "pulseaudio-utils", "libasound2-plugins",

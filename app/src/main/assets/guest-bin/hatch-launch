@@ -48,6 +48,10 @@ if [ "$WINE" = 1 ]; then
 fi
 if [ "$X11" = 1 ]; then
   case "${1:-}" in hatch-x11) shift ;; esac
+  # Electron/Chromium on the X11 rung want a session bus like on Wayland
+  if command -v dbus-run-session >/dev/null 2>&1 && [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    exec dbus-run-session -- /usr/local/bin/hatch-x11 "$@"
+  fi
   exec /usr/local/bin/hatch-x11 "$@"
 fi
 export GDK_BACKEND="${GDK_BACKEND:-wayland}" QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland}"

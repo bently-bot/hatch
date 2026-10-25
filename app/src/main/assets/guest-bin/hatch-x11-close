@@ -1,0 +1,25 @@
+#!/bin/sh
+# Polite close for an X11 app in its rootful Xwayland (Hatch's ✕): ask the WM to close every client window
+# (_NET_CLOSE_WINDOW → matchbox sends WM_DELETE_WINDOW, like a desktop's close button), then report:
+#   GONE    every window closed (the app is exiting)
+#   DIALOG  a new window appeared, e.g. "Save changes?" — Hatch keeps the window up
+#   STUCK   windows still open after ~1.8 s — Hatch force-closes
+D=$(cat "${XDG_RUNTIME_DIR:-/run/hatch}/x11-display" 2>/dev/null) || { echo GONE; exit 0; }
+export DISPLAY=":$D"
+command -v wmctrl >/dev/null 2>&1 || { echo STUCK; exit 0; }
+ids() { wmctrl -l 2>/dev/null | awk '{print $1}' | sort; }
+before=$(ids)
+[ -n "$before" ] || { echo GONE; exit 0; }
+for w in $before; do wmctrl -i -c "$w" 2>/dev/null; done
+i=0
+while [ $i -lt 18 ]; do
+  sleep 0.1; i=$((i + 1))
+  now=$(ids)
+  [ -n "$now" ] || { echo GONE; exit 0; }
+  for w in $now; do case "
+$before
+" in *"
+$w
+"*) ;; *) echo DIALOG; exit 0 ;; esac; done
+done
+echo STUCK

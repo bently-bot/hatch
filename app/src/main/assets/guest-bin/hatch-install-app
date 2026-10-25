@@ -33,7 +33,7 @@ if [ -n "$URL" ]; then PKGS="$PKGS curl ca-certificates unzip"; fi
 command -v pulseaudio >/dev/null 2>&1 || PKGS="$PKGS pulseaudio pulseaudio-utils libasound2-plugins"
 [ -f /etc/asound.conf ] || printf 'pcm.!default { type pulse }\nctl.!default { type pulse }\n' > /etc/asound.conf
 # Xwayland aborts without libEGL (it probes glamor even when it falls back to shm)
-case " $PKGS " in *" xwayland "*) PKGS="$PKGS libegl1 libgl1-mesa-dri xfonts-base matchbox-window-manager" ;; esac
+case " $PKGS " in *" xwayland "*) PKGS="$PKGS libegl1 libgl1-mesa-dri xfonts-base matchbox-window-manager wmctrl" ;; esac
 PKGS=$(echo $PKGS | tr ' ' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ' ')
 mkdir -p /etc/apt/preferences.d /var/lib/dpkg/updates
 # Recover from an interrupted dpkg run (app killed mid-install, phone rebooted, …)
@@ -95,7 +95,7 @@ fi
 if [ -n "$DESKTOP" ]; then
   # Per-toolkit extras: Qt needs its Wayland platform plugin; X11-only toolkits / terminal apps need Xwayland.
   F=/usr/share/applications/$DESKTOP
-  XSTACK="xwayland libegl1 libgl1-mesa-dri xfonts-base matchbox-window-manager xterm"
+  XSTACK="xwayland libegl1 libgl1-mesa-dri xfonts-base matchbox-window-manager wmctrl xterm"
   field() { awk -v k="$1" '/^\[/{g=($0=="[Desktop Entry]")} g&&index($0,k"=")==1{sub(/^[^=]*=/,"");print;exit}' "$F" 2>/dev/null; }
   BIN=$(field Exec | awk '{print $1}'); BIN=$(command -v "$BIN" 2>/dev/null || true)
   EXTRA=""

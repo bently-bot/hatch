@@ -5,6 +5,8 @@ set -- "$@"
 OUT=$(/usr/local/bin/hatch-xwayland)
 DISP=${OUT% *}; XPID=${OUT#* }
 export DISPLAY=":$DISP" GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb
+# hatch-x11-close (Hatch's ✕) finds the display here
+echo "$DISP" > "${XDG_RUNTIME_DIR:-/run/hatch}/x11-display" 2>/dev/null || true
 # Phone-style WM: every app window maximised to the (Android-sized) root window, dialogs centred.
 if command -v matchbox-window-manager >/dev/null 2>&1; then
   matchbox-window-manager -use_titlebar no -use_cursor yes >/dev/null 2>&1 &
@@ -16,4 +18,5 @@ trap 'kill $APP 2>/dev/null; kill $XPID 2>/dev/null' INT TERM
 wait $APP || RC=$?
 [ -n "${WM:-}" ] && kill $WM 2>/dev/null || true
 kill $XPID 2>/dev/null || true
+rm -f "${XDG_RUNTIME_DIR:-/run/hatch}/x11-display" 2>/dev/null || true
 exit ${RC:-0}
