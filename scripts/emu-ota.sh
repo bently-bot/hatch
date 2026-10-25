@@ -68,8 +68,11 @@ stamp "Later hides the card"
 
 stamp "start a Linux app so the update has something to stop"
 store_install galculator || fail "install galculator"
-launch_intent galculator Galculator; sleep 20
+launch_intent galculator Galculator
+$UI wait 'Window handle: Galculator' 60 dev.hatch || fail "galculator window didn't open"
 shot ota-02-running-app
+# Minimise it to the edge bubble: still running, but no longer covering the store.
+$UI tap '^—$' dev.hatch || fail "minimise galculator"; sleep 2
 front
 
 stamp "Settings → Check for updates"
