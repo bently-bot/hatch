@@ -21,7 +21,7 @@ Proof locations: proofs/ci-arm64/*, proofs/emu/*, proofs/local/*. "Fold-8-only" 
 - [~] B6 One Recents card: windows belong to the FGS; the notification shows "N windows running"; the guest keeps running while the store/host is open on top or closed — implemented; emulator verification in B9
 - [~] B7 Floating edge bubble (chat head) docked at the screen edge, draggable, snaps to edges; tap opens the host/store; minimised windows collect there — implemented; emulator verification in B9
 - [~] B8 Launch from the drawer stub → floating window over the current app/home (the stub must not leave an Activity behind) — implemented; emulator verification in B9
-- [ ] B9 Emulator E2E: launch over the home screen; screenshot shows the launcher wallpaper around the window; drag-move + resize change the bounds; open the store while the app keeps running
+- [x] B9 Emulator E2E: launch over the home screen; screenshot shows the launcher wallpaper around the window; drag-move + resize change the bounds; open the store while the app keeps running
 
 ## C. Host app UI (dark Material 3)
 - [~] C1 Dark theme; bottom nav Apps | Get apps | Settings with a purple pill indicator — implemented (5510ee3); emulator screenshots pending
@@ -43,14 +43,15 @@ Proof locations: proofs/ci-arm64/*, proofs/emu/*, proofs/local/*. "Fold-8-only" 
 
 ## E. Blender + performance
 - [x] E1 Blender (Debian arm64) in the catalogue (featured) and in arm64 CI: window renders via llvmpipe GL, plus a screenshot — arm64 CI run 40111368518 (Xwayland + llvmpipe, 910 colours)
-- [ ] E2 Turnip/Zink fast path on Adreno (Fold-8-only verification); llvmpipe tuned (LP_NUM_THREADS = cores) meanwhile
+- [~] E2 Turnip/Zink fast path on Adreno (Fold-8-only verification); llvmpipe tuned (LP_NUM_THREADS = cores) meanwhile. Done: LP_NUM_THREADS; X11 apps reach Zink without DRI3 (LIBGL_KOPPER_DRI2); CI proxy proves glxgears + Blender on Zink → Vulkan → Hatch (lavapipe for Turnip). Open: real Adreno numbers on device.
 
 ## F. Final pass
-- [ ] F1 README with screenshots; full test summary (unit, host compositor, arm64 guest, emulator E2E)
+- [x] F1 README with screenshots; full test summary (unit, host compositor, arm64 guest, emulator E2E)
 - [ ] F2 Signed draft release (never published)
 
 ## F. Stretch (after the core checklist + GPU): Steam (Experimental)
-- [ ] F1 Investigate x86 emulation on arm64: Box64 (+ Box86 for the 32-bit Steam client/bootstrap; Debian/Ryan Fortner box64/box86 debs or upstream builds) vs FEX-Emu (needs an x86-64 rootfs image). Pick per device test.
+- [ ] F0 (found 2026-10-25) Valve now ships a native **Linux ARM64 Steam client** on the public beta (manifest `steam_client_publicbeta_linuxarm64`), an ARM64 Steam runtime and "Proton 11.0 (ARM64)" (app 4628740); community-verified on ARM64 Debian via Xwayland. Try this first: no x86 client emulation. Risk: the Steam runtime container (pressure-vessel) needs unprivileged user and mount namespaces, which Android apps lack under proot, so find a no-container mode. Debian 13 has box64 0.3.4 (arm64) as the fallback for x86-only bits. Requires an X11 server (Xwayland: we have it) and PulseAudio (we have it).
+- [ ] F1 Investigate x86 emulation on arm64 (fallback if F0 fails): Box64 (+ Box86 for the 32-bit Steam client/bootstrap; Debian/Ryan Fortner box64/box86 debs or upstream builds) vs FEX-Emu (needs an x86-64 rootfs image). Pick per device test.
 - [ ] F2 Steam needs i386 libs: armhf multiarch for Box86, or an x86 rootfs for FEX. Prototype in the arm64 CI guest (proot), install `steam-installer`/the bootstrap, reach the login window.
 - [ ] F3 Store entry "Steam (Experimental)" with source badge "Experimental", own install script (hatch-install-app --emu box64|fex), floating window like any app.
 - [ ] F4 Verify on device (Fold 8); document the limits (anti-cheat, Proton under emulation = slow).
