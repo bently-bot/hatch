@@ -15,7 +15,7 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0-dev"
+        versionName = "0.1.0"
         // Remote store catalogue (bently-bot/hatch-catalogue). The URL is overridable at runtime (Settings → developer)
         // and via -PcatalogueUrl; the repo is private for now, so until it's public the app keeps its bundled copy.
         buildConfigField("String", "CATALOGUE_URL", "\"${(project.findProperty("catalogueUrl") as String?) ?: "https://github.com/bently-bot/hatch-catalogue/releases/latest/download/catalogue.json.gz"}\"")
