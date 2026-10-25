@@ -63,12 +63,81 @@ object FloatingWindows {
         Log.i(TAG, "floating window for $appId (${windows.size} open)")
     }
 
+    // ---- ✕ on an app: one tap, closed from the user's view ----
+    private val closing = HashMap<String, Long>()   // appId → close token (main thread)
+    /** Main thread only. */
+    fun isClosing(appId: String) = appId in closing
+
+    /**
+     * Hide every window of [appId] now, ask the app politely to close (xdg_toplevel.close to each of its toplevels;
+     * X11 apps in rootful Xwayland also get WM_DELETE_WINDOW through the WM: hatch-x11-close), and end its session
+     * if it is still running after [FloatingWindow.CLOSE_GRACE_MS]. If the app answers with a new window (a
+     * "Save changes?" dialog), the close is called off and its windows come back.
+     *
+     * Root cause of the old "second tap" bug: apps did close their window on the first request, but proot only exits
+     * when every guest process has, and session helpers (dbus-daemon, D-Bus-activated dconf/gvfs/at-spi) outlive
+     * the app, so the window sat on "Waiting for…" until a second ✕ killed the session.
+     */
+    fun closeApp(ctx: Context, appId: String) = onMain {
+        val app = ctx.applicationContext
+        val mine = windows.filter { it.appId == appId }
+        if (appId in closing) { finishClose(app, appId, closing[appId]!!, "second ✕"); return@onMain }
+        val token = android.os.SystemClock.uptimeMillis(); closing[appId] = token
+        mine.forEach { it.hideForClose() }
+        Bubble.sync(app)
+        val rt = HatchApp.instance.runtime
+        rt.server?.post { rt.server?.windows?.filter { it.client.appTag == appId }?.forEach { it.xdg?.sendClose() } }
+        dev.hatch.runtime.RuntimeControl.changed(app)
+        if (!dev.hatch.guest.AppSession.isRunning(appId)) { finishClose(app, appId, token, "not running"); return@onMain }
+        if (AppLauncher.isX11(app, appId)) {
+            Log.i(TAG, "close $appId: xdg close + WM_DELETE_WINDOW (X11)")
+            Thread({
+                val r = runCatching {
+                    kotlinx.coroutines.runBlocking {
+                        dev.hatch.guest.LinuxRuntime.run(app, "/usr/local/bin/hatch-x11-close", timeoutMs = 6_000,
+                            waylandHostDir = rt.ensureAppSocket(appId).absolutePath)
+                    }?.stdout?.trim()?.lines()?.lastOrNull()
+                }.getOrNull() ?: "?"
+                main.post {
+                    Log.i(TAG, "close $appId: X11 says $r")
+                    when (r) {
+                        "DIALOG" -> cancelClose(app, appId, "X11 dialog")
+                        else -> main.postDelayed({ finishClose(app, appId, token, "X11 $r") }, if (r == "GONE") 600 else 0)
+                    }
+                }
+            }, "hatch-close-$appId").apply { isDaemon = true; start() }
+            main.postDelayed({ finishClose(app, appId, token, "X11 timeout") }, 7_000)
+        } else {
+            Log.i(TAG, "close $appId: xdg close sent")
+            main.postDelayed({ finishClose(app, appId, token, "grace") }, FloatingWindow.CLOSE_GRACE_MS)
+        }
+    }
+
+    private fun cancelClose(ctx: Context, appId: String, why: String) {
+        if (closing.remove(appId) == null) return
+        Log.i(TAG, "close $appId called off: $why")
+        windows.filter { it.appId == appId }.forEach { it.unhideAfterClose() }
+        Bubble.sync(ctx)
+    }
+
+    private fun finishClose(ctx: Context, appId: String, token: Long, why: String) {
+        if (closing[appId] != token) return
+        closing.remove(appId)
+        val running = dev.hatch.guest.AppSession.isRunning(appId)
+        Log.i(TAG, "close $appId done ($why): ${if (running) "session still running → ending it" else "app exited"}")
+        if (running) dev.hatch.guest.AppSession.stop(appId)
+        windows.filter { it.appId == appId }.forEach { it.forceDismiss() }
+        Bubble.sync(ctx)
+    }
+
     /** Stop all: tear down every floating window now (guests are already being killed). */
-    fun closeAll(ctx: Context) = onMain { windows.toList().forEach { it.forceDismiss() } }
+    fun closeAll(ctx: Context) = onMain { closing.clear(); windows.toList().forEach { it.forceDismiss() } }
 
     /** A further toplevel of a running program (dialog, 2nd document). */
     fun openSecondary(ctx: Context, appId: String) = onMain {
         if (!enabled(ctx)) { WindowActivity.launchSecondary(ctx, appId); return@onMain }
+        // A new window while the app is being closed is its answer (e.g. "Save changes?"): show it, call off the close.
+        if (appId in closing) cancelClose(ctx, appId, "new window")
         val label = InstalledApps.get(ctx, appId)?.name ?: appId
         val fw = FloatingWindow(ctx.applicationContext, appId, label, primary = false, cascade = windows.size)
         windows += fw

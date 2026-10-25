@@ -357,6 +357,72 @@ shot P4b-restored
 adb logcat -d -s HatchRuntime HatchWindow HatchSession > "$OUT/logcat.txt" 2>&1
 stamp "mousepad leg OK"
 
+stamp "one-tap close (✕ in the caption): unfocused Calculator, then focused Mousepad"
+# Caption (34dp, inside the 10dp shadow): … ⋮ — ⤢ ✕ at 42dp each from the right edge.
+close_xy() { echo $(( $3 - $(dp 10) - $(dp 21) )) $(( $2 + $(dp 10) + $(dp 17) )); }
+min_xy() { echo $(( $3 - $(dp 10) - $(dp 105) )) $(( $2 + $(dp 10) + $(dp 17) )); }
+proc_alive() { adb shell ps -A -o NAME | tr -d '\r' | grep -qx "$1"; }
+ms_since() { echo $(( ($(date +%s%N) - $1) / 1000000 )); }
+# Wait up to $2 ms for window "$1" to leave the screen; prints elapsed ms
+wait_gone() { local t0=$3; while [ "$(ms_since $t0)" -lt "$2" ]; do float_frame "$1" >/dev/null || { ms_since $t0; return 0; }; sleep 0.1; done; return 1; }
+read ML MT MR MB <<<"$(float_frame Mousepad)" || fail "no Mousepad window before close test"
+read GL GT GR GB <<<"$(float_frame Calculator)" || fail "no Calculator window before close test"
+adb shell input tap $(( (ML + MR) / 2 )) $(( (MT + MB) / 2 )); sleep 1     # Mousepad focused → Calculator is not
+read CX CY <<<"$(close_xy $GL $GT $GR)"
+PARKED=""
+if [ $CX -ge $ML ] && [ $CX -le $MR ] && [ $CY -ge $MT ] && [ $CY -le $MB ]; then
+  read NX NY <<<"$(min_xy $ML $MT $MR)"; adb shell input tap $NX $NY; sleep 2   # Calculator's ✕ is under Mousepad: park it
+  float_frame Mousepad >/dev/null && fail "Mousepad's caption — didn't minimise it"
+  PARKED=1
+fi
+proc_alive galculator || fail "galculator not running before the close test"
+adb logcat -c; shot 15a-before-one-tap-close
+T0=$(date +%s%N); adb shell input tap $CX $CY
+GONE=$(wait_gone Calculator 3000 $T0) || { shot 15b-close-failed; adb logcat -d -s HatchFloat HatchRuntime | tail -20; fail "Calculator still on screen 3 s after ONE tap on ✕ (unfocused window)"; }
+stamp "unfocused Calculator: window gone ${GONE} ms after one tap on ✕"
+for i in $(seq 1 25); do proc_alive galculator || break; sleep 0.2; done
+proc_alive galculator && fail "galculator still running 5 s after one tap on ✕"
+adb logcat -d -s HatchFloat | grep -E "close (tapped|galculator)" | sed 's/^.*HatchFloat[^:]*: /  /'
+stamp "galculator session ended"
+
+if [ -n "$PARKED" ]; then
+  read BL BT BR BB <<<"$(win_frame 'Hatch bubble')" || fail "bubble missing"
+  adb logcat -c; adb shell input tap $(( (BL + BR) / 2 )) $(( (BT + BB) / 2 )); sleep 2
+  tap_target "bubble-menu ▢  Mousepad" bubble || fail "bubble menu has no Mousepad"; sleep 2
+fi
+read ML MT MR MB <<<"$(float_frame Mousepad)" || fail "Mousepad not on screen for the focused close"
+adb shell input tap $(( (ML + MR) / 2 )) $(( (MT + MB) / 2 )); sleep 1     # focused
+read CX CY <<<"$(close_xy $ML $MT $MR)"
+adb logcat -c; T0=$(date +%s%N); adb shell input tap $CX $CY
+if GONE=$(wait_gone Mousepad 3000 $T0); then
+  stamp "focused Mousepad: window gone ${GONE} ms after one tap on ✕"
+elif adb logcat -d -s HatchFloat | grep -q "close mousepad called off"; then
+  # Unsaved text from the typing check: Mousepad answered with its own "Save changes?" dialog, which Hatch shows.
+  sleep 1; shot 15c-close-save-changes-dialog
+  stamp "focused Mousepad answered ✕ with its own dialog (kept on screen, as intended)"
+  read ML MT MR MB <<<"$(adb shell dumpsys window windows | python3 -c '
+import re,sys
+t=sys.stdin.read(); best=None
+for m in re.finditer(r"Hatch: Mousepad", t):
+    f=re.search(r"frame=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]", t[m.end():m.end()+6000])
+    if f:
+        b=tuple(map(int,f.groups())); a=(b[2]-b[0])*(b[3]-b[1])
+        if best is None or a>best[0]: best=(a,b)
+print(*best[1])')"
+  read CX CY <<<"$(close_xy $ML $MT $MR)"
+  T0=$(date +%s%N); adb shell input tap $CX $CY
+  GONE=$(wait_gone Mousepad 3000 $T0) || { shot 15d-close-failed; fail "Mousepad still on screen 3 s after ✕ with its dialog up"; }
+  stamp "Mousepad (dialog up): closed ${GONE} ms after ✕"
+else
+  shot 15d-close-failed; adb logcat -d -s HatchFloat HatchRuntime | tail -20
+  fail "Mousepad still on screen 3 s after ONE tap on ✕ (focused window)"
+fi
+for i in $(seq 1 25); do proc_alive mousepad || break; sleep 0.2; done
+proc_alive mousepad && fail "mousepad still running 5 s after close"
+shot 15e-after-one-tap-close
+adb logcat -d -s HatchFloat | grep -E "close (tapped|mousepad)|hidden for close|called off" | sed 's/^.*HatchFloat[^:]*: /  /'
+stamp "one-tap close OK"
+
 if [ "${E2E_WINE:-1}" = 1 ]; then
   stamp "Windows app via Wine: Notepad++ (x64 build on this x86_64 emulator; ARM64 build is proven on the arm64 runner)"
   adb shell am start -S -W -n dev.hatch/.ui.MainActivity >/dev/null
