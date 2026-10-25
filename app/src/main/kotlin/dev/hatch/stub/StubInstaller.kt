@@ -12,36 +12,15 @@ import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
-import java.security.KeyStore
-import java.security.KeyPairGenerator
-import java.security.cert.X509Certificate
-import java.math.BigInteger
-import java.util.Date
-import javax.security.auth.x500.X500Principal
-import java.security.PrivateKey
 
 /**
  * Build a per-app stub APK from assets/stub-template.apk and install via PackageInstaller.
  */
 object StubInstaller {
     private const val TAG = "HatchStub"
-    private const val KS_PASS = "***REMOVED***"
 
     fun stubPackageFor(appId: String): String =
         "dev.hatch.app." + appId.lowercase().replace(Regex("[^a-z0-9_]"), "_")
-
-    fun ensureKeystore(context: Context): File {
-        val ks = File(context.filesDir, "stub-keystore.p12")
-        if (ks.exists()) return ks
-        // Generate a simple self-signed cert with Android KeyPairGenerator + Bouncy-less approach:
-        // Use keytool via... we don't have keytool on device. Use a pre-baked approach:
-        // Create PKCS12 with Android's built-in APIs is hard without BouncyCastle.
-        // Ship a build-time generated keystore in assets and copy it.
-        context.assets.open("stub-keystore.p12").use { inn ->
-            ks.outputStream().use { out -> inn.copyTo(out) }
-        }
-        return ks
-    }
 
     fun buildAndStage(context: Context, appId: String, label: String, iconSource: ByteArray? = null): File {
         val template = File(context.cacheDir, "stub-template.apk")
@@ -50,7 +29,7 @@ object StubInstaller {
                 template.outputStream().use { out -> inn.copyTo(out) }
             }
         }
-        val ks = ensureKeystore(context)
+        val signer = StubKeys.get(context)
         val out = File(context.cacheDir, "stub-$appId.apk")
         val icon = makeIconPng(label, iconSource?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) })
         StubFactory.build(
@@ -60,8 +39,7 @@ object StubInstaller {
             label = label,
             appId = appId,
             iconPng = icon,
-            keystore = ks,
-            keystorePass = KS_PASS.toCharArray(),
+            signer = signer,
             out = out,
         )
         return out

@@ -5,10 +5,6 @@ import com.android.apksig.ApkSigner
 import com.reandroid.apk.ApkModule
 import com.reandroid.archive.ByteInputSource
 import java.io.File
-import java.io.FileInputStream
-import java.security.KeyStore
-import java.security.PrivateKey
-import java.security.cert.X509Certificate
 
 /**
  * Template stub APK → per-app APK (package, label, icon, appId), then v2/v3 sign.
@@ -16,14 +12,13 @@ import java.security.cert.X509Certificate
  */
 object StubFactory {
     fun build(
-        context: Context,
+        context: Context?,
         template: File,
         pkg: String,
         label: String,
         appId: String,
         iconPng: ByteArray,
-        keystore: File,
-        keystorePass: CharArray,
+        signer: StubKeys.Signer,
         out: File,
     ) {
         val apk = ApkModule.loadApkFile(template)
@@ -43,11 +38,7 @@ object StubFactory {
         val unsigned = File(out.path + ".unsigned")
         apk.writeApk(unsigned)
 
-        val store = KeyStore.getInstance("PKCS12")
-        FileInputStream(keystore).use { store.load(it, keystorePass) }
-        val key = store.getKey("stub", keystorePass) as PrivateKey
-        val cert = store.getCertificate("stub") as X509Certificate
-        val sc = ApkSigner.SignerConfig.Builder("stub", key, listOf(cert)).build()
+        val sc = ApkSigner.SignerConfig.Builder("stub", signer.key, listOf(signer.cert)).build()
         ApkSigner.Builder(listOf(sc))
             .setInputApk(unsigned)
             .setOutputApk(out)

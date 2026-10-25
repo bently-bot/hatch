@@ -96,6 +96,7 @@ dependencies {
     implementation(libs.tukaani.xz)
     implementation(libs.okhttp)
     implementation(libs.bcprov)
+    implementation(libs.bcpkix)
     implementation(libs.androidx.work)
     testImplementation(libs.junit)
 }
