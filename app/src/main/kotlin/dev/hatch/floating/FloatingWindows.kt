@@ -67,12 +67,16 @@ object FloatingWindows {
     private val closing = HashMap<String, Long>()   // appId → close token (main thread)
     /** Main thread only. */
     fun isClosing(appId: String) = appId in closing
+    /** appId → when its last close was answered with a dialog. A ✕ within [ANSWERED_MS] of that means "close anyway". */
+    private val answered = HashMap<String, Long>()
+    private const val ANSWERED_MS = 60_000L
 
     /**
      * Hide every window of [appId] now, ask the app politely to close (xdg_toplevel.close to each of its toplevels;
      * X11 apps in rootful Xwayland also get WM_DELETE_WINDOW through the WM: hatch-x11-close), and end its session
      * if it is still running after [FloatingWindow.CLOSE_GRACE_MS]. If the app answers with a new window (a
-     * "Save changes?" dialog), the close is called off and its windows come back.
+     * "Save changes?" dialog), the close is called off and its windows come back; a further ✕ within a minute closes
+     * the app anyway (no second round of asking).
      *
      * Root cause of the old "second tap" bug: apps did close their window on the first request, but proot only exits
      * when every guest process has, and session helpers (dbus-daemon, D-Bus-activated dconf/gvfs/at-spi) outlive
@@ -83,6 +87,12 @@ object FloatingWindows {
         val mine = windows.filter { it.appId == appId }
         if (appId in closing) { finishClose(app, appId, closing[appId]!!, "second ✕"); return@onMain }
         val token = android.os.SystemClock.uptimeMillis(); closing[appId] = token
+        val answeredAt = answered.remove(appId)
+        if (answeredAt != null && token - answeredAt < ANSWERED_MS) {
+            // The app already asked (e.g. "Save changes?") and the user pressed ✕ again: close anyway, no second round.
+            mine.forEach { it.hideForClose() }
+            finishClose(app, appId, token, "✕ again after the app's dialog"); return@onMain
+        }
         mine.forEach { it.hideForClose() }
         Bubble.sync(app)
         val rt = HatchApp.instance.runtime
@@ -116,6 +126,7 @@ object FloatingWindows {
     private fun cancelClose(ctx: Context, appId: String, why: String) {
         if (closing.remove(appId) == null) return
         Log.i(TAG, "close $appId called off: $why")
+        answered[appId] = android.os.SystemClock.uptimeMillis()
         windows.filter { it.appId == appId }.forEach { it.unhideAfterClose() }
         Bubble.sync(ctx)
     }
