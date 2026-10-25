@@ -60,7 +60,8 @@ class HatchRuntime(private val app: Context) : WindowHost {
         ensureStarted()
         val dir = File(sockDir, "app-" + appId.replace(Regex("[^A-Za-z0-9._-]"), "_")).apply { mkdirs() }
         synchronized(appSockets) {
-            if (appId !in appSockets) {
+            // Re-listen if the socket file is gone (Storage reset wiped filesDir while the compositor kept running).
+            if (appId !in appSockets || !File(dir, "wayland-0").exists()) {
                 val sock = File(dir, "wayland-0"); sock.delete()
                 if (server?.addSocket(sock.absolutePath, appId) == true) appSockets.add(appId)
             }
@@ -68,6 +69,15 @@ class HatchRuntime(private val app: Context) : WindowHost {
         return dir
     }
     private val appSockets = HashSet<String>()
+
+    /** After a Storage reset: recreate the socket dir and the main socket; app sockets come back on next launch. */
+    fun reopenSockets() {
+        sockDir.mkdirs()
+        synchronized(appSockets) { appSockets.clear() }
+        val s = server ?: return
+        val sock = File(sockDir, "wayland-0"); sock.delete()
+        s.addSocket(sock.absolutePath, "hatch")
+    }
 
     /** An Android window (WindowActivity) that can show one toplevel. */
     interface WindowSlot {

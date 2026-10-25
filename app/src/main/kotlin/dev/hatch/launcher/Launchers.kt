@@ -118,6 +118,15 @@ object Launchers {
     }
 
     /** Uninstall: remove the recent entry and grey out a pinned icon (launchers don't let apps delete pins). */
+    /** Remove every Hatch shortcut (Storage reset): dynamic ones go, pinned ones are disabled. */
+    fun removeAll(ctx: Context, appIds: Collection<String>) {
+        val sm = ctx.getSystemService(android.content.pm.ShortcutManager::class.java) ?: return
+        runCatching { sm.removeAllDynamicShortcuts() }
+        val ids = (appIds.map { shortcutId(it) } + runCatching { sm.getShortcuts(android.content.pm.ShortcutManager.FLAG_MATCH_PINNED).map { it.id } }.getOrDefault(emptyList())).distinct()
+        if (ids.isNotEmpty()) runCatching { sm.disableShortcuts(ids, "Removed from Hatch") }
+        ctx.getSharedPreferences("hatch", Context.MODE_PRIVATE).edit().remove("launcher_pending_pins").apply()
+    }
+
     fun remove(ctx: Context, appId: String) {
         val m = sm(ctx) ?: return
         runCatching { m.removeDynamicShortcuts(listOf(shortcutId(appId))) }

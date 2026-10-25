@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -181,7 +182,6 @@ fun HatchHome(state: HatchUiState, actions: StoreActions) {
             owner.lifecycle.addObserver(obs); onDispose { owner.lifecycle.removeObserver(obs) }
         }
         Column(Modifier.padding(pad).fillMaxSize()) {
-        if (overlayMissing) OverlayBanner(actions.grantOverlay)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 0 -> AppsTab(state, actions, onDetail = { detailId = it })
@@ -425,14 +425,18 @@ private fun OverlayBanner(onAllow: () -> Unit) {
 
 // ---------- App details ----------
 @Composable
-private fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreActions, onBack: () -> Unit, onSelect: (String) -> Unit = {}) {
+internal fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreActions, onBack: () -> Unit, onSelect: (String) -> Unit = {}) {
     val src = sourceOf(app)
     val installed = app.id in state.installed
     val working = (state.progress as? InstallManager.Progress.Working)?.takeIf { it.appId == app.id }
     val otherBusy = state.progress is InstallManager.Progress.Working && working == null
     var menu by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Row(Modifier.fillMaxWidth().padding(4.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    // Edge-to-edge: the background fills behind the status bar; content stays inside the safe area (status bar,
+    // camera cutout, gesture bar), and is width-capped on the unfolded Fold / tablets.
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(Modifier.widthIn(max = 840.dp).fillMaxWidth().padding(4.dp, 8.dp).testTag("detail-topbar"), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
             Column(Modifier.weight(1f)) {
                 Text(app.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -440,7 +444,7 @@ private fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreAc
             }
             SourcePill(app); Spacer(Modifier.width(12.dp))
         }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+        Column(Modifier.widthIn(max = 840.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppIconImage(app, 88, circle = true)
@@ -538,6 +542,7 @@ private fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreAc
                 if (app.packages.isNotEmpty()) append(" · package ${app.packages.first()}")
             }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
             Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp)); Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
     }
 }
@@ -576,7 +581,8 @@ private fun SettingsTab(actions: StoreActions) {
             Hint("Installs a tiny launcher APK per app instead, so programs also show in the app drawer. Android scans each one and needs \u201cInstall unknown apps\u201d for Hatch.")
             if (stubs) OutlinedButton(onClick = actions.installSettings) { Text("Install permission") }
         }
-        SettingCard("Storage") { Hint(if (storage.isEmpty()) "Linux system: unknown" else "Linux system and apps: $storage") }
+        actions.storage?.let { StorageSection(it, onUninstall = actions.uninstall) }
+            ?: SettingCard("Storage") { Hint(if (storage.isEmpty()) "Linux system: unknown" else "Linux system and apps: $storage") }
         SettingCard("About") { Hint("Hatch ${actions.versionName} · Debian 13 ($deviceArch) under proot · Wayland compositor · Wine") }
     }
 }

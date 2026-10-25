@@ -131,12 +131,19 @@ adb logcat -c
 
 stamp "launch Hatch"
 adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null
-$UI wait 'Download & set up' 60 || fail "no setup screen"
-shot 01-first-run
-$UI tap 'Download & set up' || fail "tap setup"
+$UI wait '^Set up Hatch$' 60 || fail "no welcome screen"
+shot 01-welcome-folded
+# Same screen on the Fold's inner display size (the emulator profile boots folded).
+adb shell wm size 2208x1840; sleep 3; shot 01b-welcome-unfolded; adb shell wm size reset; sleep 3
+SETUP_T0=$(date +%s)
+$UI tap '^Set up Hatch$' dev.hatch || fail "tap setup"
 # A tap during cold start can be dropped (button still showing, nothing started): re-tap a few times.
-for k in 1 2 3; do sleep 10; $UI has '^Download & set up$' dev.hatch || break; stamp "setup tap not taken, re-tapping ($k)"; $UI tap '^Download & set up$' dev.hatch || true; done
-sleep 20; shot 02-setup-progress
+for k in 1 2 3; do sleep 4; $UI has '^Set up Hatch$' dev.hatch || break; stamp "setup tap not taken, re-tapping ($k)"; $UI tap '^Set up Hatch$' dev.hatch || true; done
+# Permission steps are skipped here (granted above); the screenshot tests render them.
+for k in 1 2 3; do $UI has '^Not now$|^Use full-screen apps$' dev.hatch || break; $UI tap '^Not now$|^Use full-screen apps$' dev.hatch; sleep 1; done
+sleep 3; shot 02-setup-progress-folded
+adb shell wm size 2208x1840; sleep 3; shot 02b-setup-progress-unfolded; adb shell wm size reset; sleep 2
+$UI tap '^Details$' dev.hatch && { sleep 1; shot 02c-setup-details; $UI tap '^Hide details$' dev.hatch || true; }
 # First run: download rootfs + apt; log what the setup screen says every minute so a slow/failed step is visible.
 ok=0; retried=0
 for i in $(seq 1 25); do
@@ -144,16 +151,19 @@ for i in $(seq 1 25); do
   screen=$($UI dump 2>/dev/null | grep dev.hatch | cut -d: -f2- | tr '\n' '|')
   stamp "setup still running ($i min): $(echo "$screen" | cut -c1-300)"
   [ $((i % 5)) -eq 0 ] && shot "02-setup-${i}min"
-  if echo "$screen" | grep -q "'Failed: "; then
+  if echo "$screen" | grep -q "Setup didn.t finish"; then
     shot "02-setup-failed-$retried"
-    stamp "setup reported: $(echo "$screen" | grep -o "'Failed: [^']*'")"
-    # A user would tap Retry: do that once (proves the retry path), then give up.
+    stamp "setup reported a failure: $(echo "$screen" | cut -c1-300)"
+    # A user would tap Try again: do that once (proves the retry path), then give up.
     [ $retried = 0 ] || break
-    retried=1; $UI tap '^Retry$' || break
+    retried=1; $UI tap '^Try again$' || break
   fi
 done
+SETUP_SECS=$(( $(date +%s) - SETUP_T0 ))
 adb logcat -d -s HatchSetup HatchGuest HatchRootfs > "$OUT/setup-logcat.txt" 2>&1 || true
 stamp "setup log: $(grep -c . "$OUT/setup-logcat.txt") lines; $(grep -cE 'Temporary failure|Could not resolve' "$OUT/setup-logcat.txt") DNS errors"
+stamp "SETUP TIME (tap → store): ${SETUP_SECS}s; app timings: $(grep -o 'setup timing: .*' "$OUT/setup-logcat.txt" | tr '\n' ';')"
+echo "setup_seconds=$SETUP_SECS" > "$OUT/setup-timing.txt"; grep -o 'setup timing: .*' "$OUT/setup-logcat.txt" >> "$OUT/setup-timing.txt" || true
 guest_probe
 [ $ok = 1 ] || fail "setup did not reach store"
 shot 03-store
@@ -471,4 +481,21 @@ if $UI tap 'Search apps' dev.hatch || $UI tap 'Search' dev.hatch; then
   # Steam's native client is ARM64-only ("arches": ["arm64"]), so an x86-64 emulator must not offer it
   if $UI has '^Steam$' dev.hatch; then stamp "WARN: Steam listed on x86-64 (should be arm64-only)"; else stamp "steam hidden on x86-64 OK"; fi
 else stamp "tour: search field not found (steam check skipped)"; fi
+stamp "Settings → Remove Linux and all apps (type-to-confirm) → back to onboarding"
+$UI tap '^Settings$' dev.hatch; sleep 2
+for k in 1 2 3 4 5 6; do $UI has '^Remove Linux and all apps$' dev.hatch && break; adb shell input swipe 500 1500 500 500 300; sleep 1; done
+shot 26-settings-storage
+$UI tap '^Remove Linux and all apps$' dev.hatch || fail "no Remove Linux button in Settings"
+$UI wait 'Frees about' 30 dev.hatch || fail "no first reset confirmation"; shot 27-reset-confirm-1
+$UI tap '^Continue$' dev.hatch || fail "no Continue"
+$UI wait 'Type DELETE to confirm' 10 dev.hatch || fail "no type-to-confirm"
+$UI tap 'DELETE' dev.hatch; adb shell input text DELETE; sleep 1; hide_ime; shot 28-reset-type-to-confirm
+$UI tap '^Remove everything$' dev.hatch || fail "no Remove everything button"
+$UI wait '^Set up Hatch$' 180 dev.hatch || { shot 29-reset-failed; fail "did not return to onboarding after the reset"; }
+shot 29-after-reset-onboarding
+LEFT=$(adb shell run-as dev.hatch sh -c 'find files cache no_backup -mindepth 1 \( -type f -o -type l \) 2>/dev/null' | tr -d '\r')
+[ -z "$LEFT" ] || { echo "$LEFT" | head -20; fail "files left after Remove Linux and all apps"; }
+adb shell run-as dev.hatch ls shared_prefs | grep -q hatch.xml || stamp "WARN: prefs not found after reset"
+adb shell dumpsys activity services dev.hatch | grep -q HatchRuntimeService && fail "runtime service running after the reset"
+stamp "reset OK: only shared_prefs left"
 stamp "emu-e2e OK"

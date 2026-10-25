@@ -159,6 +159,7 @@ object InstallManager {
     private val _legacyStubs = MutableStateFlow<List<String>>(emptyList())
     val legacyStubs = _legacyStubs.asStateFlow()
     fun legacyStubHandled(pkg: String) { _legacyStubs.value = _legacyStubs.value - pkg }
+    fun queueLegacyStubs(pkgs: List<String>) { _legacyStubs.value = (_legacyStubs.value + pkgs).distinct() }
 
     private fun installedStoreApps(context: Context): List<StoreApp> {
         val ids = InstalledApps.list(context).map { it.id }.toSet()

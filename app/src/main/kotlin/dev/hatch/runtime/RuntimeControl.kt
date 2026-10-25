@@ -77,6 +77,13 @@ object RuntimeControl {
         }, "hatch-stop-all").start()
     }
 
+    /** Stop all and wait until no guest process is left (Storage reset). */
+    fun stopAllAndWait(ctx: Context, timeoutMs: Long = 8_000) {
+        stopAll(ctx, "storage reset")
+        val end = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < end && (guestPids(ctx).isNotEmpty() || HatchRuntimeService.running)) Thread.sleep(200)
+    }
+
     private fun stopService(app: Context) {
         HatchRuntimeService.running = false
         app.stopService(Intent(app, HatchRuntimeService::class.java))

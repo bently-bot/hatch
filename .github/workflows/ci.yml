@@ -153,6 +153,15 @@ jobs:
             sed -i 's/compileSdk = 37/compileSdk = 36/' app/build.gradle.kts
           fi
           ./gradlew :app:assembleDebug --stacktrace
+      - name: Unit + screenshot tests (Roborazzi, phone + unfolded Fold)
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-and-tests
+          path: |
+            app/build/outputs/roborazzi/*.png
+            app/build/reports/tests/testDebugUnitTest/
       - name: Assemble signed release
         env:
           HATCH_KEYSTORE_BASE64: ${{ secrets.HATCH_KEYSTORE_BASE64 }}

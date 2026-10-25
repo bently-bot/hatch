@@ -43,12 +43,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
-
-        HatchApp.instance.runtime.ensureStarted()
+        // Permissions are asked in onboarding; the runtime (and its notification) starts with the first app.
 
         setContent {
             HatchTheme {
@@ -65,12 +60,32 @@ class MainActivity : ComponentActivity() {
                     val scope = rememberCoroutineScope()
                     // Installs queue a home-screen pin; ask the launcher once Hatch is in front.
                     LaunchedEffect(installProg) { if (installProg is InstallManager.Progress.Done && resumed) flushPins() }
+                    // A v0.1.0 stub APK: Android removes it with its own confirmation (needs REQUEST_DELETE_PACKAGES).
+                    val stubs by InstallManager.legacyStubs.collectAsStateWithLifecycle()
+                    LaunchedEffect(stubs) {
+                        stubs.firstOrNull()?.let { pkg ->
+                            InstallManager.legacyStubHandled(pkg)
+                            runCatching { startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))) }
+                                .onFailure { android.util.Log.w("HatchInstall", "legacy stub $pkg not removed: $it") }
+                        }
+                    }
 
                     if (!ready) {
-                        SetupScreen(
+                        val fw = dev.hatch.floating.FloatingWindows
+                        Onboarding(
                             stage = setupStage,
                             log = setupLog,
+                            estimate = remember { RootfsInstaller.estimate() },
+                            perms = remember {
+                                OnboardingPerms(
+                                    notificationsNeeded = Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                                        this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED,
+                                    overlayNeeded = fw.mode(this@MainActivity) == fw.MODE_FLOATING && !fw.canOverlay(this@MainActivity),
+                                )
+                            },
                             onStart = { RootfsInstaller.start(this@MainActivity) },
+                            onAllowNotifications = { if (Build.VERSION.SDK_INT >= 33) notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                            onAllowOverlay = { runCatching { startActivity(fw.overlayPermissionIntent(this@MainActivity)) } },
                         )
                     } else {
                         LaunchedEffect(ready) { dev.hatch.gpu.Gpu.ensureChecked(this@MainActivity) }
@@ -79,15 +94,6 @@ class MainActivity : ComponentActivity() {
                             UninstallDialog(app, estimate = { InstallManager.estimateUninstall(this@MainActivity, app) },
                                 onConfirm = { confirmUninstall = null; scope.launch { InstallManager.uninstall(this@MainActivity, app) } },
                                 onDismiss = { confirmUninstall = null })
-                        }
-                        // A v0.1.0 stub APK: Android removes it with its own confirmation (needs REQUEST_DELETE_PACKAGES).
-                        val stubs by InstallManager.legacyStubs.collectAsStateWithLifecycle()
-                        LaunchedEffect(stubs) {
-                            stubs.firstOrNull()?.let { pkg ->
-                                InstallManager.legacyStubHandled(pkg)
-                                runCatching { startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))) }
-                                    .onFailure { android.util.Log.w("HatchInstall", "legacy stub $pkg not removed: $it") }
-                            }
                         }
                         HatchHome(
                             HatchUiState(catalogue.apps, catalogue.categories, installed, installProg),
@@ -126,6 +132,14 @@ class MainActivity : ComponentActivity() {
                                 uiScale = { getSharedPreferences("hatch", MODE_PRIVATE).getInt("ui_scale", 0) },
                                 setUiScale = { v -> getSharedPreferences("hatch", MODE_PRIVATE).edit().putInt("ui_scale", v).apply() },
                                 storageUsed = { InstallManager.storageUsed(this@MainActivity) },
+                                storage = StorageActions(
+                                    report = { dev.hatch.store.Storage.report(this@MainActivity) },
+                                    appSize = { app -> InstallManager.estimateUninstall(this@MainActivity, app) },
+                                    clearCache = { dev.hatch.store.Storage.clearCache(this@MainActivity) },
+                                    // NonCancellable: Settings leaves the screen during these (back to onboarding); never stop a wipe halfway.
+                                    removeAllApps = { kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { dev.hatch.store.Storage.removeAllApps(this@MainActivity) } },
+                                    removeEverything = { kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { dev.hatch.store.Storage.removeEverything(this@MainActivity) } },
+                                ),
                                 addToHome = { app -> pin(app, explicit = true) },
                                 isPinned = { app -> dev.hatch.launcher.Launchers.isPinned(this@MainActivity, app.id) },
                                 stubsEnabled = { dev.hatch.launcher.Launchers.stubsEnabled(this@MainActivity) },
@@ -175,49 +189,3 @@ class MainActivity : ComponentActivity() {
         )
     }
 }
-
-@Composable
-private fun SetupScreen(stage: RootfsInstaller.Stage, log: List<String>, onStart: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Welcome to Hatch", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "First run downloads Debian 13 (${deviceArch}) and prepares a Linux desktop environment. " +
-                "Apps install as their own launcher icons and open in real windows — Fold / DeX friendly.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(20.dp))
-        when (stage) {
-            is RootfsInstaller.Stage.Idle ->
-                Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-                    Text("Download & set up")
-                }
-            is RootfsInstaller.Stage.Downloading -> {
-                Text("Downloading ${stage.what}…")
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(progress = { stage.fraction }, modifier = Modifier.fillMaxWidth())
-                Text("${stage.bytes / 1_000_000} / ${stage.total / 1_000_000} MB",
-                    style = MaterialTheme.typography.bodySmall)
-            }
-            is RootfsInstaller.Stage.Working -> {
-                Text(stage.what)
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-            is RootfsInstaller.Stage.Done -> Text("Ready.")
-            is RootfsInstaller.Stage.Failed -> {
-                Text("Failed: ${stage.message}", color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = onStart) { Text("Retry") }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            items(log.takeLast(100)) { line ->
-                Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-

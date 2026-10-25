@@ -117,6 +117,8 @@ data class StoreActions(
     val versionName: String = "",
     /** Pin the app's icon to the home screen (launcher shortcut; no APK). */
     val addToHome: (StoreApp) -> Unit = {},
+    /** Settings → Storage & reset (null in previews/tests). */
+    val storage: StorageActions? = null,
     val isPinned: (StoreApp) -> Boolean = { false },
     /** Advanced: per-app stub APKs instead of shortcuts (off by default). */
     val stubsEnabled: () -> Boolean = { false },
