@@ -39,7 +39,7 @@ object AudioBridge {
                 Thread({
                     val buf = ByteArray(4096)
                     while (true) { val n = runCatching { dev.hatch.wayland.Native.readSome(s.outFd, buf) }.getOrDefault(-1); if (n <= 0) break }
-                    runCatching { dev.hatch.wayland.Native.waitPid(s.pid, false) }
+                    dev.hatch.guest.LinuxRuntime.reap(s.pid)
                     synchronized(this) { if (daemon === s) daemon = null }
                     Log.i(TAG, "sound server exited")
                 }, "hatch-audio-daemon").apply { isDaemon = true; start() }

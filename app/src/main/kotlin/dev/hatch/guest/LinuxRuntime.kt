@@ -132,6 +132,22 @@ object LinuxRuntime {
     }
 
     /** Long-lived guest process (GUI app). Returns pid+stdout fd. */
+    /**
+     * Collect a spawned proot's exit status so it doesn't stay a zombie. Its stdout reaching EOF (or us closing the
+     * fd in AppSession.stop) can come before the process has actually exited, so a single WNOHANG wait missed it
+     * and every stopped session left a `[libproot.so]` zombie behind. Polls for ~3 s, then SIGKILLs the group and
+     * waits. Call from a background thread.
+     */
+    fun reap(pid: Int): Int? {
+        repeat(30) {
+            val r = runCatching { Native.waitPid(pid, false) }.getOrNull() ?: return null
+            if (r != -1000) return r.takeIf { it >= 0 }
+            Thread.sleep(100)
+        }
+        runCatching { Native.killGroup(pid, 9) }
+        return runCatching { Native.waitPid(pid, true) }.getOrNull()?.takeIf { it >= 0 }
+    }
+
     fun spawn(
         context: Context,
         guestCommand: List<String>,
@@ -199,6 +215,7 @@ object LinuxRuntime {
             } finally {
                 session.kill()
                 Native.close(session.outFd)
+                Thread({ reap(session.pid) }, "hatch-reap-${session.pid}").apply { isDaemon = true; start() }
             }
         } catch (e: Exception) {
             Log.e(TAG, "run failed", e); null

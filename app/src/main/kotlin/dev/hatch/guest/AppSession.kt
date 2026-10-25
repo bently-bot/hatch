@@ -80,7 +80,7 @@ object AppSession {
             // stdout EOF ⇒ proot (and every guest process) exited
             if (sessions[appId] === s) sessions.remove(appId)
             changed()
-            val code = runCatching { dev.hatch.wayland.Native.waitPid(s.pid, false) }.getOrNull()
+            val code = LinuxRuntime.reap(s.pid)
             Log.i(TAG, "$appId exited (status=$code)")
             lastExit[appId] = ExitInfo(code, tail.lines(60), System.currentTimeMillis())
             tail.lines().forEach { Log.i(TAG, "$appId| $it") }
