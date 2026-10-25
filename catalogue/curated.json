@@ -203,6 +203,8 @@
         "firefox-esr"
       ],
       "command": [
+        "env",
+        "MOZ_DISABLE_WAYLAND_PROXY=1",
         "firefox-esr"
       ],
       "wine": false
@@ -523,6 +525,134 @@
       "screenshotsFrom": "io.github.fabiangreffrath.doom",
       "license": "GPL-2.0+",
       "x11": true
+    },
+    {
+      "id": "dosbox",
+      "name": "DOSBox Emulator",
+      "source": "debian",
+      "packages": [
+        "dosbox"
+      ],
+      "x11": true,
+      "command": [
+        "env",
+        "SDL_VIDEODRIVER=x11",
+        "hatch-desktop",
+        "dosbox.desktop"
+      ]
+    },
+    {
+      "id": "scummvm",
+      "name": "ScummVM",
+      "source": "debian",
+      "packages": [
+        "scummvm"
+      ],
+      "x11": true,
+      "command": [
+        "env",
+        "SDL_VIDEODRIVER=x11",
+        "hatch-desktop",
+        "org.scummvm.scummvm.desktop"
+      ]
+    },
+    {
+      "id": "supertux",
+      "name": "SuperTux",
+      "source": "debian",
+      "packages": [
+        "supertux"
+      ],
+      "x11": true,
+      "command": [
+        "env",
+        "SDL_VIDEODRIVER=x11",
+        "hatch-desktop",
+        "supertux2.desktop"
+      ]
+    },
+    {
+      "id": "luanti",
+      "name": "Luanti",
+      "source": "debian",
+      "packages": [
+        "luanti"
+      ],
+      "x11": true,
+      "command": [
+        "env",
+        "SDL_VIDEODRIVER=x11",
+        "hatch-desktop",
+        "net.minetest.minetest.desktop"
+      ]
+    },
+    {
+      "id": "krita",
+      "name": "Krita",
+      "source": "debian",
+      "packages": [
+        "krita"
+      ],
+      "x11": true,
+      "command": [
+        "env",
+        "QT_QPA_PLATFORM=xcb",
+        "hatch-desktop",
+        "org.kde.krita.desktop"
+      ]
+    },
+    {
+      "id": "thonny",
+      "name": "Thonny",
+      "source": "debian",
+      "packages": [
+        "thonny"
+      ],
+      "x11": true,
+      "command": [
+        "hatch-desktop",
+        "org.thonny.Thonny.desktop"
+      ]
+    },
+    {
+      "id": "libreoffice-calc",
+      "name": "LibreOffice Calc",
+      "source": "debian",
+      "packages": [
+        "libreoffice-calc",
+        "libreoffice-gtk3"
+      ],
+      "command": [
+        "libreoffice",
+        "--calc"
+      ]
+    },
+    {
+      "id": "libreoffice-impress",
+      "name": "LibreOffice Impress",
+      "source": "debian",
+      "packages": [
+        "libreoffice-impress",
+        "libreoffice-gtk3"
+      ],
+      "command": [
+        "libreoffice",
+        "--impress"
+      ]
+    },
+    {
+      "id": "thunderbird",
+      "name": "Thunderbird",
+      "source": "debian",
+      "packages": [
+        "thunderbird"
+      ],
+      "command": [
+        "env",
+        "MOZ_DISABLE_WAYLAND_PROXY=1",
+        "hatch-desktop",
+        "thunderbird.desktop"
+      ]
     }
   ]
 }
