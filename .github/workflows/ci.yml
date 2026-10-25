@@ -27,7 +27,7 @@ jobs:
         run: |
           mkdir -p build/host harness-out
           gcc -shared -fPIC -O2 -DHATCH_HOST -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
-            -o build/host/libhatchnative.so app/src/main/cpp/hatchnative.c -lpthread
+            -o build/host/libhatchnative.so app/src/main/cpp/hatchnative.c -lpthread -lm
           kotlinc -d build/host/classes -jvm-target 17 \
             app/src/main/kotlin/dev/hatch/wayland/*.kt harness/src/dev/hatch/harness/Main.kt
           CLIENT=$(command -v weston-simple-shm)

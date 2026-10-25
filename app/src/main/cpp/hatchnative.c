@@ -11,6 +11,7 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <stdint.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/eventfd.h>
@@ -222,6 +223,29 @@ JNIEXPORT jint JNICALL J(storeCopyFd)(JNIEnv *env, jclass c, jint fd, jint offse
     }
     free(row);
     return 0;
+}
+
+/* Black-window detection: luma mean and standard deviation over a <=64x64 sample grid of a store.
+ * Returns (mean << 8) | min(stddev, 255), or -1. A Chromium/Electron/CEF window whose GPU path failed commits
+ * solid black (or fully transparent) frames: mean ~0, stddev 0. */
+JNIEXPORT jint JNICALL J(storeStats)(JNIEnv *env, jclass c, jlong sp) {
+    store_t *s = (store_t *)(intptr_t)sp;
+    if (!s || !s->px || s->w <= 0 || s->h <= 0) return -1;
+    int nx = s->w < 64 ? s->w : 64, ny = s->h < 64 ? s->h : 64;
+    double sum = 0, sq = 0; int n = 0;
+    for (int j = 0; j < ny; j++) {
+        int y = (int)(((long)j * 2 + 1) * s->h / (2L * ny));
+        for (int i = 0; i < nx; i++) {
+            int x = (int)(((long)i * 2 + 1) * s->w / (2L * nx));
+            uint32_t v = s->px[(size_t)y * (size_t)s->w + (size_t)x];   /* stored as R,G,B,A bytes (ABGR word) */
+            double l = (0.299 * (v & 0xff) + 0.587 * ((v >> 8) & 0xff) + 0.114 * ((v >> 16) & 0xff));
+            sum += l; sq += l * l; n++;
+        }
+    }
+    double mean = sum / n, var = sq / n - mean * mean;
+    int sd = var > 0 ? (int)(sqrt(var) + 0.5) : 0; if (sd > 255) sd = 255;
+    int m = (int)(mean + 0.5); if (m > 255) m = 255;
+    return (m << 8) | sd;
 }
 
 /* ---------- targets ---------- */

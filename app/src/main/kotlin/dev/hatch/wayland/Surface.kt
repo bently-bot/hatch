@@ -109,6 +109,17 @@ class SurfaceRes(c: Client, id: Int) : Res(c, id, 4) {
                 }
                 val r = Native.storeCopyFd(buf.pool.fd, buf.offset, buf.stride, buf.format, store, buf.w, buf.h)
                 if (r < 0) client.server.host.log("storeCopyFd failed $r")
+                else (role as? Role.ToplevelRole)?.t?.let { t ->
+                    t.framesCommitted++
+                    if (!t.hasContent) {
+                        val st = Native.storeStats(store); t.lastStats = st
+                        if (st >= 0 && ((st and 0xff) >= 2 || (st shr 8) >= 10)) {
+                            t.hasContent = true
+                            client.server.host.log("content '${t.title}' after ${t.framesCommitted} frame(s) (luma ${st shr 8}±${st and 0xff})")
+                            client.server.host.windowContent(t)
+                        }
+                    }
+                }
                 opaque = buf.format == 1 || buf.format == 0x34324258 || pendingOpaqueRegion != null
                 if (buf.busy) { /* previous still held */ }
                 buf.busy  = true

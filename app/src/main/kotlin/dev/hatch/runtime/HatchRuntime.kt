@@ -85,6 +85,8 @@ class HatchRuntime(private val app: Context) : WindowHost {
         fun bind(w: Toplevel)
         fun windowGone(w: Toplevel)
         fun guestExited() {}
+        /** [w] showed real pixels for the first time (not a black/transparent frame). */
+        fun contentShown(w: Toplevel) {}
         fun textInput(enabled: Boolean) {}
     }
 
@@ -133,6 +135,10 @@ class HatchRuntime(private val app: Context) : WindowHost {
 
     override fun windowChanged(w: Toplevel) {
         if (w.appId.isNotEmpty()) listeners[w.appId]?.forEach { it(w) }
+    }
+
+    override fun windowContent(w: Toplevel) {
+        slots[w.client.appTag]?.forEach { if (it.boundWindow === w) it.contentShown(w) }
     }
 
     override fun textInputChanged(enabled: Boolean) { focusedSlot?.textInput(enabled) }

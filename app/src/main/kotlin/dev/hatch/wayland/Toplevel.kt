@@ -4,6 +4,10 @@ package dev.hatch.wayland
 class Toplevel(val server: WaylandServer, val client: Client, val surface: SurfaceRes, val xdgSurface: XdgSurfaceRes) {
     var xdg: XdgToplevelRes? = null
     var title = ""; var appId = ""
+    /** Content tracking for black-window detection: frames committed, and whether any had real pixels. */
+    @Volatile var hasContent = false
+    @Volatile var framesCommitted = 0
+    @Volatile var lastStats = -1
     var minW = 0; var minH = 0; var maxW = 0; var maxH = 0
     /** Desired logical size (from the Android window). 0 = let the client choose. */
     var configuredW = 0; var configuredH = 0

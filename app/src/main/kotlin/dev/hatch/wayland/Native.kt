@@ -31,6 +31,8 @@ object Native {
     @JvmStatic external fun storeFree(store: Long)
     @JvmStatic external fun storeCopy(shm: Long, offset: Int, stride: Int, format: Int, store: Long, rects: IntArray, count: Int, poolSize: Long): Int
     @JvmStatic external fun storeCopyFd(fd: Int, offset: Int, stride: Int, format: Int, store: Long, w: Int, h: Int): Int
+    /** (luma mean << 8) | luma stddev over a sample grid of a store; -1 if empty. */
+    @JvmStatic external fun storeStats(store: Long): Int
     @JvmStatic external fun targetForSurface(surface: Any, w: Int, h: Int): Long
     @JvmStatic external fun targetMemory(w: Int, h: Int): Long
     @JvmStatic external fun targetRelease(target: Long)

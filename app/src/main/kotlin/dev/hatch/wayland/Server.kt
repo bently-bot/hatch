@@ -11,6 +11,8 @@ interface WindowHost {
     /** A new toplevel appeared. The host should give it a target via [Toplevel.attachTarget]. */
     fun windowCreated(w: Toplevel)
     fun windowChanged(w: Toplevel) {}
+    /** First frame of [w] with real pixels (not solid black/transparent). Black-window detection keys off this. */
+    fun windowContent(w: Toplevel) {}
     fun windowDestroyed(w: Toplevel)
     fun clipboardChanged(text: String) {}
     fun clipboardText(): String? = null
