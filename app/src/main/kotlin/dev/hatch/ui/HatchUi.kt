@@ -1,5 +1,6 @@
 package dev.hatch.ui
 
+import androidx.compose.material.icons.filled.Add
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -213,10 +214,18 @@ private fun AppsTab(state: HatchUiState, actions: StoreActions, onDetail: (Strin
         LazyVerticalGrid(GridCells.Adaptive(88.dp), verticalArrangement = Arrangement.spacedBy(18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(mine, key = { it.id }) { a ->
                 val installing = busy?.appId == a.id
+                var menu by remember { mutableStateOf(false) }
                 Column(
-                    Modifier.combinedClickable(onClick = { if (a.id in state.installed && !installing) actions.launch(a) else onDetail(a.id) }, onLongClick = { onDetail(a.id) }),
+                    Modifier.combinedClickable(onClick = { if (a.id in state.installed && !installing) actions.launch(a) else onDetail(a.id) },
+                        onLongClick = { if (a.id in state.installed && !installing) menu = true else onDetail(a.id) })
+                        .semantics { contentDescription = "installed-${a.id}" },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    DropdownMenu(menu, { menu = false }) {
+                        DropdownMenuItem({ Text("Open") }, { menu = false; actions.launch(a) })
+                        DropdownMenuItem({ Text("Add to home screen") }, { menu = false; actions.addToHome(a) })
+                        DropdownMenuItem({ Text("App details") }, { menu = false; onDetail(a.id) })
+                    }
                     AppIconImage(a, 60, circle = true)
                     Spacer(Modifier.height(6.dp))
                     Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
@@ -300,8 +309,8 @@ private fun ProgressStrip(state: HatchUiState) {
     val p = state.progress
     if (p is InstallManager.Progress.Failed) {
         val name = state.apps.firstOrNull { it.id == p.appId }?.name ?: p.appId
-        Text("$name: ${p.message}", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+        val (t, body) = failureText(p, name)
+        ErrorCard(t, body, p.log, Modifier.padding(horizontal = 16.dp, vertical = 6.dp), onDismiss = { InstallManager.dismissFailure() })
     }
 }
 
@@ -465,6 +474,7 @@ private fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreAc
                             shape = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 26.dp, bottomEnd = 26.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = HatchBlue, contentColor = HatchOnBlue)) { Icon(Icons.Default.ArrowDropDown, "More actions") }
                         DropdownMenu(menu, { menu = false }) {
+                            DropdownMenuItem({ Text("Add to home screen") }, { menu = false; actions.addToHome(app) })
                             DropdownMenuItem({ Text("Update") }, { menu = false; actions.update(app) }, enabled = !otherBusy)
                             DropdownMenuItem({ Text("Uninstall") }, { menu = false; actions.uninstall(app) }, enabled = !otherBusy)
                         }
@@ -473,15 +483,24 @@ private fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreAc
                 else -> Button(onClick = { actions.install(app) }, Modifier.fillMaxWidth().height(52.dp), enabled = !otherBusy, shape = RoundedCornerShape(26.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = HatchBlue, contentColor = HatchOnBlue)) { Text("Install", fontWeight = FontWeight.SemiBold) }
             }
-            if (failed != null) {
-                Spacer(Modifier.height(8.dp))
-                var open by remember(failed) { mutableStateOf(false) }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(failed.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                    if (failed.log.isNotEmpty()) TextButton(onClick = { open = !open }) { Text(if (open) "Hide details" else "Details") }
+            if (installed && working == null) {
+                // Re-checked on resume: the launcher's own confirmation sheet (One UI / Pixel) may have just closed.
+                var pinned by remember(app.id) { mutableStateOf(actions.isPinned(app)) }
+                val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                DisposableEffect(owner, app.id) {
+                    val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) pinned = actions.isPinned(app) }
+                    owner.lifecycle.addObserver(obs); onDispose { owner.lifecycle.removeObserver(obs) }
                 }
-                if (open) Text(failed.log.takeLast(25).joinToString("\n"), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp,
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp))
+                Spacer(Modifier.height(10.dp))
+                if (pinned) Text("On your Home screen", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else OutlinedButton(onClick = { actions.addToHome(app) }, Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(24.dp)) {
+                    Icon(Icons.Default.Add, null); Spacer(Modifier.width(8.dp)); Text("Add to home screen")
+                }
+            }
+            if (failed != null) {
+                Spacer(Modifier.height(12.dp))
+                val (t, body) = failureText(failed, app.name)
+                ErrorCard(t, body, failed.log, onDismiss = { InstallManager.dismissFailure() })
             }
             if (app.screenshots.isNotEmpty()) {
                 Spacer(Modifier.height(20.dp))
@@ -550,9 +569,12 @@ private fun SettingsTab(actions: StoreActions) {
             SwitchRow("Use the GPU when available", gpu) { gpu = it; actions.setGpuEnabled(it) }
             Hint(actions.gpuStatus())
         }
-        SettingCard("App installs") {
-            Hint("Hatch adds each app to your launcher as its own icon. Android asks once for permission to do this.")
-            OutlinedButton(onClick = actions.installSettings) { Text("Install permission") }
+        SettingCard("Launcher icons") {
+            var stubs by remember { mutableStateOf(actions.stubsEnabled()) }
+            Hint("Installed apps go on your Home screen as shortcuts: nothing extra is installed, so there's no Play Protect scan.")
+            SwitchRow("Separate app per icon (advanced)", stubs) { stubs = it; actions.setStubsEnabled(it) }
+            Hint("Installs a tiny launcher APK per app instead, so programs also show in the app drawer. Android scans each one and needs \u201cInstall unknown apps\u201d for Hatch.")
+            if (stubs) OutlinedButton(onClick = actions.installSettings) { Text("Install permission") }
         }
         SettingCard("Storage") { Hint(if (storage.isEmpty()) "Linux system: unknown" else "Linux system and apps: $storage") }
         SettingCard("About") { Hint("Hatch ${actions.versionName} · Debian 13 ($deviceArch) under proot · Wayland compositor · Wine") }

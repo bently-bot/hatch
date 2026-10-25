@@ -63,6 +63,8 @@ class WindowActivity : ComponentActivity(), HatchRuntime.WindowSlot {
         secondary = intent.getBooleanExtra(EXTRA_SECONDARY, false)
         label = intent.getStringExtra(EXTRA_LABEL) ?: InstalledApps.get(this, appId)?.name ?: appId
 
+        if (!secondary && appId != "unknown") reportRecent(appId, label)
+
         // Floating mode (default, like a desktop): the program opens as an overlay window owned by the runtime
         // service, so this Activity is only a trampoline and leaves no Recents card behind.
         if (!secondary && dev.hatch.floating.FloatingWindows.enabled(this)) {
@@ -212,6 +214,16 @@ class WindowActivity : ComponentActivity(), HatchRuntime.WindowSlot {
             }, 20_000)
         }
         super.onDestroy()
+    }
+
+    /** Recent apps as dynamic shortcuts on Hatch's own icon (off the main thread: icon decode + ShortcutManager IPC). */
+    private fun reportRecent(id: String, name: String) {
+        val ctx = applicationContext
+        Thread {
+            val app = runCatching { dev.hatch.store.Catalogue.load(ctx).firstOrNull { it.id == id } }.getOrNull()
+            val icon = app?.let { runCatching { dev.hatch.store.AppIcons.png(ctx, it) }.getOrNull() }
+            dev.hatch.launcher.Launchers.reportUsed(ctx, id, name, icon)
+        }.start()
     }
 
     companion object {

@@ -63,6 +63,8 @@ class MainActivity : ComponentActivity() {
                         InstalledApps.list(this@MainActivity).map { it.id }.toSet()
                     }
                     val scope = rememberCoroutineScope()
+                    // Installs queue a home-screen pin; ask the launcher once Hatch is in front.
+                    LaunchedEffect(installProg) { if (installProg is InstallManager.Progress.Done && resumed) flushPins() }
 
                     if (!ready) {
                         SetupScreen(
@@ -72,11 +74,26 @@ class MainActivity : ComponentActivity() {
                         )
                     } else {
                         LaunchedEffect(ready) { dev.hatch.gpu.Gpu.ensureChecked(this@MainActivity) }
+                        var confirmUninstall by remember { mutableStateOf<StoreApp?>(null) }
+                        confirmUninstall?.let { app ->
+                            UninstallDialog(app, estimate = { InstallManager.estimateUninstall(this@MainActivity, app) },
+                                onConfirm = { confirmUninstall = null; scope.launch { InstallManager.uninstall(this@MainActivity, app) } },
+                                onDismiss = { confirmUninstall = null })
+                        }
+                        // A v0.1.0 stub APK: Android removes it with its own confirmation (needs REQUEST_DELETE_PACKAGES).
+                        val stubs by InstallManager.legacyStubs.collectAsStateWithLifecycle()
+                        LaunchedEffect(stubs) {
+                            stubs.firstOrNull()?.let { pkg ->
+                                InstallManager.legacyStubHandled(pkg)
+                                runCatching { startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))) }
+                                    .onFailure { android.util.Log.w("HatchInstall", "legacy stub $pkg not removed: $it") }
+                            }
+                        }
                         HatchHome(
                             HatchUiState(catalogue.apps, catalogue.categories, installed, installProg),
                             StoreActions(
                                 install = { app -> scope.launch { InstallManager.install(this@MainActivity, app, HatchApp.instance.runtime.socketDir().absolutePath) } },
-                                uninstall = { app -> scope.launch { InstallManager.uninstall(this@MainActivity, app) } },
+                                uninstall = { app -> confirmUninstall = app },
                                 update = { app -> scope.launch { InstallManager.update(this@MainActivity, app, HatchApp.instance.runtime.socketDir().absolutePath) } },
                                 launch = { app -> launchApp(app) },
                                 installSettings = {
@@ -109,6 +126,10 @@ class MainActivity : ComponentActivity() {
                                 uiScale = { getSharedPreferences("hatch", MODE_PRIVATE).getInt("ui_scale", 0) },
                                 setUiScale = { v -> getSharedPreferences("hatch", MODE_PRIVATE).edit().putInt("ui_scale", v).apply() },
                                 storageUsed = { InstallManager.storageUsed(this@MainActivity) },
+                                addToHome = { app -> pin(app, explicit = true) },
+                                isPinned = { app -> dev.hatch.launcher.Launchers.isPinned(this@MainActivity, app.id) },
+                                stubsEnabled = { dev.hatch.launcher.Launchers.stubsEnabled(this@MainActivity) },
+                                setStubsEnabled = { on -> dev.hatch.launcher.Launchers.setStubsEnabled(this@MainActivity, on) },
                                 versionName = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "",
                             ),
                         )
@@ -116,6 +137,30 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private var resumed = false
+    override fun onResume() { super.onResume(); resumed = true; flushPins() }
+    override fun onPause() { resumed = false; super.onPause() }
+
+    private fun flushPins() {
+        val ids = dev.hatch.launcher.Launchers.takePending(this); if (ids.isEmpty()) return
+        val apps = Catalogue.load(this)
+        for (id in ids) apps.firstOrNull { it.id == id }?.let { pin(it, explicit = false) }
+    }
+
+    /** Pin [app]'s icon. Quiet when automatic (after an install); explains itself when the user asked. */
+    private fun pin(app: StoreApp, explicit: Boolean) {
+        val icon = runCatching { dev.hatch.store.AppIcons.png(this, app) }.getOrNull()
+        val r = dev.hatch.launcher.Launchers.requestPin(this, app.id, app.name, icon)
+        android.util.Log.i("HatchLauncher", "pin ${app.id}: $r")
+        val msg = when (r) {
+            dev.hatch.launcher.Launchers.PinResult.ALREADY_PINNED -> if (explicit) "${app.name} is already on your Home screen" else null
+            dev.hatch.launcher.Launchers.PinResult.UNSUPPORTED -> "Your launcher can't add shortcuts. Open ${app.name} from Hatch, or long-press Hatch's icon."
+            dev.hatch.launcher.Launchers.PinResult.FAILED -> if (explicit) "Couldn't add ${app.name} to the Home screen" else null
+            dev.hatch.launcher.Launchers.PinResult.REQUESTED -> null
+        }
+        msg?.let { android.widget.Toast.makeText(this, it, android.widget.Toast.LENGTH_LONG).show() }
     }
 
     private fun launchApp(app: StoreApp) {

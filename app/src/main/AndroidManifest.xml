@@ -8,6 +8,9 @@
     <!-- device DNS servers for the guest resolv.conf (LinkProperties) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <!-- Only for Hatch's own updates and the optional per-app stub APKs (off by default); never asked for on first run. -->
+    <!-- Only to let Android remove a legacy v0.1.0 per-app stub APK (ACTION_DELETE, with Android's own confirmation). -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"/>
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
@@ -74,5 +77,6 @@
         </service>
 
         <receiver android:name=".stub.InstallResultReceiver" android:exported="false"/>
+        <receiver android:name=".launcher.PinResultReceiver" android:exported="false"/>
     </application>
 </manifest>
