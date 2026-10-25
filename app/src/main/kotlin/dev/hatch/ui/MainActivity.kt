@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        dev.hatch.update.SelfUpdater.onAppStart(applicationContext)
         // Permissions are asked in onboarding; the runtime (and its notification) starts with the first app.
 
         setContent {
@@ -82,6 +83,7 @@ class MainActivity : ComponentActivity() {
                     val setupStage by RootfsInstaller.stage.collectAsStateWithLifecycle()
                     val setupLog by RootfsInstaller.log.collectAsStateWithLifecycle()
                     val installProg by InstallManager.progress.collectAsStateWithLifecycle()
+                    val selfUpdate by dev.hatch.update.SelfUpdater.state.collectAsStateWithLifecycle()
                     val ready = remember(installedTick) { LinuxRuntime.isInstalled(this@MainActivity) }
                     val catalogue = remember { Catalogue.loadFile(this@MainActivity) }
                     val installed = remember(installProg, installedTick) {
@@ -121,6 +123,8 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(ready) { dev.hatch.gpu.Gpu.ensureChecked(this@MainActivity) }
                         // Fix a package database an interrupted install or Hatch 0.2.0's uninstall left broken
                         LaunchedEffect(ready) { InstallManager.repairIfNeeded(this@MainActivity) }
+                        // Hatch's own updates: quiet check on store start, at most every 6 h (Settings has the switch)
+                        LaunchedEffect(ready) { dev.hatch.update.SelfUpdater.autoCheck(this@MainActivity) }
                         var confirmUninstall by remember { mutableStateOf<StoreApp?>(null) }
                         confirmUninstall?.let { app ->
                             UninstallDialog(app, estimate = { InstallManager.estimateUninstall(this@MainActivity, app) },
@@ -128,7 +132,7 @@ class MainActivity : ComponentActivity() {
                                 onDismiss = { confirmUninstall = null })
                         }
                         HatchHome(
-                            HatchUiState(catalogue.apps, catalogue.categories, installed, installProg),
+                            HatchUiState(catalogue.apps, catalogue.categories, installed, installProg, selfUpdate),
                             StoreActions(
                                 install = { app -> scope.launch { InstallManager.install(this@MainActivity, app, HatchApp.instance.runtime.socketDir().absolutePath) } },
                                 uninstall = { app -> confirmUninstall = app },
@@ -173,6 +177,21 @@ class MainActivity : ComponentActivity() {
                                     removeEverything = { kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { dev.hatch.store.Storage.removeEverything(this@MainActivity) } },
                                 ),
                                 addToHome = { app -> pin(app, explicit = true) },
+                                updates = run {
+                                    val u = dev.hatch.update.SelfUpdater; val ctx = applicationContext
+                                    UpdateActions(
+                                        update = { offer -> u.scope.launch { u.update(ctx, offer) } },
+                                        later = { u.later(ctx) },
+                                        skip = { offer -> u.skip(ctx, offer.version) },
+                                        openPermission = { runCatching { startActivity(u.permissionIntent(ctx)) } },
+                                        stopAppsAndUpdate = { u.stopAppsAndInstall(ctx) },
+                                        dismiss = { u.dismiss() },
+                                        checkNow = { u.scope.launch { u.checkNow(ctx) } },
+                                        autoCheck = { u.autoCheckEnabled(ctx) },
+                                        setAutoCheck = { on -> u.setAutoCheckEnabled(ctx, on) },
+                                        currentVersion = u.currentVersion,
+                                    )
+                                },
                                 isPinned = { app -> dev.hatch.launcher.Launchers.isPinned(this@MainActivity, app.id) },
                                 softwareRendering = { app -> dev.hatch.gpu.Renderers.softwareForced(this@MainActivity, app.id) },
                                 setSoftwareRendering = { app, on -> dev.hatch.gpu.Renderers.setSoftwareForced(this@MainActivity, app.id, on) },
@@ -190,7 +209,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private var resumed = false
-    override fun onResume() { super.onResume(); resumed = true; flushPins() }
+    override fun onResume() { super.onResume(); resumed = true; flushPins(); dev.hatch.update.SelfUpdater.onResume(this) }
     override fun onPause() { resumed = false; super.onPause() }
 
     private fun flushPins() {

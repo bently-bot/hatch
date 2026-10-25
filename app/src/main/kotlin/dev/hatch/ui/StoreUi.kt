@@ -213,6 +213,8 @@ data class StoreActions(
     /** Advanced: per-app stub APKs instead of shortcuts (off by default). */
     val stubsEnabled: () -> Boolean = { false },
     val setStubsEnabled: (Boolean) -> Unit = {},
+    /** Hatch's own updates (card + Settings → Updates). */
+    val updates: UpdateActions = UpdateActions(),
 )
 
 @Composable

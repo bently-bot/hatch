@@ -14,8 +14,12 @@ android {
         applicationId = "dev.hatch"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.2.1"
+        // -PversionCodeOverride / -PversionNameOverride: only for the OTA end-to-end test (an "older" and a "newer" build)
+        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 4
+        versionName = (project.findProperty("versionNameOverride") as String?) ?: "0.3.0"
+        // In-app updates of Hatch itself: GitHub Releases of bently-bot/hatch (public, no token). -PupdateFeed points a
+        // test build at a local fake feed (debug builds allow cleartext to the emulator host 10.0.2.2 only).
+        buildConfigField("String", "UPDATE_FEED", "\"${(project.findProperty("updateFeed") as String?) ?: "https://api.github.com/repos/bently-bot/hatch/releases/latest"}\"")
         // Remote store catalogue (bently-bot/hatch-catalogue). The URL is overridable at runtime (Settings → developer)
         // and via -PcatalogueUrl; the repo is private for now, so until it's public the app keeps its bundled copy.
         buildConfigField("String", "CATALOGUE_URL", "\"${(project.findProperty("catalogueUrl") as String?) ?: "https://github.com/bently-bot/hatch-catalogue/releases/latest/download/catalogue.json.gz"}\"")

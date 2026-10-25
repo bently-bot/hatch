@@ -78,8 +78,8 @@ object RuntimeControl {
     }
 
     /** Stop all and wait until no guest process is left (Storage reset). */
-    fun stopAllAndWait(ctx: Context, timeoutMs: Long = 8_000) {
-        stopAll(ctx, "storage reset")
+    fun stopAllAndWait(ctx: Context, timeoutMs: Long = 8_000, reason: String = "storage reset") {
+        stopAll(ctx, reason)
         val end = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < end && (guestPids(ctx).isNotEmpty() || HatchRuntimeService.running)) Thread.sleep(200)
     }
