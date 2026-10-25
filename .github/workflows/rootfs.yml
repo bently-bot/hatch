@@ -1,0 +1,113 @@
+name: rootfs
+# Prebaked Debian 13 rootfs (tar.zst) for Hatch's fast first-run setup: build per arch, sign the manifest (Ed25519,
+# the catalogue key the app already trusts), publish as a rootfs-YYYYMMDD prerelease (never "latest"), and time
+# the old vs new setup pipeline on the arm64 runner.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish a rootfs-YYYYMMDD prerelease
+        type: boolean
+        default: false
+permissions:
+  contents: write
+concurrency:
+  group: rootfs
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+          - { arch: amd64, runner: ubuntu-latest }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y -qq zstd >/dev/null
+      - name: Build
+        run: bash scripts/build-rootfs.sh ${{ matrix.arch }} out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rootfs-${{ matrix.arch }}
+          path: out/
+          compression-level: 0
+
+  publish:
+    needs: build
+    if: inputs.publish
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.rel.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rootfs-*
+          path: out
+          merge-multiple: true
+      - name: Manifest + Ed25519 signature
+        env:
+          ROOTFS_SIGNING_KEY: ${{ secrets.ROOTFS_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          TAG=rootfs-$(date -u +%Y%m%d); echo "TAG=$TAG" >> "$GITHUB_ENV"
+          python3 scripts/rootfs-manifest.py out/rootfs-manifest.json "$TAG"
+          K=$(mktemp); chmod 600 "$K"; printf '%s\n' "$ROOTFS_SIGNING_KEY" > "$K"
+          openssl pkeyutl -sign -rawin -inkey "$K" -in out/rootfs-manifest.json -out out/sig.bin; rm -f "$K"
+          base64 -w0 out/sig.bin > out/rootfs-manifest.json.sig; echo >> out/rootfs-manifest.json.sig
+          PUB=$(grep -o 'CATALOGUE_PUBKEY", "\\"[^\\]*' app/build.gradle.kts | sed 's/.*"\\"//')
+          { printf '\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00'; echo "$PUB" | base64 -d; } > out/pub.der
+          openssl pkey -pubin -inform DER -in out/pub.der -out out/pub.pem
+          openssl pkeyutl -verify -rawin -pubin -inkey out/pub.pem -in out/rootfs-manifest.json -sigfile out/sig.bin
+          rm -f out/sig.bin out/pub.der out/pub.pem
+      - id: rel
+        name: Release (prerelease, not latest)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release delete "$TAG" -y --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" --prerelease --latest=false --target "$GITHUB_SHA" --title "Debian 13 rootfs $TAG" \
+            --notes "Prebuilt Debian 13 (trixie) root filesystem for Hatch's first-run setup (arm64 + amd64), with the base packages in rootfs/base-packages.txt. Verified by the app against rootfs-manifest.json (Ed25519) and the sha256 pinned in the app. Not an app release." \
+            out/*.tar.zst out/*.packages.txt out/rootfs-manifest.json out/rootfs-manifest.json.sig
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  bench:
+    needs: [build, publish]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/download-artifact@v4
+        with: { name: rootfs-arm64, path: out }
+      - name: Tools (termux proot, kotlinc)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make libtalloc-dev curl unzip >/dev/null
+          curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip && sudo unzip -qo /tmp/kotlin.zip -d /opt
+          echo /opt/kotlinc/bin >> "$GITHUB_PATH"
+          git init -q /tmp/proot && git -C /tmp/proot fetch -q --depth 1 https://github.com/termux/proot b27d81a68d765f3462e807f4a14e01a03f8e89ea && git -C /tmp/proot checkout -q FETCH_HEAD
+          make -C /tmp/proot/src -j"$(nproc)" HAS_LOADER_32BIT= proot >/dev/null
+          echo "PROOT=/tmp/proot/src/proot" >> "$GITHUB_ENV"
+      - name: Before/after setup timings
+        env:
+          TAG: ${{ needs.publish.outputs.tag }}
+          PROOF_DIR: harness-out
+        run: |
+          set -euo pipefail
+          SHA=$(python3 -c 'import json; print(json.load(open("out/hatch-rootfs-debian13-arm64.json"))["sha256"])')
+          if [ -n "$TAG" ]; then ZST="https://github.com/bently-bot/hatch/releases/download/$TAG/hatch-rootfs-debian13-arm64.tar.zst"; else ZST="$PWD/out/hatch-rootfs-debian13-arm64.tar.zst"; fi
+          ZST="$ZST" ZST_SHA="$SHA" bash scripts/rootfs-bench.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rootfs-bench
+          path: |
+            harness-out/rootfs-bench.txt
+            out/*.json
+            out/*.packages.txt
