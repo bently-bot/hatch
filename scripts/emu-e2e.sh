@@ -407,4 +407,20 @@ bbox = ImageChops.difference(a, b).getbbox(); print("diff bbox", bbox); sys.exit
 PY
   stamp "wine leg OK"
 fi
+
+# Store tour (C1-C10 screenshots): Apps grid, Installed, Updates, Settings, and the Experimental Steam entry.
+tour() { # shot-name label-regex
+  if $UI tap "$2" dev.hatch; then sleep 2; shot "$1"; stamp "tour $1 OK"; else stamp "tour $1: '$2' not found"; fi; }
+adb shell am force-stop dev.hatch; sleep 1   # close the floating windows so they do not cover the tour
+adb shell monkey -p dev.hatch -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep 5; hide_ime
+tour 15-apps-tab '^Apps$'
+tour 16-get-apps '^Get apps$'
+tour 17-installed-tab '^Installed$'
+tour 18-updates-tab '^Updates$'
+tour 19-settings '^Settings$'
+if $UI tap '^Get apps$' dev.hatch && $UI tap 'Search apps' dev.hatch; then
+  adb shell input text "steam"; sleep 2; adb shell input keyevent 111 || true; sleep 1; shot 20-search-steam
+  if $UI tap '^Steam$' dev.hatch; then sleep 2; shot 20b-steam-detail
+    $UI has 'Experimental' dev.hatch && stamp "steam detail shows Experimental" || stamp "steam detail: no Experimental label"; fi
+fi
 stamp "emu-e2e OK"
