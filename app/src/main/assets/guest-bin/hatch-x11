@@ -1,10 +1,12 @@
 #!/bin/sh
 # Run an X11-only program inside its own rootful Xwayland window.
 set -eu
-set -- "$@"
+# Already inside a hatch-x11 session (hatch-launch --x11 → hatch-desktop → here): a second rootful
+# Xwayland would race for the same display and take the app down with it, so just run it.
+[ -n "${HATCH_X11_SESSION:-}" ] && [ -n "${DISPLAY:-}" ] && exec "$@"
 OUT=$(/usr/local/bin/hatch-xwayland)
 DISP=${OUT% *}; XPID=${OUT#* }
-export DISPLAY=":$DISP" GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb
+export DISPLAY=":$DISP" GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb HATCH_X11_SESSION=1
 # hatch-x11-close (Hatch's ✕) finds the display here
 echo "$DISP" > "${XDG_RUNTIME_DIR:-/run/hatch}/x11-display" 2>/dev/null || true
 # Phone-style WM: every app window maximised to the (Android-sized) root window, dialogs centred.
