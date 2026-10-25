@@ -156,7 +156,8 @@ PY
     if capture "gpu-blender-$v" 300 --title=Xwayland --settle=60000 -- "${GU[@]}" bash -c "env $E hatch-x11 blender --python /tmp/hatch-fps.py"; then :; fi
     grep -h 'HATCH-FPS' "$PROOF/gpu-blender-$v-client.log" | sed "s/^/  [$v] /" || stamp "WARN: no Blender FPS line for $v"
   done
-  grep -q 'renderer string: zink' "$PROOF/gpu-glxgears-zink-client.log" && stamp "GPU proxy OK: GL runs on Zink over Vulkan, presented through Hatch" \
+  grep -qE 'GL_RENDERER *= *zink|renderer string: zink' "$PROOF/gpu-glxgears-zink-client.log" \
+    && grep -q 'HATCH-FPS renderer=zink' "$PROOF/gpu-blender-zink-client.log" && stamp "GPU proxy OK: glxgears and Blender run on Zink over Vulkan, presented through Hatch" \
     || { stamp "GPU proxy FAILED: Zink not active"; FAILED+=(gpu-proxy-zink); }
 fi
 
