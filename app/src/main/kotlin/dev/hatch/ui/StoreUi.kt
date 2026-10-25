@@ -18,11 +18,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -34,8 +36,6 @@ import dev.hatch.store.CatalogueCategory
 import dev.hatch.store.InstallManager
 import dev.hatch.store.StoreApp
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -65,29 +65,112 @@ private fun categoryColour(app: StoreApp) = when (app.category) {
     else -> Color(0xFF475569)
 }
 
-@Composable
-internal fun RemoteImage(url: String, modifier: Modifier) {
-    val ctx = LocalContext.current
-    val bmp by produceState<Bitmap?>(null, url) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val f = File(ctx.cacheDir, "shots/" + url.hashCode().toUInt().toString(16))
-                if (!f.exists()) {
-                    val c = URL(url).openConnection() as HttpURLConnection
-                    c.connectTimeout = 10_000; c.readTimeout = 20_000
-                    val bytes = c.inputStream.use { it.readBytes() }
-                    f.parentFile?.mkdirs(); f.writeBytes(bytes)
-                }
-                BitmapFactory.decodeFile(f.absolutePath)
-            }.getOrNull()
-        }
-    }
-    Box(modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFF26262B)), contentAlignment = Alignment.Center) {
-        val b = bmp
-        if (b != null) Image(b.asImageBitmap(), null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-        else CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+/** What a remote image is doing; [Failed] is final for this visit (never an endless spinner). */
+sealed interface ImageState {
+    data object Loading : ImageState
+    data class Loaded(val bitmap: Bitmap) : ImageState
+    data object Failed : ImageState
+}
+
+/** Loader used by [RemoteImage]; tests swap it via [LocalImageLoader]. */
+fun interface ImageLoader { suspend fun load(url: String, maxPx: Int): Bitmap? }
+
+val LocalImageLoader = staticCompositionLocalOf<ImageLoader?> { null }
+
+private class DiskImageLoader(private val cacheDir: File) : ImageLoader {
+    override suspend fun load(url: String, maxPx: Int): Bitmap? = withContext(Dispatchers.IO) {
+        val f = dev.hatch.store.ImageCache.fetch(cacheDir, url) ?: return@withContext null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(f.absolutePath, bounds)
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= maxPx || bounds.outHeight / (sample * 2) >= maxPx) sample *= 2
+        val bmp = runCatching { BitmapFactory.decodeFile(f.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample }) }.getOrNull()
+        if (bmp == null) dev.hatch.store.ImageCache.dropCorrupt(cacheDir, url)
+        bmp
     }
 }
+
+@Composable
+private fun rememberImageLoader(): ImageLoader {
+    LocalImageLoader.current?.let { return it }
+    val ctx = LocalContext.current
+    return remember(ctx) {
+        dev.hatch.store.ImageCache.userAgent = "Hatch/${dev.hatch.BuildConfig.VERSION_NAME} (+https://github.com/bently-bot/hatch)"
+        DiskImageLoader(ctx.cacheDir)
+    }
+}
+
+@Composable
+fun rememberImageState(url: String, maxPx: Int = 900): ImageState {
+    val loader = rememberImageLoader()
+    val st by produceState<ImageState>(ImageState.Loading, url, maxPx) {
+        value = runCatching { loader.load(url, maxPx) }.getOrNull()?.let { ImageState.Loaded(it) } ?: ImageState.Failed
+    }
+    return st
+}
+
+/** Stateless frame: spinner while loading, the image, or a "broken image" placeholder. */
+@Composable
+fun ImageFrame(state: ImageState, modifier: Modifier, onClick: (() -> Unit)? = null, fit: ContentScale = ContentScale.Fit) {
+    Box(
+        modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFF26262B))
+            .then(if (onClick != null && state is ImageState.Loaded) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        when (state) {
+            is ImageState.Loaded -> Image(state.bitmap.asImageBitmap(), "Screenshot", contentScale = fit, modifier = Modifier.fillMaxSize())
+            ImageState.Loading -> CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+            ImageState.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.semantics { contentDescription = "Image unavailable" }) {
+                Text("🖼", fontSize = 26.sp, color = Color(0xFF8A8A92), modifier = Modifier.alpha(0.45f))
+                Text("Image unavailable", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8A8A92))
+            }
+        }
+    }
+}
+
+@Composable
+internal fun RemoteImage(url: String, modifier: Modifier, maxPx: Int = 900, onClick: (() -> Unit)? = null) =
+    ImageFrame(rememberImageState(url, maxPx), modifier, onClick)
+
+/**
+ * Screenshot strip for the detail page: shots that fail to load drop out, the whole strip disappears when none work,
+ * and tapping one opens a full-screen, swipeable viewer.
+ */
+@Composable
+fun ScreenshotCarousel(urls: List<String>, modifier: Modifier = Modifier, height: androidx.compose.ui.unit.Dp = 200.dp) {
+    if (urls.isEmpty()) return
+    val failed = remember(urls) { mutableStateListOf<String>() }
+    val visible = urls.filter { it !in failed }
+    if (visible.isEmpty()) return
+    var full by remember(urls) { mutableStateOf<String?>(null) }
+    LazyRow(modifier.testTag("screenshots"), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(visible, key = { it }) { url ->
+            val st = rememberImageState(url)
+            LaunchedEffect(st) { if (st is ImageState.Failed) failed.add(url) }
+            ImageFrame(st, Modifier.height(height).width(height * 1.5f), onClick = { full = url })
+        }
+    }
+    full?.let { start ->
+        ScreenshotViewer(visible, visible.indexOf(start).coerceAtLeast(0)) { full = null }
+    }
+}
+
+@Composable
+private fun ScreenshotViewer(urls: List<String>, start: Int, onClose: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        val pager = androidx.compose.foundation.pager.rememberPagerState(start) { urls.size }
+        Box(Modifier.fillMaxSize().background(Color.Black).testTag("screenshot-viewer")) {
+            androidx.compose.foundation.pager.HorizontalPager(pager, Modifier.fillMaxSize()) { page ->
+                ImageFrame(rememberImageState(urls[page], maxPx = 2400), Modifier.fillMaxSize().clickable(onClick = onClose))
+            }
+            Text("${pager.currentPage + 1} / ${urls.size}", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp))
+            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(8.dp)) {
+                Text("✕", color = Color.White, fontSize = 22.sp)
+            }
+        }
+    }
+}
+
 
 data class StoreActions(
     val install: (StoreApp) -> Unit,
@@ -352,12 +435,7 @@ private fun AppDetail(
             LinearProgressIndicator(Modifier.fillMaxWidth(), color = Accent)
             Text(progress.message, style = MaterialTheme.typography.bodySmall, color = Accent)
         }
-        if (app.screenshots.isNotEmpty()) {
-            Spacer(Modifier.height(18.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(app.screenshots) { url -> RemoteImage(url, Modifier.height(220.dp).width(320.dp)) }
-            }
-        }
+        ScreenshotCarousel(app.screenshots, Modifier.padding(top = 18.dp), height = 220.dp)
         Spacer(Modifier.height(18.dp))
         Text(app.description.ifBlank { app.summary }, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))

@@ -509,10 +509,7 @@ internal fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreA
                 val (t, body) = failureText(failed, app.name)
                 ErrorCard(t, body, failed.log, onDismiss = { InstallManager.dismissFailure() })
             }
-            if (app.screenshots.isNotEmpty()) {
-                Spacer(Modifier.height(20.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) { items(app.screenshots) { url -> RemoteImage(url, Modifier.height(200.dp).width(300.dp)) } }
-            }
+            ScreenshotCarousel(app.screenshots, Modifier.padding(top = 20.dp))
             Spacer(Modifier.height(24.dp))
             Text("Build", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(6.dp))
