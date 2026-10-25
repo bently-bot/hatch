@@ -362,13 +362,23 @@ if [ "${E2E_WINE:-1}" = 1 ]; then
   stamp "Notepad++ stub installed"
   adb logcat -c
   adb shell monkey -p "$WSTUB" -c android.intent.category.LAUNCHER 1 >/dev/null
-  for i in $(seq 1 240); do adb logcat -d -s HatchWindow | grep -q "bound target.*Notepad++" && break; sleep 3; done
+  # First run creates the Wine prefix (wineboot) under proot, which is slow on the emulator: allow 20 min, log progress.
+  NPP="bound target.*Notepad\+\+|title '[^']*Notepad\+\+"
+  for i in $(seq 1 400); do
+    adb logcat -d -s HatchWindow | grep -qE "$NPP" && break
+    adb logcat -d -s HatchSession | grep -q "notepadpp exited" && break
+    if [ $((i % 40)) -eq 0 ]; then
+      stamp "waiting for Notepad++ ($((i * 3 / 60)) min): $(adb shell run-as dev.hatch tail -c 300 files/logs/notepadpp.log 2>/dev/null | tr '\n' ' ' | tail -c 200)"
+      shot "12b-wine-wait-$((i * 3 / 60))min"
+    fi
+    sleep 3
+  done
   adb logcat -d -s HatchRuntime HatchWindow HatchSession > "$OUT/wine-logcat.txt" 2>&1
-  if ! grep -q "bound target.*Notepad++" "$OUT/wine-logcat.txt"; then
-    # Why did wine exit? Run it in the foreground inside the guest and keep its output.
-    guest 'command -v wine wine64; dpkg -l | grep -E "^ii +(wine|libwine)" | head; ls -la /opt/hatch/npp | head -5; ls -la /home/hatch/.wine 2>&1 | head -3; timeout 25 su hatch -s /bin/sh -c "HOME=/home/hatch XDG_RUNTIME_DIR=/run/hatch WAYLAND_DISPLAY=wayland-0 WINEDEBUG=err+all /usr/local/bin/hatch-launch --wine -- wine /opt/hatch/npp/notepad++.exe" 2>&1 | tail -40' > "$OUT/wine-guest.txt" 2>&1
-    tail -25 "$OUT/wine-guest.txt"
-    fail "no Notepad++ window (see wine-logcat.txt, wine-guest.txt)"
+  adb shell run-as dev.hatch cat files/logs/notepadpp.log > "$OUT/wine-app-output.txt" 2>&1 || true
+  if ! grep -qE "$NPP" "$OUT/wine-logcat.txt"; then
+    adb shell ps -A -o PID,TIME,ARGS 2>/dev/null | grep -iE 'wine|proot|\.exe' > "$OUT/wine-ps.txt" || true
+    tail -30 "$OUT/wine-app-output.txt"; cat "$OUT/wine-ps.txt"
+    fail "no Notepad++ window (see wine-app-output.txt, wine-logcat.txt, wine-ps.txt)"
   fi
   sleep 10; shot 13-notepadpp-window
   python3 - "$OUT/13-notepadpp-window.png" <<'PY' || fail "Notepad++ window looks empty"

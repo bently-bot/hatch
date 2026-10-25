@@ -109,7 +109,7 @@ class XdgToplevelRes(c: Client, id: Int, val tl: Toplevel, v: Int = 1) : Res(c, 
         when (op) {
             0 -> destroy()
             1 -> { /* set_parent */ a.obj() }
-            2 -> tl.title = a.string() ?: ""
+            2 -> { val t = a.string() ?: ""; if (t != tl.title) android.util.Log.i("HatchWindow", "title '$t' (app_id '${tl.appId}')"); tl.title = t }
             3 -> tl.appId = a.string() ?: ""
             4 -> { a.obj() /* seat */; a.uint(); a.int(); a.int() /* show_window_menu */ }
             5 -> { a.obj(); a.uint() /* move */ }
