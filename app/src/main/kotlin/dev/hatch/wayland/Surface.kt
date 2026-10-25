@@ -111,11 +111,16 @@ class SurfaceRes(c: Client, id: Int) : Res(c, id, 4) {
                 if (r < 0) client.server.host.log("storeCopyFd failed $r")
                 else (role as? Role.ToplevelRole)?.t?.let { t ->
                     t.framesCommitted++
-                    if (!t.hasContent) {
+                    if (!t.hasContent || !t.varied) {
                         val st = Native.storeStats(store); t.lastStats = st
-                        if (st >= 0 && ((st and 0xff) >= 2 || (st shr 8) >= 10)) {
-                            t.hasContent = true
+                        val varied = st >= 0 && (st and 0xff) >= 2
+                        if (!t.hasContent && (varied || (st >= 0 && (st shr 8) >= 10))) {
+                            t.hasContent = true; t.varied = varied
                             client.server.host.log("content '${t.title}' after ${t.framesCommitted} frame(s) (luma ${st shr 8}±${st and 0xff})")
+                            client.server.host.windowContent(t)
+                        } else if (t.hasContent && varied) {
+                            t.varied = true
+                            client.server.host.log("detail '${t.title}' after ${t.framesCommitted} frame(s) (luma ${st shr 8}±${st and 0xff})")
                             client.server.host.windowContent(t)
                         }
                     }

@@ -482,6 +482,7 @@ class FloatingWindow(
     override fun contentShown(w: Toplevel) {
         main.post {
             if (boundWindow !== w || drewContent) return@post
+            if (strictContent() && !w.varied) { Log.i(TAG, "'$label' flat frame (stats ${w.lastStats}); waiting for real content"); return@post }
             drewContent = true; autoRetries = 0
             main.removeCallbacks(blackCheck)
             Renderers.active[appId]?.let { Renderers.markWorked(ctx, appId, it); Log.i(TAG, "'$label' drew on ${it.id}") }
@@ -490,8 +491,13 @@ class FloatingWindow(
     }
 
     // ---- black window / crash → next renderer rung, then an error card ----
+    /** Chromium/Electron/CEF: a uniform window (any brightness) is the failed-GPU-compositing look, not content. */
+    private fun strictContent(): Boolean =
+        Renderers.kind(InstalledApps.get(ctx, appId)?.command.orEmpty()) != Renderers.Kind.GENERIC
+    private fun shows(w: Toplevel) = if (strictContent()) w.varied else w.hasContent
+
     private fun armBlackCheck(w: Toplevel) {
-        if (w.hasContent) { contentShown(w); return }
+        if (shows(w)) { contentShown(w); return }
         main.removeCallbacks(blackCheck)
         val cmd = InstalledApps.get(ctx, appId)?.command.orEmpty()
         val sec = maxOf(Renderers.blackTimeoutSec(Renderers.kind(cmd)), if (AppLauncher.isX11(ctx, appId)) 40 else 0)
@@ -500,7 +506,7 @@ class FloatingWindow(
 
     private fun onBlackTimeout() {
         val w = boundWindow ?: return
-        if (w.hasContent || drewContent || hiddenForClose) return
+        if (shows(w) || drewContent || hiddenForClose) return
         Log.w(TAG, "'$label' window stayed black (${w.framesCommitted} frames, stats ${w.lastStats})")
         failed(if (w.framesCommitted == 0) "nodraw" else "black")
     }

@@ -6,6 +6,9 @@ class Toplevel(val server: WaylandServer, val client: Client, val surface: Surfa
     var title = ""; var appId = ""
     /** Content tracking for black-window detection: frames committed, and whether any had real pixels. */
     @Volatile var hasContent = false
+    /** Ever showed real variation (luma stddev ≥ 2). A flat bright frame counts as [hasContent] for ordinary apps,
+     *  but Chromium/CEF failing GPU compositing paints exactly that: a uniform white/grey window. */
+    @Volatile var varied = false
     @Volatile var framesCommitted = 0
     @Volatile var lastStats = -1
     var minW = 0; var minH = 0; var maxW = 0; var maxH = 0
