@@ -439,6 +439,8 @@ class FloatingWindow(
             if (hiddenForClose && !FloatingWindows.isClosing(appId)) unhideAfterClose()
             takeFocus()
             if (primary) armBlackCheck(w)
+            // A dialog usually draws before its window is bound (windowContent then reaches no slot): fit it now.
+            else if (w.hasContent) fitToClient(w)
         }
     }
 
