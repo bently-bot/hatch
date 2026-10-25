@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [app/src/main/assets/guest-bin/hatch-steam, .github/workflows/steam-experiment.yml]
+    paths: [app/src/main/assets/guest-bin/hatch-steam, .github/workflows/steam-experiment.yml, catalogue/curated.json]
 jobs:
   steam-arm64:
     timeout-minutes: 60
