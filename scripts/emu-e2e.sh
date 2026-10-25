@@ -142,17 +142,18 @@ adb logcat -c
 stamp "launch Hatch"
 adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null
 $UI wait '^Set up Hatch$' 60 || fail "no welcome screen"
-shot 01-welcome-folded
-# Same screen on the Fold's inner display size (the emulator profile boots folded).
-adb shell wm size 2208x1840; sleep 3; shot 01b-welcome-unfolded; adb shell wm size reset; sleep 3
+# The pixel_fold AVD boots on its inner (unfolded) display; the cover screen is emulated with its size (1080x2092).
+COVER=1080x2092
+adb shell wm size $COVER; sleep 4; shot 01-welcome-folded; adb shell wm size reset; sleep 4
+shot 01b-welcome-unfolded
 SETUP_T0=$(date +%s)
 $UI tap '^Set up Hatch$' dev.hatch || fail "tap setup"
 # A tap during cold start can be dropped (button still showing, nothing started): re-tap a few times.
 for k in 1 2 3; do sleep 4; $UI has '^Set up Hatch$' dev.hatch || break; stamp "setup tap not taken, re-tapping ($k)"; $UI tap '^Set up Hatch$' dev.hatch || true; done
 # Permission steps are skipped here (granted above); the screenshot tests render them.
 for k in 1 2 3; do $UI has '^Not now$|^Use full-screen apps$' dev.hatch || break; $UI tap '^Not now$|^Use full-screen apps$' dev.hatch; sleep 1; done
-sleep 3; shot 02-setup-progress-folded
-adb shell wm size 2208x1840; sleep 3; shot 02b-setup-progress-unfolded; adb shell wm size reset; sleep 2
+sleep 3; shot 02b-setup-progress-unfolded
+adb shell wm size $COVER; sleep 4; shot 02-setup-progress-folded; adb shell wm size reset; sleep 3
 $UI tap '^Details$' dev.hatch && { sleep 1; shot 02c-setup-details; $UI tap '^Hide details$' dev.hatch || true; }
 # First run: download rootfs + apt; log what the setup screen says every minute so a slow/failed step is visible.
 ok=0; retried=0
