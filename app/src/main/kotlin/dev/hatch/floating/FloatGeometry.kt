@@ -43,6 +43,20 @@ object FloatGeometry {
         return Bounds(x, y, w, h)
     }
 
+    /**
+     * A dialog (fixed-size toplevel) drawn smaller than the window it was given: shrink the window to the dialog
+     * ([wantW]×[wantH] px of content), keep its centre, stay on screen. Null if it already fits (nothing to do).
+     */
+    fun fitContent(cur: Bounds, wantW: Int, wantH: Int, screenW: Int, screenH: Int): Bounds? {
+        if (wantW <= 0 || wantH <= 0) return null
+        val w = min(wantW, screenW); val h = min(wantH, screenH)
+        if (w >= cur.w - 8 && h >= cur.h - 8) return null
+        val cx = cur.x + cur.w / 2; val cy = cur.y + cur.h / 2
+        val x = (cx - w / 2).coerceIn(0, maxOf(0, screenW - w))
+        val y = (cy - h / 2).coerceIn(0, maxOf(0, screenH - h))
+        return Bounds(x, y, w, h)
+    }
+
     /** Bubble snaps to the nearest vertical screen edge. */
     fun snapX(x: Int, size: Int, screenW: Int, margin: Int) = if (x + size / 2 < screenW / 2) margin else screenW - size - margin
 }

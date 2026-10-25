@@ -59,7 +59,8 @@ class FloatingWindow(
 
     private val shadow = dp(10f)
     private val handleH = dp(34f)
-    private val minW = dp(240f); private val minH = dp(160f)
+    // Dialogs (secondary windows) may be small; main windows keep a usable minimum.
+    private val minW = if (primary) dp(240f) else dp(120f); private val minH = if (primary) dp(160f) else dp(64f)
     private val sv = GuestSurfaceView(ctx)
     private val controls = dev.hatch.ui.TouchPads.controlsFor(ctx, appId)
     private val touchPad: dev.hatch.ui.TouchPad? =
@@ -482,12 +483,28 @@ class FloatingWindow(
     override fun contentShown(w: Toplevel) {
         main.post {
             if (boundWindow !== w || drewContent) return@post
+            if (!primary) fitToClient(w)
             if (strictContent() && !w.varied) { Log.i(TAG, "'$label' flat frame (stats ${w.lastStats}); waiting for real content"); return@post }
             drewContent = true; autoRetries = 0
             main.removeCallbacks(blackCheck)
             Renderers.active[appId]?.let { Renderers.markWorked(ctx, appId, it); Log.i(TAG, "'$label' drew on ${it.id}") }
             problemBox.visibility = View.GONE
         }
+    }
+
+    /** Dialogs keep their own size (GTK/Qt ignore the configured one): fit the window to what the app drew. */
+    private fun fitToClient(w: Toplevel) {
+        val g = w.xdgSurface.windowGeometry
+        val (lw, lh) = when {
+            g != null && g[2] > 0 && g[3] > 0 -> g[2] to g[3]
+            w.minW > 0 && w.minW == w.maxW && w.minH == w.maxH -> w.minW to w.minH
+            else -> return
+        }
+        val sc = w.server.scale
+        val (sw, sh) = screen()
+        val fit = FloatGeometry.fitContent(bounds(), lw * sc, lh * sc, sw, sh - handleH) ?: return
+        Log.i(TAG, "fit '$label' to its dialog: ${lw}x$lh (logical) → ${fit.w}x${fit.h}")
+        apply(fit)
     }
 
     // ---- black window / crash → next renderer rung, then an error card ----

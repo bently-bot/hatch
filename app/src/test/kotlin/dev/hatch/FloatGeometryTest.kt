@@ -35,4 +35,21 @@ class FloatGeometryTest {
         assertEquals(8, FloatGeometry.snapX(100, 150, 1080, 8))
         assertEquals(1080 - 150 - 8, FloatGeometry.snapX(700, 150, 1080, 8))
     }
+
+    @Test fun fitContentShrinksAroundCentre() {
+        val cur = Bounds(397, 342, 1598, 1429)
+        val f = FloatGeometry.fitContent(cur, 952, 294, 2208, 1840)!!
+        assertEquals(952, f.w); assertEquals(294, f.h)
+        assertEquals(cur.x + cur.w / 2, f.x + f.w / 2); assertEquals(cur.y + cur.h / 2, f.y + f.h / 2)
+    }
+
+    @Test fun fitContentLeavesFittingWindowsAlone() {
+        assertNull(FloatGeometry.fitContent(Bounds(0, 0, 800, 600), 800, 600, 2208, 1840))
+        assertNull(FloatGeometry.fitContent(Bounds(0, 0, 800, 600), 0, 0, 2208, 1840))
+    }
+
+    @Test fun fitContentStaysOnScreen() {
+        val f = FloatGeometry.fitContent(Bounds(2000, 1700, 200, 140), 100, 100, 2208, 1840)!!
+        assert(f.x + f.w <= 2208 && f.y + f.h <= 1840 && f.x >= 0 && f.y >= 0)
+    }
 }
