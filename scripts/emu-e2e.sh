@@ -50,8 +50,15 @@ wait_installed() {
       adb logcat -d -s HatchInstall > "$OUT/$1-install-logcat.txt" 2>&1; return 1
     fi
     [ $((i % 12)) -eq 0 ] && stamp "install running ($((i / 12)) min): $($UI dump 2>/dev/null | grep -m1 -E ' — ' | cut -c1-120)"
+    [ $((i % 24)) -eq 12 ] && { stamp "installer log so far:"; adb logcat -d -s HatchInstall HatchGuest | tail -8 | cut -c1-200 | sed 's/^/  /'; }
     sleep 5
-  done; return 1
+  done
+  stamp "install of $1 timed out; diagnostics:"
+  shot "$1-install-timeout"
+  adb logcat -d -s HatchInstall HatchGuest HatchRuntime HatchSetup > "$OUT/$1-install-logcat.txt" 2>&1; tail -40 "$OUT/$1-install-logcat.txt" | cut -c1-220
+  HU=$(adb shell ps -A -o USER,NAME | awk '$2=="dev.hatch"{print $1}' | tr -d '\r' | head -1)
+  adb shell ps -A -o USER,PID,PPID,STAT,TIME,ARGS | tr -d '\r' | awk -v u="$HU" '$1==u' | cut -c1-200 | tee "$OUT/$1-install-ps.txt"
+  return 1
 }
 # Start an app the way its Home screen shortcut does (same intent, flags NEW_TASK|MULTIPLE_TASK|NEW_DOCUMENT).
 launch_intent() { adb shell am start -a android.intent.action.VIEW -d "hatch://app/$1" -n dev.hatch/.ui.WindowActivity --es appId "$1" --es label "'$2'" -f 0x18080000 >/dev/null; }
@@ -75,7 +82,7 @@ store_install() {
   hide_ime; sleep 1
   for t in 1 2 3 4; do $UI has '^Install$' dev.hatch && break; $UI tap "^$name\$" dev.hatch || true; sleep 2; done
   $UI tap '^Install$' dev.hatch || return 1
-  wait_installed "$id" 240 || return 1
+  wait_installed "$id" 120 || return 1
   pin_confirm || stamp "WARN: no pin sheet for $id"
 }
 # Frame of any window by exact title, e.g. "Hatch bubble".
@@ -108,6 +115,7 @@ print(*m.groups())' "$1"
 # Run a shell snippet inside the app's guest (debug APK → run-as), mirroring LinuxRuntime's proot argv/env.
 guest() {
   local lib; lib=$(adb shell pm dump dev.hatch | grep -m1 'legacyNativeLibraryDir=' | sed 's|.*legacyNativeLibraryDir=||' | tr -d '\r')/x86_64
+  adb shell "run-as dev.hatch sh -c 'mkdir -p files/tmp files/linux/tmp files/linux/.l2s'"   # the app makes these lazily
   printf '%s\n' "$1" | adb shell "run-as dev.hatch sh -c 'cat > files/linux/tmp/hatch-probe.sh'"
   adb shell "run-as dev.hatch sh -c 'cd /data/data/dev.hatch/files && LD_LIBRARY_PATH=$lib PROOT_LOADER=$lib/libproot_loader.so PROOT_TMP_DIR=/data/data/dev.hatch/files/tmp PROOT_L2S_DIR=/data/data/dev.hatch/files/linux/.l2s $lib/libproot.so -0 -l -r /data/data/dev.hatch/files/linux -b /dev -b /proc -b /sys -b /data/data/dev.hatch/files/linux/.l2s -w /root /usr/bin/env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/root /bin/sh /tmp/hatch-probe.sh'" 2>&1
 }
@@ -182,7 +190,7 @@ shot 04b-detail
 $UI tap '^Install$' dev.hatch || fail "no Install button"
 sleep 6; shot 04c-installing
 # Installed → Hatch asks the launcher to pin the app's icon: a shortcut, so no APK and no Play Protect scan.
-wait_installed 05 300 || { guest_probe; fail "install failed in store"; }
+wait_installed 05 120 || { guest_probe; fail "install failed in store"; }
 stamp "installed; launcher pin sheet:"
 pin_confirm 05-pin-sheet || stamp "WARN: no launcher pin sheet (launcher may have added it silently)"
 sleep 2; shot 06-store-installed
