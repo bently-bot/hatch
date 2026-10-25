@@ -1,14 +1,17 @@
 #!/bin/sh
 # Hatch guest installer. Same script is used by the Android app and by CI.
-# usage: hatch-install-app [--packages "a b"] [--repo ID KEYURL URIS SUITES COMPONENTS] [--payload URL SHA256 DEST] [--wine]
+# usage: hatch-install-app [--id APP-ID] [--packages "a b"] [--repo ID KEYURL URIS SUITES COMPONENTS] [--payload URL SHA256 DEST] [--wine]
 #        [--extra URL SHA256 DEST MEMBER]...  optional downloads (e.g. DOOM's shareware IWAD): a failure only warns.
 #        MEMBER = path inside a .deb/.zip/.tar to take (empty: the file itself), saved as DEST/<basename>.
+# --id records what this install really added in /var/lib/hatch/apps/APP-ID.pkgs (only packages that weren't
+# installed before), so hatch-uninstall-app never touches a package that was already there (base system, other apps).
 set -eu
-PKGS=""; URL=""; SHA=""; DEST=""; WINE=0; DESKTOP=""; REPO=""; EXTRAS=""
+ID=""; PKGS=""; URL=""; SHA=""; DEST=""; WINE=0; DESKTOP=""; REPO=""; EXTRAS=""
 NL='
 '
 while [ $# -gt 0 ]; do
   case "$1" in
+    --id) ID="$2"; shift 2 ;;
     --packages) PKGS="$2"; shift 2 ;;
     --payload) URL="$2"; SHA="$3"; DEST="$4"; shift 4 ;;
     --repo) REPO="$2"; RKEY="$3"; RURIS="$4"; RSUITES="$5"; RCOMP="$6"; shift 6 ;;
@@ -19,6 +22,28 @@ while [ $# -gt 0 ]; do
   esac
 done
 export DEBIAN_FRONTEND=noninteractive
+case "$ID" in *[!A-Za-z0-9._-]*) echo "hatch: bad app id" >&2; exit 2 ;; esac
+# ---- install record: snapshot installed packages + auto marks now, diff on exit (also after a failed install) ----
+APPS_DIR=/var/lib/hatch/apps; SNAP="/tmp/hatch-snap.$$"
+installed_pkgs() { dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 2>/dev/null | awk '$1=="ii"{print $2}' | sort -u; }
+if [ -n "$ID" ]; then
+  mkdir -p "$APPS_DIR"; installed_pkgs > "$SNAP.pre"; apt-mark showauto 2>/dev/null | sed 's/:[a-z0-9]*$//' | sort -u > "$SNAP.auto"
+fi
+record() {
+  [ -n "$ID" ] && [ -f "$SNAP.pre" ] || return 0
+  installed_pkgs > "$SNAP.post"
+  # apt-get install marks a requested package that was already there as manually installed; put back the auto
+  # mark of every package that had one (e.g. libudev1), so a dependency never becomes something to keep for ever.
+  back=$(apt-mark showmanual 2>/dev/null | sed 's/:[a-z0-9]*$//' | sort -u | comm -12 - "$SNAP.auto" | tr '\n' ' ')
+  # shellcheck disable=SC2086
+  [ -z "$back" ] || apt-mark auto $back >/dev/null 2>&1 || true
+  # Newly installed by this app (merged with an earlier install of it, e.g. an update), still installed
+  { comm -13 "$SNAP.pre" "$SNAP.post"; cat "$APPS_DIR/$ID.pkgs" 2>/dev/null; } | sort -u | comm -12 - "$SNAP.post" > "$APPS_DIR/$ID.pkgs.new"
+  mv -f "$APPS_DIR/$ID.pkgs.new" "$APPS_DIR/$ID.pkgs"
+  echo "hatch: recorded $(grep -c . "$APPS_DIR/$ID.pkgs") new package(s) for $ID"
+  rm -f "$SNAP.pre" "$SNAP.post" "$SNAP.auto"
+}
+trap record EXIT
 # Mirrors/CDNs hiccup (5xx, resets); never fail an install on one bad response.
 # Vendor packages (Cursor, VS Code, Chrome, Brave…) install their own sources entry for their repo on first install.
 # Ours only bootstraps that: once the vendor's entry exists, drop ours (apt rejects two Signed-By for one source).

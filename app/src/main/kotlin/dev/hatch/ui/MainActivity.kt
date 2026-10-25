@@ -119,6 +119,8 @@ class MainActivity : ComponentActivity() {
                         )
                     } else {
                         LaunchedEffect(ready) { dev.hatch.gpu.Gpu.ensureChecked(this@MainActivity) }
+                        // Fix a package database an interrupted install or Hatch 0.2.0's uninstall left broken
+                        LaunchedEffect(ready) { InstallManager.repairIfNeeded(this@MainActivity) }
                         var confirmUninstall by remember { mutableStateOf<StoreApp?>(null) }
                         confirmUninstall?.let { app ->
                             UninstallDialog(app, estimate = { InstallManager.estimateUninstall(this@MainActivity, app) },

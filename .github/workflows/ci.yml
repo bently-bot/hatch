@@ -84,6 +84,31 @@ jobs:
             harness-out/*.png
             harness-out/*.log
 
+  uninstall-proof:
+    # Uninstall regression ("Couldn't uninstall Steam": apt wanted libudev1 → util-linux/apt gone). Prebuilt arm64
+    # rootfs under proot; Blender + VS Code + Steam installed and uninstalled by the app's own guest scripts, the
+    # 0.2.0 path reproduced, damage recovery, apt failure → soft warning, reinstall; base system checked each time.
+    timeout-minutes: 40
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/rootfs.tar.zst
+          key: rootfs-zst-${{ hashFiles('app/src/main/kotlin/dev/hatch/guest/RootfsCatalog.kt') }}
+      - name: Host deps
+        run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make libtalloc-dev curl zstd
+      - name: Install → uninstall → base system intact (Steam, Blender, VS Code)
+        env:
+          PROOF_DIR: harness-out/uninstall
+          APPS2: blender code
+        run: bash scripts/ci-uninstall-proof.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: uninstall-proof
+          path: harness-out/uninstall/
+
   turnip-kgsl:
     # Mesa Turnip (Vulkan, Adreno) with the KGSL kernel backend for Qualcomm Android, built in Debian 13 arm64.
     # Bundled in the APK (assets/gpu); used only after the on-device self-test (hatch-gpu-check) passes.

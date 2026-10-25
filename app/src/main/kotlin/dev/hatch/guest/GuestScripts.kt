@@ -83,8 +83,11 @@ object GuestScripts {
         repo: dev.hatch.store.AptRepo? = null,
         flatpak: String? = null,
         extras: List<dev.hatch.store.Extra> = emptyList(),
+        id: String? = null,
     ): String = if (!flatpak.isNullOrEmpty()) "$BIN/hatch-flatpak install ${sq(flatpak)} 2>&1" else buildList {
         add("$BIN/hatch-install-app")
+        // Records what this install really adds (/var/lib/hatch/apps/<id>.pkgs), so uninstall removes only that
+        if (!id.isNullOrEmpty()) { add("--id"); add(sq(id)) }
         if (packages.isNotEmpty()) { add("--packages"); add(sq(packages.joinToString(" "))) }
         if (repo != null) {
             add("--repo"); add(sq(repo.id)); add(sq(repo.keyUrl)); add(sq(repo.uris)); add(sq(repo.suites)); add(sq(repo.components))

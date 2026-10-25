@@ -361,6 +361,11 @@ private fun ProgressBanner(progress: InstallManager.Progress, apps: List<StoreAp
             val (t, body) = failureText(progress, apps.firstOrNull { it.id == progress.appId }?.name ?: progress.appId)
             ErrorCard(t, body, progress.log, Modifier.padding(horizontal = 16.dp, vertical = 6.dp), onDismiss = { InstallManager.dismissFailure() })
         }
+        is InstallManager.Progress.Done -> progress.warning?.let { w ->
+            // Soft warning: it worked (e.g. the app is uninstalled) but apt left something behind
+            val name = apps.firstOrNull { it.id == progress.appId }?.name ?: progress.appId
+            ErrorCard("$name uninstalled", w, progress.log, Modifier.padding(horizontal = 16.dp, vertical = 6.dp), onDismiss = { InstallManager.dismissFailure() })
+        }
         else -> {}
     }
 }

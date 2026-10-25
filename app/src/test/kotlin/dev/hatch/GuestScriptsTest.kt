@@ -22,9 +22,14 @@ class GuestScriptsTest {
         assertTrue(c, c.startsWith("/usr/local/bin/hatch-install-app --packages 'cursor' --repo 'cursor' 'https://downloads.cursor.com/keys/anysphere.asc' 'https://downloads.cursor.com/aptrepo' 'stable' 'main'"))
     }
 
+    @Test fun installCommandRecordsWhatTheAppAdds() {
+        val c = GuestScripts.installCommand(listOf("a"), wine = false, id = "steam")
+        assertTrue(c, c.startsWith("/usr/local/bin/hatch-install-app --id 'steam' --packages 'a'"))
+    }
+
     @Test fun assetsShipScripts() {
         val dir = java.io.File("src/main/assets/guest-bin")
-        for (n in listOf("hatch-launch", "hatch-install-app", "hatch-xwayland", "hatch-x11")) {
+        for (n in listOf("hatch-launch", "hatch-install-app", "hatch-uninstall-app", "hatch-base-packages", "hatch-xwayland", "hatch-x11")) {
             assertTrue("missing $n", java.io.File(dir, n).exists())
         }
     }
