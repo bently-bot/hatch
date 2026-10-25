@@ -20,6 +20,15 @@ object AppSession {
         fun lines(limit: Int = 40): List<String> = sb.lines().map { it.trimEnd() }.filter { it.isNotEmpty() }.takeLast(limit)
     }
 
+    /** How the last run of an app ended (for the in-window error card). */
+    data class ExitInfo(val status: Int?, val tail: List<String>, val atMs: Long)
+    val lastExit = java.util.concurrent.ConcurrentHashMap<String, ExitInfo>()
+
+    fun logsDir(context: Context) = java.io.File(context.filesDir, "logs")
+    /** filesDir/logs/<id>.log is the current/last launch; <id>.prev.log the one before. */
+    fun logFile(context: Context, appId: String) = logsDir(context).resolve("${safe(appId)}.log")
+    private fun safe(id: String) = id.replace(Regex("[^A-Za-z0-9._-]"), "_")
+
     fun isRunning(appId: String): Boolean = sessions.containsKey(appId)
     fun runningIds(): List<String> = sessions.keys.toList()
     private fun changed() { runCatching { dev.hatch.runtime.RuntimeControl.changed(dev.hatch.HatchApp.instance) } }
@@ -31,6 +40,7 @@ object AppSession {
         waylandHostDir: String,
         extraEnv: Map<String, String> = emptyMap(),
         onExit: (() -> Unit)? = null,
+        header: String = "",
     ): Boolean {
         stop(appId)
         Log.i(TAG, "start $appId: $command")
@@ -50,8 +60,15 @@ object AppSession {
         Thread({
             val buf = ByteArray(4096)
             val tail = OutputTail()
-            val logFile = runCatching { java.io.File(context.filesDir, "logs").apply { mkdirs() }.resolve("$appId.log") }.getOrNull()
+            val logFile = runCatching {
+                logsDir(context).mkdirs()
+                logFile(context, appId).also { f -> if (f.exists()) f.renameTo(logsDir(context).resolve("${safe(appId)}.prev.log")) }
+            }.getOrNull()
             val log = runCatching { logFile?.outputStream() }.getOrNull()
+            runCatching {
+                log?.write(("# Hatch ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", java.util.Locale.US).format(java.util.Date())}  $appId\n" +
+                    header.lines().filter { it.isNotBlank() }.joinToString("") { "# $it\n" } + "# argv: $command\n").toByteArray())
+            }
             var written = 0L
             while (true) {
                 val n = try { dev.hatch.wayland.Native.readSome(s.outFd, buf) } catch (_: Throwable) { -1 }
@@ -65,15 +82,18 @@ object AppSession {
             changed()
             val code = runCatching { dev.hatch.wayland.Native.waitPid(s.pid, false) }.getOrNull()
             Log.i(TAG, "$appId exited (status=$code)")
+            lastExit[appId] = ExitInfo(code, tail.lines(60), System.currentTimeMillis())
             tail.lines().forEach { Log.i(TAG, "$appId| $it") }
             onExit?.invoke()
         }, "hatch-guest-$appId").apply { isDaemon = true; start() }
         return true
     }
 
+    /** End a session: SIGTERM to the proot group now, SIGKILL in the background if anything is still there. */
     fun stop(appId: String) {
         sessions.remove(appId)?.let {
-            runCatching { it.kill() }
+            runCatching { dev.hatch.wayland.Native.killGroup(it.pid, 15) }
+            Thread({ Thread.sleep(1200); runCatching { dev.hatch.wayland.Native.killGroup(it.pid, 9) } }, "hatch-kill-$appId").apply { isDaemon = true; start() }
             runCatching { dev.hatch.wayland.Native.close(it.outFd) }
             changed()
         }

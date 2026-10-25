@@ -479,6 +479,9 @@ internal fun AppDetailScreen(app: StoreApp, state: HatchUiState, actions: StoreA
                             colors = ButtonDefaults.buttonColors(containerColor = HatchBlue, contentColor = HatchOnBlue)) { Icon(Icons.Default.ArrowDropDown, "More actions") }
                         DropdownMenu(menu, { menu = false }) {
                             DropdownMenuItem({ Text("Add to home screen") }, { menu = false; actions.addToHome(app) })
+                            var sw by remember(app.id) { mutableStateOf(actions.softwareRendering(app)) }
+                            DropdownMenuItem({ Text("Use software rendering") }, { sw = !sw; actions.setSoftwareRendering(app, sw) },
+                                trailingIcon = { Checkbox(sw, null) })
                             DropdownMenuItem({ Text("Update") }, { menu = false; actions.update(app) }, enabled = !otherBusy)
                             DropdownMenuItem({ Text("Uninstall") }, { menu = false; actions.uninstall(app) }, enabled = !otherBusy)
                         }
@@ -573,6 +576,11 @@ private fun SettingsTab(actions: StoreActions) {
         SettingCard("Graphics") {
             SwitchRow("Use the GPU when available", gpu) { gpu = it; actions.setGpuEnabled(it) }
             Hint(actions.gpuStatus())
+            Hint("Apps start on the GPU. If an app's window stays black or it quits before drawing, Hatch retries it with the next renderer and falls back to software last, then remembers what worked. To force software for one app, use its menu (⋮ on the window, or the ▾ next to Open).")
+        }
+        SettingCard("Help") {
+            Hint("Each app launch is logged on this phone. Share logs bundles them with Hatch's own log and device info and opens the share sheet. Nothing is sent until you pick where it goes.")
+            OutlinedButton(onClick = actions.shareLogs, Modifier.testTag("share-logs")) { Text("Share logs") }
         }
         SettingCard("Launcher icons") {
             var stubs by remember { mutableStateOf(actions.stubsEnabled()) }

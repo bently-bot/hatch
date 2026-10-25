@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Log bundles for "Share logs" / "Report" only (cacheDir/share). -->
+<paths>
+    <cache-path name="share" path="share/" />
+</paths>

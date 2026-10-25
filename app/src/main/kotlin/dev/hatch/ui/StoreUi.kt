@@ -119,6 +119,11 @@ data class StoreActions(
     val addToHome: (StoreApp) -> Unit = {},
     /** Settings → Storage & reset (null in previews/tests). */
     val storage: StorageActions? = null,
+    /** Per-app "Use software rendering" (GPU-first otherwise) and the renderer that last worked. */
+    val softwareRendering: (StoreApp) -> Boolean = { false },
+    val setSoftwareRendering: (StoreApp, Boolean) -> Unit = { _, _ -> },
+    val rendererInfo: (StoreApp) -> String = { "" },
+    val shareLogs: () -> Unit = {},
     val isPinned: (StoreApp) -> Boolean = { false },
     /** Advanced: per-app stub APKs instead of shortcuts (off by default). */
     val stubsEnabled: () -> Boolean = { false },

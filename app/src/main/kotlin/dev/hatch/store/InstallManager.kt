@@ -213,7 +213,7 @@ object InstallManager {
                 _progress.value = Progress.Failed(app.id, Uninstall.failureReason(log), log, "Couldn't uninstall ${app.name}")
                 return@withContext false
             }
-            InstalledApps.remove(context, app.id)
+            InstalledApps.remove(context, app.id); dev.hatch.gpu.Renderers.forget(context, app.id)
             runCatching { dev.hatch.launcher.Launchers.remove(context, app.id) }
             val stub = rec?.stubPackage.orEmpty()
             if (stub.isNotEmpty() && runCatching { context.packageManager.getPackageInfo(stub, 0) }.isSuccess)
