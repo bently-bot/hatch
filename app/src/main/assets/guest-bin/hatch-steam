@@ -75,7 +75,8 @@ esac
 if [ -z "${HATCH_STEAM_DBUS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
   unset DBUS_SESSION_BUS_ADDRESS; export HATCH_STEAM_DBUS=1; exec dbus-run-session -- "$0" "$@"; fi
 fetch; libenv; cd "$ST"
-# Valve's ARM64 web helper draws with SDL3 on Wayland: straight onto Hatch's compositor (X11 stays for the rest)
+# SDL3 in the web helper needs a Wayland-capable SDL (it asserts otherwise); the UI itself draws through X11
+# (Steam's own Wayland mode is gamescope-only), so it lands in Hatch's rootful Xwayland window.
 export SDL_VIDEO_DRIVER="${SDL_VIDEO_DRIVER:-wayland,x11}"
 say "starting $(cat "$ST/package/.hatch-version") (native ARM64, no container)"
 exec "$ST/steamrtarm64/steam" -no-cef-sandbox -nobootstrapupdate -noverifyfiles "$@"

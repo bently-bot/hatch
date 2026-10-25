@@ -102,7 +102,7 @@ capture() { # name seconds harness-opts... -- cmd...
   [ $rc -eq 0 ] || { echo "--- $name client log ---"; tail -30 "$PROOF/$name-client.log" 2>/dev/null || true; }
   return $rc
 }
-title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender) echo "Xwayland";; steam) echo "Steam";; cursor) echo "Cursor";; brave-browser) echo "Brave";; org.darktable.Darktable) echo "darktable";; hdrview) echo "HDRView";; *) echo "";; esac; }
+title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender|steam) echo "Xwayland";; cursor) echo "Cursor";; brave-browser) echo "Brave";; org.darktable.Darktable) echo "darktable";; hdrview) echo "HDRView";; *) echo "";; esac; }
 
 FAILED=()
 for app in $APPS; do

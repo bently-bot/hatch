@@ -429,7 +429,9 @@
         "libwayland-cursor0",
         "libwayland-egl1",
         "libdecor-0-0",
-        "dbus"
+        "dbus",
+        "lsof",
+        "pciutils"
       ],
       "command": [
         "hatch-steam"
