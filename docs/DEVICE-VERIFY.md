@@ -28,3 +28,12 @@
 8. **Install-from-unknown-sources prompt** wording/flow for launcher stubs on One UI (Play Protect may scan generated stubs).
 9. **Overlay windows on One UI**: the "Display over other apps" grant flow, the edge bubble next to Samsung's Edge panel, and that program windows have no Recents cards of their own (only Hatch's).
 10. **Flathub on device**: the GNOME runtime (about 1 GB) downloads and deploys under the app's proot, and Darktable opens. CI covers the same path on an arm64 runner with stock proot.
+
+### v0.2.0 phone-only checks
+11. **Home screen shortcuts on One UI**: Install → One UI's "Add to Home screen" sheet → icon opens the app in a floating window; no Play Protect scan or "Install unknown apps" prompt at any point (fresh install of 0.2.0).
+12. **Legacy stubs from 0.1.0**: after updating, Hatch offers to remove each old stub (Android's uninstall dialog); declining never breaks uninstalling the guest app.
+13. **One tap on ✕**: closes the window immediately (focused and unfocused); Mousepad with unsaved text shows its "Save changes?" dialog instead.
+14. **Renderer ladder on Adreno**: VS Code, Cursor, Brave and Steam draw (no black window). Window ⋮ shows the renderer they settled on; expected the first rung ("GPU (Zink, X11 + ANGLE/GL)") for Chromium apps. If a window is black for ~25 s, Hatch moves on by itself; the error card's Report shares logs.
+15. **Stop all** from the "Hatch runtime" notification on One UI; the notification disappears ~10 s after the last window closes.
+16. **Insets on the real Fold 8**, folded and unfolded (cutout, taskbar): onboarding, store, detail top bar, Settings.
+17. **First-capital-letter glitch** (to watch): type "Hello" into Mousepad with the Samsung keyboard.
