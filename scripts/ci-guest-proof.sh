@@ -137,9 +137,13 @@ for app in $APPS; do
   fi
   stamp "== launch $app =="
   LAUNCH=$(python3 scripts/catalogue-args.py launch "$app")
-  T=$(title_for "$app"); topt=(); [ -n "$T" ] && topt=(--title="$T")
+  T=$(title_for "$app")
+  ISX11=$(python3 -c 'import json,sys; print(int(any(a["id"]==sys.argv[2] and a.get("x11") for a in json.load(open(sys.argv[1]))["apps"])))' catalogue/catalogue.json "$app")
+  [ -z "$T" ] && [ "$ISX11" = 1 ] && T=Xwayland   # X11 apps render inside the rootful Xwayland window
+  topt=(); [ -n "$T" ] && topt=(--title="$T")
   secs=90; [ "$app" = notepadpp ] && secs=420; [ "$app" = blender ] && secs=300; case "$app" in cursor|brave-browser) secs=240 ;; org.darktable.*) secs=420 ;; steam) secs=600 ;; esac
   settle=3000; [ "$app" = blender ] && settle=90000; [ "$app" = doom ] && settle=15000; case "$app" in cursor|brave-browser) settle=30000 ;; org.darktable.*) settle=90000 ;; steam) settle=180000 ;; esac   # rootful Xwayland appears first; Blender compiles GL shaders on llvmpipe
+  [ "$ISX11" = 1 ] && [ "$settle" -lt 15000 ] && settle=15000   # X server + WM first, then the client maps
   minu=12; [ "$app" = xterm ] && minu=2   # xterm's core bitmap font really is 2 colours
   # Flathub apps run from their spec on the host side (own root), not inside the Debian guest's shell.
   case "$LAUNCH" in hatch-flatpak-run*) RUNARGS=(${LAUNCH}) ;; *) RUNARGS=(bash -c "$LAUNCH") ;; esac
