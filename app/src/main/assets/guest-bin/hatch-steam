@@ -34,7 +34,10 @@ fetch() {
       d="$ST/$(echo "${x#"$ST"/}" | tr '\\' '/')"; mkdir -p "$(dirname "$d")"; mv -f "$x" "$d"; done
   fi
   mv -f "$MAN.new" "$MAN.installed"; echo "$ver" > .hatch-version
-  chmod +x "$ST"/steamrtarm64/steam "$ST"/steamrtarm64/steamwebhelper* "$ST"/steamrtarm64/*.sh 2>/dev/null || true
+  # Valve's zips don't keep unix modes: mark every ELF executable / shared object and the scripts executable
+  find "$ST/steamrtarm64" -type f | while read -r x; do
+    case "$x" in *.sh) chmod +x "$x" ;; *) [ "$(head -c4 "$x" 2>/dev/null | od -An -c | tr -d ' ')" = '177ELF' ] && chmod +x "$x" ;; esac
+  done || true
 }
 
 libenv() {
@@ -66,5 +69,10 @@ case "${1:-}" in
 esac
 
 fetch; libenv; cd "$ST"
+# Steam's web helper wants a session bus; give it a private one (no systemd under proot)
+if [ -z "${HATCH_STEAM_DBUS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
+  unset DBUS_SESSION_BUS_ADDRESS; export HATCH_STEAM_DBUS=1; exec dbus-run-session -- "$0" "$@"; fi
+# Valve's ARM64 web helper draws with SDL3 on Wayland: straight onto Hatch's compositor (X11 stays for the rest)
+export SDL_VIDEO_DRIVER="${SDL_VIDEO_DRIVER:-wayland,x11}"
 say "starting $(cat "$ST/package/.hatch-version") (native ARM64, no container)"
 exec "$ST/steamrtarm64/steam" -no-cef-sandbox -nobootstrapupdate -noverifyfiles "$@"
