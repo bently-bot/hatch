@@ -54,7 +54,11 @@ if cmd == "dump":
         t = n.get("text") or n.get("content-desc")
         if t: print(f'{n.get("package")}: {t!r} {n.get("bounds")}')
 elif cmd == "has":
-    sys.exit(0 if find(sys.argv[2]) else 1)
+    sys.exit(0 if find(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None) else 1)
+elif cmd == "xy":
+    p = find(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
+    if not p: sys.exit(1)
+    print(p[0], p[1])
 elif cmd == "tap":
     p = find(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
     if not p: print(f"not found: {sys.argv[2]}", file=sys.stderr); sys.exit(1)

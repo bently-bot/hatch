@@ -3,4 +3,7 @@
     <string name="app_name">Hatch</string>
     <string name="runtime_notification_title">Hatch runtime</string>
     <string name="runtime_notification_text">Linux / Windows apps are running</string>
+    <string name="runtime_notification_idle">Ready to open apps</string>
+    <string name="runtime_stop_all">Stop all</string>
+    <string name="runtime_open">Open Hatch</string>
 </resources>

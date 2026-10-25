@@ -24,7 +24,7 @@ class HatchRuntime(private val app: Context) : WindowHost {
     private val anyListeners = CopyOnWriteArrayList<(Toplevel) -> Unit>()
 
     fun ensureStarted() {
-        if (server != null) return
+        if (server != null) { if (!HatchRuntimeService.running) startService(); return }
         synchronized(this) {
             if (server != null) return
             // Force JNI load
@@ -41,9 +41,13 @@ class HatchRuntime(private val app: Context) : WindowHost {
             check(s.addSocket(sock, "hatch")) { "wayland listen failed" }
             server = s
             Log.i(TAG, "Wayland listening on $sock")
-            val svc = Intent(app, HatchRuntimeService::class.java)
-            if (Build.VERSION.SDK_INT >= 26) app.startForegroundService(svc) else app.startService(svc)
+            startService()
         }
+    }
+
+    private fun startService() {
+        val svc = Intent(app, HatchRuntimeService::class.java)
+        if (Build.VERSION.SDK_INT >= 26) app.startForegroundService(svc) else app.startService(svc)
     }
 
     fun socketDir(): File = sockDir
@@ -86,9 +90,11 @@ class HatchRuntime(private val app: Context) : WindowHost {
     fun unregister(appId: String, slot: WindowSlot) {
         slots[appId]?.remove(slot)
         if (focusedSlot === slot) focusedSlot = null
+        RuntimeControl.changed(app)
     }
 
     fun hasSlots(appId: String) = slots[appId]?.isNotEmpty() == true
+    fun anySlots() = slots.values.any { it.isNotEmpty() }
 
     fun claimFor(appId: String, slot: WindowSlot): Boolean {
         if (slot.boundWindow != null) return true

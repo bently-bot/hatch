@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Android emulator E2E through the real UI:
 #   first run → "Download & set up" (Debian 13 under proot) → store → search → Install mousepad
-#   → system installs the generated launcher stub (own icon) → tap stub → real program window → input.
+#   → launcher pins the app's Home screen icon (shortcut, no APK) → tap it → real program window → input
+#   → Stop all from the runtime notification (no processes left) → uninstall from the detail page.
 # x86_64 KVM emulator: uses the x86_64 Termux proot + amd64 Debian; arm64-only bits are proven on the arm64 runner.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APK="${1:-$(find "$ROOT/apks" "$ROOT/app/build/outputs" -name app-debug.apk 2>/dev/null | head -1)}"; [ -f "$APK" ] || { echo "no apk"; exit 1; }; echo "Using $APK"; APP="${E2E_APP:-mousepad}"; STUB="dev.hatch.app.${APP//-/_}"
+APK="${1:-$(find "$ROOT/apks" "$ROOT/app/build/outputs" -name app-debug.apk 2>/dev/null | head -1)}"; [ -f "$APK" ] || { echo "no apk"; exit 1; }; echo "Using $APK"; APP="${E2E_APP:-mousepad}"
 OUT="${PROOF_DIR:-$ROOT/harness-out/emu}"; mkdir -p "$OUT"
 UI="python3 $ROOT/scripts/ui.py"
 t0=$(date +%s); stamp() { echo "[$(( $(date +%s) - t0 ))s] $*"; }
@@ -29,9 +30,41 @@ type_search() {
 # Another ordinary Android app to float over. Not Settings: it sets HIDE_NON_SYSTEM_OVERLAY_WINDOWS, so Android
 # hides every third-party overlay above it by design.
 other_app() { adb shell am start -W -a android.intent.action.DIAL >/dev/null 2>&1 || adb shell am start -W -a android.intent.action.VIEW -d https://example.org >/dev/null; }
-# Install a catalogue app through the store UI (search → result → detail → Install → stub prompt). $1 = app id.
+# The launcher's "Add to home screen" sheet for Hatch's pinned shortcut (Pixel: "Add to home screen"; One UI: "Add").
+PINRX='^(Add to home screen|Add automatically|ADD AUTOMATICALLY|Add)$'
+pin_confirm() { # [screenshot-name]
+  for k in $(seq 1 8); do
+    if $UI has "$PINRX" 'launcher|nexus|systemui'; then
+      [ -n "${1:-}" ] && shot "$1"
+      $UI tap "$PINRX" 'launcher|nexus|systemui' && { sleep 2; return 0; }
+    fi
+    sleep 2
+  done; return 1
+}
+# Wait for the store's Open button after Install (failure → Details shot). $1 = proof prefix.
+wait_installed() {
+  for i in $(seq 1 ${2:-300}); do
+    $UI has '^Open$' dev.hatch && return 0
+    if $UI has "Couldn.t install|Install failed" dev.hatch; then
+      $UI tap '^Details$' dev.hatch || true; sleep 2; shot "$1-install-failed"
+      adb logcat -d -s HatchInstall > "$OUT/$1-install-logcat.txt" 2>&1; return 1
+    fi
+    [ $((i % 12)) -eq 0 ] && stamp "install running ($((i / 12)) min): $($UI dump 2>/dev/null | grep -m1 -E ' — ' | cut -c1-120)"
+    sleep 5
+  done; return 1
+}
+# Start an app the way its Home screen shortcut does (same intent, flags NEW_TASK|MULTIPLE_TASK|NEW_DOCUMENT).
+launch_intent() { adb shell am start -a android.intent.action.VIEW -d "hatch://app/$1" -n dev.hatch/.ui.WindowActivity --es appId "$1" --es label "'$2'" -f 0x18080000 >/dev/null; }
+# Tap the app's icon on the Home screen; falls back to the shortcut intent if the launcher put it elsewhere.
+launch_app() {
+  adb shell input keyevent 3; sleep 3
+  if $UI tap "^$2\$" 'launcher|nexus'; then stamp "launched $2 from its Home screen icon"; else stamp "WARN: no Home screen icon labelled $2; using its shortcut intent"; launch_intent "$1" "$2"; fi
+}
+app_name() { python3 -c 'import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])' "$ROOT/catalogue/catalogue.json" "$1"; }
+
+# Install a catalogue app through the store UI (search → result → detail → Install → pin sheet). $1 = app id.
 store_install() {
-  local id=$1 name stub=dev.hatch.app.${1//-/_}
+  local id=$1 name
   name=$(python3 -c 'import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])' "$ROOT/catalogue/catalogue.json" "$id")
   adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 3
   # The store may resume on a detail page (no tab bar): back out to the tabs first.
@@ -42,13 +75,8 @@ store_install() {
   hide_ime; sleep 1
   for t in 1 2 3 4; do $UI has '^Install$' dev.hatch && break; $UI tap "^$name\$" dev.hatch || true; sleep 2; done
   $UI tap '^Install$' dev.hatch || return 1
-  for i in $(seq 1 240); do
-    adb shell pm list packages | grep -q "package:$stub$" && return 0
-    $UI has 'Install failed' dev.hatch && return 1
-    if $UI has 'Do you want to install|install this app'; then $UI tap '^Install$' 'packageinstaller' || true; fi
-    sleep 5
-  done
-  return 1
+  wait_installed "$id" 240 || return 1
+  pin_confirm || stamp "WARN: no pin sheet for $id"
 }
 # Frame of any window by exact title, e.g. "Hatch bubble".
 win_frame() {
@@ -143,37 +171,19 @@ for t in 1 2 3; do $UI has '^Install$' dev.hatch && break; $UI tap "^$APPNAME\$"
 shot 04b-detail
 $UI tap '^Install$' dev.hatch || fail "no Install button"
 sleep 6; shot 04c-installing
-# PackageInstaller confirmation for the generated stub APK
-for i in $(seq 1 300); do
-  adb shell pm list packages | grep -q "package:$STUB$" && break
-  if $UI has 'Install failed' dev.hatch; then
-    $UI tap '^Details$' dev.hatch || true; sleep 2; shot 05-install-failed
-    adb logcat -d -s HatchInstall > "$OUT/install-logcat.txt" 2>&1; guest_probe; fail "install failed in store"
-  fi
-  if $UI has 'Do you want to install|install this app'; then shot 05-stub-prompt; $UI tap '^Install$' 'packageinstaller' || true; fi
-  sleep 5
-done
-adb shell pm list packages | grep -q "package:$STUB$" || fail "stub $STUB not installed"
-stamp "stub installed: $STUB"
-adb shell cmd package query-activities -a android.intent.action.MAIN -c android.intent.category.LAUNCHER | grep -q "$STUB" \
-  || fail "stub has no launcher activity"
-$UI wait '^Open$' 120 dev.hatch || fail "store did not show Open"
-shot 06-store-installed
+# Installed → Hatch asks the launcher to pin the app's icon: a shortcut, so no APK and no Play Protect scan.
+wait_installed 05 300 || { guest_probe; fail "install failed in store"; }
+stamp "installed; launcher pin sheet:"
+pin_confirm 05-pin-sheet || stamp "WARN: no launcher pin sheet (launcher may have added it silently)"
+sleep 2; shot 06-store-installed
+adb shell dumpsys shortcut > "$OUT/shortcuts.txt" 2>&1
+grep -q "app:$APP" "$OUT/shortcuts.txt" || fail "no launcher shortcut for $APP"
+stamp "shortcut: $(grep -m1 "app:$APP" "$OUT/shortcuts.txt" | cut -c1-200)"
+adb shell input keyevent 3; sleep 3; shot 07-home-shortcut
 
-stamp "app drawer"
-adb shell input keyevent 3; sleep 2
-SZ=$(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1); SX=${SZ%x*}; SY=${SZ#*x}
-adb shell input swipe $((SX / 2)) $((SY * 85 / 100)) $((SX / 2)) $((SY / 6)) 300; sleep 3
-shot 07-app-drawer
-$UI has "$(python3 - "$ROOT/catalogue/catalogue.json" "$APP" <<'PY'
-import json,sys; print([a for a in json.load(open(sys.argv[1]))["apps"] if a["id"]==sys.argv[2]][0]["name"])
-PY
-)" && stamp "stub icon visible in drawer" || stamp "WARN: label not found in drawer dump"
-adb shell input keyevent 3
-
-stamp "launch stub → program window"
+stamp "Home screen icon → program window"
 adb logcat -c
-adb shell monkey -p "$STUB" -c android.intent.category.LAUNCHER 1 >/dev/null
+launch_app "$APP" "$APPNAME"
 for i in $(seq 1 120); do adb logcat -d | grep -qE 'windowCreated|window created' && break; sleep 2; done
 adb logcat -d | grep -qE 'windowCreated|window created' || fail "no Wayland window created"
 sleep 8
@@ -302,7 +312,7 @@ tap_target "bubble-menu ▢  Mousepad" bubble || fail "bubble menu has no Mousep
 float_frame Mousepad >/dev/null || fail "Mousepad not restored from bubble"
 other_app; sleep 3
 adb logcat -c
-adb shell monkey -p dev.hatch.app.galculator -c android.intent.category.LAUNCHER 1 >/dev/null
+launch_intent galculator "$(app_name galculator)"
 for i in $(seq 1 60); do float_frame Calculator >/dev/null && break; sleep 2; done
 float_frame Calculator >/dev/null || fail "Calculator (galculator) did not open as a floating window"
 sleep 6
@@ -339,7 +349,6 @@ stamp "mousepad leg OK"
 
 if [ "${E2E_WINE:-1}" = 1 ]; then
   stamp "Windows app via Wine: Notepad++ (x64 build on this x86_64 emulator; ARM64 build is proven on the arm64 runner)"
-  WSTUB=dev.hatch.app.notepadpp
   adb shell am start -S -W -n dev.hatch/.ui.MainActivity >/dev/null
   $UI wait 'Search apps' 60 || fail "store not shown again"
   $UI tap 'Search apps' && adb shell input text "notepad" && sleep 2
@@ -348,21 +357,12 @@ if [ "${E2E_WINE:-1}" = 1 ]; then
   $UI tap '^Notepad\+\+$' dev.hatch || fail "no search result for Notepad++"
   sleep 2; shot 11b-notepadpp-detail
   $UI tap '^Install$' dev.hatch || fail "no Install button for Notepad++"
-  for i in $(seq 1 360); do
-    adb shell pm list packages | grep -q "package:$WSTUB$" && break
-    if $UI has 'Install failed' dev.hatch; then
-      $UI tap '^Details$' dev.hatch || true; sleep 2; shot 12-wine-install-failed
-      adb logcat -d -s HatchInstall > "$OUT/wine-install-logcat.txt" 2>&1; fail "Notepad++ install failed"
-    fi
-    if $UI has 'Do you want to install|install this app'; then shot 12-wine-stub-prompt; $UI tap '^Install$' 'packageinstaller' || true; fi
-    [ $((i % 12)) -eq 0 ] && stamp "wine install running ($((i / 12)) min): $($UI dump 2>/dev/null | grep -m1 -E 'Notepad\+\+ —' | cut -c1-120)"
-    sleep 5
-  done
-  adb shell pm list packages | grep -q "package:$WSTUB$" || fail "stub $WSTUB not installed"
-  stamp "Notepad++ stub installed"
+  wait_installed 12-wine 360 || fail "Notepad++ install failed"
+  pin_confirm 12-wine-pin-sheet || stamp "WARN: no pin sheet for Notepad++"
+  stamp "Notepad++ installed"
   guest 'mkdir -p /etc/hatch && echo "+timestamp,+loaddll,+process,err" > /etc/hatch/winedebug' >/dev/null 2>&1 || true
   adb logcat -c; adb logcat -b crash -c 2>/dev/null || true
-  adb shell monkey -p "$WSTUB" -c android.intent.category.LAUNCHER 1 >/dev/null
+  launch_intent notepadpp "Notepad++"
   # First run creates the Wine prefix (wineboot) under proot, which is slow on the emulator: allow 20 min, log progress.
   NPP="bound target.*Notepad\+\+|title '[^']*Notepad\+\+"
   for i in $(seq 1 400); do
@@ -407,6 +407,53 @@ bbox = ImageChops.difference(a, b).getbbox(); print("diff bbox", bbox); sys.exit
 PY
   stamp "wine leg OK"
 fi
+
+stamp "Stop all from the runtime notification"
+HUSER=$(adb shell ps -A -o USER,NAME | awk '$2=="dev.hatch"{print $1}' | tr -d '\r' | head -1)
+guest_procs() { adb shell ps -A -o USER,PID,NAME | tr -d '\r' | awk -v u="$HUSER" '$1==u && $3!="dev.hatch"'; }
+stamp "app uid $HUSER; guest processes before: $(guest_procs | wc -l)"
+float_frame Mousepad >/dev/null || { launch_intent "$APP" "$APPNAME"; sleep 15; }
+adb shell cmd statusbar expand-notifications; sleep 3
+if ! $UI has '^(Stop all|STOP ALL)$' systemui; then
+  # Collapsed notification: drag it down to expand its actions.
+  XY=$($UI xy 'Hatch runtime' systemui) && { read NX NY <<<"$XY"; adb shell input swipe $NX $NY $NX $((NY + 400)) 400; sleep 2; }
+fi
+shot 21-runtime-notification
+$UI has 'apps? running' systemui && stamp "notification: $($UI dump | grep -m1 -oE "[0-9]+ apps? running[^']*")" || stamp "WARN: running-apps text not found"
+$UI tap '^(Stop all|STOP ALL)$' systemui || fail "no Stop all action on the runtime notification"
+sleep 8; adb shell cmd statusbar collapse; sleep 2
+shot 22-after-stop-all
+adb shell dumpsys activity services dev.hatch | grep -q 'HatchRuntimeService' && fail "runtime service still running after Stop all"
+LEFT=$(guest_procs); [ -z "$LEFT" ] || { echo "$LEFT"; fail "guest processes left after Stop all"; }
+float_frame Mousepad >/dev/null && fail "floating window left after Stop all"
+win_frame "Hatch bubble" >/dev/null && fail "bubble left after Stop all"
+adb shell dumpsys power | sed -n '/Wake Locks:/,/^$/p' | grep -q 'dev.hatch' && fail "wakelock held after Stop all"
+adb shell dumpsys notification | grep -q 'pkg=dev.hatch.*id=42' && fail "runtime notification still shown"
+stamp "stop all OK: no service, guest processes, overlays, wakelocks or notification"
+
+stamp "uninstall galculator from its detail page"
+adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 3
+for k in 1 2 3; do $UI has '^Get apps$' dev.hatch && break; hide_ime; adb shell input keyevent 4; sleep 2; done
+$UI tap '^Get apps$' dev.hatch || true; sleep 1
+type_search galculator || fail "search for galculator"
+hide_ime; sleep 1
+GNAME=$(app_name galculator)
+for t in 1 2 3 4; do $UI has '^Open$' dev.hatch && break; $UI tap "^$GNAME\$" dev.hatch || true; sleep 2; done
+shot 23-detail-installed
+$UI tap 'More actions' dev.hatch || fail "no More actions on the detail page"; sleep 1
+$UI tap '^Uninstall$' dev.hatch || fail "no Uninstall menu item"
+$UI wait 'Frees about|Removes the app' 120 dev.hatch || fail "no uninstall confirmation with the space freed"
+shot 24-uninstall-confirm
+stamp "confirm: $($UI dump | grep -m1 -oE "Frees about [^']*|Removes the app[^']*")"
+$UI tap '^Uninstall$' dev.hatch || fail "no Uninstall confirm button"
+$UI wait '^Install$' 300 dev.hatch || { shot 25-uninstall-failed; fail "store did not return to Install after uninstall"; }
+$UI has "Couldn.t uninstall|REQUEST_DELETE_PACKAGES|Exception" dev.hatch && { shot 25-uninstall-failed; fail "uninstall showed an error"; }
+shot 25-uninstalled
+guest 'dpkg-query -W -f="\${Status}" galculator 2>/dev/null | grep -q "install ok installed" && echo STILL-INSTALLED || echo REMOVED' | tee "$OUT/uninstall-dpkg.txt" | grep -q REMOVED || fail "galculator still installed in Debian"
+guest 'dpkg-query -W -f="\${Status}\n" mousepad libgtk-3-0t64 2>/dev/null' | grep -c 'install ok installed' | grep -qx 2 || fail "uninstall removed packages other apps need"
+adb shell run-as dev.hatch cat files/installed.json | grep -q '"galculator"' && fail "galculator still recorded as installed"
+stamp "shortcut after uninstall: $(adb shell dumpsys shortcut | grep -m1 'app:galculator' | cut -c1-200 || echo none)"
+stamp "uninstall OK"
 
 # Store tour (C1-C10 screenshots): Apps grid, Installed, Updates, Settings, and the Experimental Steam entry.
 tour() { # shot-name label-regex

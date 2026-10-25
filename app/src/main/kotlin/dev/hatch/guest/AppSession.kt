@@ -21,6 +21,8 @@ object AppSession {
     }
 
     fun isRunning(appId: String): Boolean = sessions.containsKey(appId)
+    fun runningIds(): List<String> = sessions.keys.toList()
+    private fun changed() { runCatching { dev.hatch.runtime.RuntimeControl.changed(dev.hatch.HatchApp.instance) } }
 
     fun start(
         context: Context,
@@ -43,6 +45,7 @@ object AppSession {
             asUser = true,
         ) ?: return false
         sessions[appId] = s
+        changed()
         // Drain stdout in background so pipe doesn't block
         Thread({
             val buf = ByteArray(4096)
@@ -59,6 +62,7 @@ object AppSession {
             runCatching { log?.close() }
             // stdout EOF ⇒ proot (and every guest process) exited
             if (sessions[appId] === s) sessions.remove(appId)
+            changed()
             val code = runCatching { dev.hatch.wayland.Native.waitPid(s.pid, false) }.getOrNull()
             Log.i(TAG, "$appId exited (status=$code)")
             tail.lines().forEach { Log.i(TAG, "$appId| $it") }
@@ -71,6 +75,7 @@ object AppSession {
         sessions.remove(appId)?.let {
             runCatching { it.kill() }
             runCatching { dev.hatch.wayland.Native.close(it.outFd) }
+            changed()
         }
     }
 

@@ -297,12 +297,15 @@ class FloatingWindow(
         else { if (primary) AppSession.stop(appId); dismiss() }
     }
 
+    fun forceDismiss() { dismiss() }
+
     private fun dismiss() {
         rt.unregister(appId, this)
         sv.detach()
         if (attached) runCatching { wm.removeViewImmediate(root) }
         attached = false
         FloatingWindows.removed(this, ctx)
+        dev.hatch.runtime.RuntimeControl.changed(ctx)
         if (primary) {
             val id = appId
             main.postDelayed({ if (!rt.hasSlots(id) && rt.windowsOf(id).isEmpty()) AppSession.stop(id) }, 20_000)

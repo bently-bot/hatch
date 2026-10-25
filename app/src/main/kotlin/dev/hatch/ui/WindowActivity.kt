@@ -1,5 +1,7 @@
 package dev.hatch.ui
 
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import android.app.ActivityManager
 import android.content.ClipboardManager
 import android.content.Intent
@@ -64,6 +66,8 @@ class WindowActivity : ComponentActivity(), HatchRuntime.WindowSlot {
         label = intent.getStringExtra(EXTRA_LABEL) ?: InstalledApps.get(this, appId)?.name ?: appId
 
         if (!secondary && appId != "unknown") reportRecent(appId, label)
+        // "Stop all" from the runtime notification closes full-screen app windows too.
+        lifecycleScope.launch { dev.hatch.runtime.RuntimeControl.stopped.collect { finishAndRemoveTask() } }
 
         // Floating mode (default, like a desktop): the program opens as an overlay window owned by the runtime
         // service, so this Activity is only a trampoline and leaves no Recents card behind.

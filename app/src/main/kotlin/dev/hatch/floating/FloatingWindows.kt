@@ -63,6 +63,9 @@ object FloatingWindows {
         Log.i(TAG, "floating window for $appId (${windows.size} open)")
     }
 
+    /** Stop all: tear down every floating window now (guests are already being killed). */
+    fun closeAll(ctx: Context) = onMain { windows.toList().forEach { it.forceDismiss() } }
+
     /** A further toplevel of a running program (dialog, 2nd document). */
     fun openSecondary(ctx: Context, appId: String) = onMain {
         if (!enabled(ctx)) { WindowActivity.launchSecondary(ctx, appId); return@onMain }
