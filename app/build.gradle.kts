@@ -74,6 +74,14 @@ android {
         cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" }
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            // Roborazzi: always write the screenshots (build/outputs/roborazzi), CI uploads them.
+            all { it.systemProperty("roborazzi.test.record", "true") }
+        }
+    }
+
     androidResources {
         noCompress += listOf("so", "tar", "xz", "zst")
     }
@@ -94,11 +102,22 @@ dependencies {
     implementation(libs.arsclib)
     implementation(libs.apksig)
     implementation(libs.tukaani.xz)
+    // Prebuilt rootfs (.tar.zst) stream decompression: native zstd (AAR: arm64-v8a + x86_64 kept by abiFilters)
+    implementation("${libs.zstd.jni.get()}@aar")
     implementation(libs.okhttp)
     implementation(libs.bcprov)
     implementation(libs.bcpkix)
     implementation(libs.androidx.work)
     testImplementation(libs.junit)
+    // Compose previews + Roborazzi/Robolectric screenshot tests (phone and unfolded Fold)
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.77.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.77.0")
+    testImplementation(libs.zstd.jni)   // host jar (linux natives) for JVM tests
 }
 
 

@@ -29,9 +29,9 @@ fun main(args: Array<String>) {
             val st = ZstdInputStream(counting).use { z ->
                 val s = TarExtractor(dest, File(dest, ".l2s")).extract(z.buffered(1 shl 20))
                 val sink = ByteArray(1 shl 16); while (z.read(sink) >= 0) {}
+                while (counting.read(sink) >= 0) {}   // rest of the stream (hash covers the whole file)
                 s
             }
-            while (counting.read(ByteArray(1 shl 16)) >= 0) {}
             val got = md.digest().joinToString("") { "%02x".format(it) }
             println("NEW extract ${secs()}s compressed=${compressed / 1_000_000}MB files=${st.files} dirs=${st.dirs} symlinks=${st.symlinks} hardlinks=${st.hardlinks} skipped=${st.skipped} bytes=${st.bytes / 1_000_000}MB sha256=${if (want.isEmpty()) got else if (got == want) "OK" else "MISMATCH $got"}")
             if (want.isNotEmpty() && got != want) System.exit(2)

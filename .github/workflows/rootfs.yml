@@ -9,6 +9,10 @@ on:
         description: Publish a rootfs-YYYYMMDD prerelease
         type: boolean
         default: false
+      bench_only_tag:
+        description: Only run the bench against this existing rootfs-YYYYMMDD release
+        type: string
+        default: ""
 permissions:
   contents: write
 concurrency:
@@ -16,6 +20,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    if: inputs.bench_only_tag == ''
     strategy:
       matrix:
         include:
@@ -76,7 +81,7 @@ jobs:
 
   bench:
     needs: [build, publish]
-    if: always() && needs.build.result == 'success'
+    if: always() && (needs.build.result == 'success' || inputs.bench_only_tag != '')
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     steps:
@@ -84,6 +89,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: actions/download-artifact@v4
+        if: inputs.bench_only_tag == ''
         with: { name: rootfs-arm64, path: out }
       - name: Tools (termux proot, kotlinc)
         run: |
@@ -96,10 +102,13 @@ jobs:
           echo "PROOT=/tmp/proot/src/proot" >> "$GITHUB_ENV"
       - name: Before/after setup timings
         env:
-          TAG: ${{ needs.publish.outputs.tag }}
+          TAG: ${{ needs.publish.outputs.tag || inputs.bench_only_tag }}
           PROOF_DIR: harness-out
         run: |
           set -euo pipefail
+          mkdir -p out
+          [ -f out/hatch-rootfs-debian13-arm64.json ] || curl -fsSL "https://github.com/bently-bot/hatch/releases/download/$TAG/rootfs-manifest.json" \
+            | python3 -c 'import json,sys; json.dump(json.load(sys.stdin)["images"]["arm64"], open("out/hatch-rootfs-debian13-arm64.json","w"))'
           SHA=$(python3 -c 'import json; print(json.load(open("out/hatch-rootfs-debian13-arm64.json"))["sha256"])')
           if [ -n "$TAG" ]; then ZST="https://github.com/bently-bot/hatch/releases/download/$TAG/hatch-rootfs-debian13-arm64.tar.zst"; else ZST="$PWD/out/hatch-rootfs-debian13-arm64.tar.zst"; fi
           ZST="$ZST" ZST_SHA="$SHA" bash scripts/rootfs-bench.sh

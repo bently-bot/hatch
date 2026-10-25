@@ -31,6 +31,26 @@ object RootfsCatalog {
 
     data class Rootfs(val url: String, val sha256: String, val build: String)
 
+    /** Hatch's prebuilt rootfs (rootfs.yml → release [PREBAKED_RELEASE], manifest Ed25519-signed). sizes in bytes. */
+    data class Prebaked(val url: String, val sha256: String, val size: Long, val installedSize: Long)
+    const val PREBAKED_RELEASE = "rootfs-20261025"
+    private val PREBAKED: Map<String, Prebaked> = mapOf(
+        "amd64" to Prebaked(
+            "https://github.com/bently-bot/hatch/releases/download/rootfs-20261025/hatch-rootfs-debian13-amd64.tar.zst",
+            "e8a0c5358e66f23bcaf6a8227298497afe061252f24654ed6b57654e7eb8b41a", 135419163, 483763710,
+        ),
+        "arm64" to Prebaked(
+            "https://github.com/bently-bot/hatch/releases/download/rootfs-20261025/hatch-rootfs-debian13-arm64.tar.zst",
+            "6b1fe925a2d76e1bc41aa6b658e5a57faf4e569f5f069f7f1ea807c4d97d9b7c", 129726975, 485802726,
+        ),
+    )
+
+    fun prebaked(arch: String = lxcArch()): Prebaked? = PREBAKED[arch]?.takeIf { it.sha256.length == 64 }
+
+    /** Developer/bench switch: use the standard (pre-0.2) setup path. */
+    fun forceLegacy(context: android.content.Context): Boolean =
+        context.getSharedPreferences("hatch", android.content.Context.MODE_PRIVATE).getBoolean("rootfs_legacy", false)
+
     /** linuxcontainers arch name for this device (arm64 phones; amd64 for x86_64 emulators/Chromebooks). */
     fun lxcArch(abis: Array<String> = Build.SUPPORTED_ABIS): String =
         if (abis.firstOrNull()?.startsWith("x86_64") == true) "amd64" else "arm64"

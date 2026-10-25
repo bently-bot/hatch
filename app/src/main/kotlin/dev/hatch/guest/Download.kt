@@ -72,3 +72,11 @@ fun sha256Hex(file: File): String {
     }
     return md.digest().joinToString("") { "%02x".format(it) }
 }
+
+/** Open [url] for streaming (no temp file); returns the body stream and its length (-1 if unknown). */
+fun openStream(url: String): Pair<java.io.InputStream, Long> {
+    val resp = http.newCall(Request.Builder().url(url).build()).execute()
+    if (!resp.isSuccessful) { resp.close(); error("HTTP ${resp.code} for $url") }
+    val body = resp.body ?: run { resp.close(); error("empty body") }
+    return body.byteStream() to body.contentLength()
+}

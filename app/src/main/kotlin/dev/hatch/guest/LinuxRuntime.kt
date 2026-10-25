@@ -28,7 +28,7 @@ object LinuxRuntime {
     fun rootfsDir(context: Context): File = File(context.filesDir, "linux")
     fun prootTmpDir(context: Context): File = File(context.filesDir, "tmp").apply { mkdirs() }
     fun guestTmpDir(context: Context): File = File(rootfsDir(context), "tmp").apply { mkdirs() }
-    private fun l2sDir(context: Context): File = File(rootfsDir(context), ".l2s").apply { mkdirs() }
+    fun l2sDir(context: Context): File = File(rootfsDir(context), ".l2s").apply { mkdirs() }
     private fun nativeLibDir(context: Context): File = File(context.applicationInfo.nativeLibraryDir)
     fun prootBinary(context: Context): File = File(nativeLibDir(context), "libproot.so")
     private fun installMarker(context: Context): File = File(rootfsDir(context), ".hatch-installed")
