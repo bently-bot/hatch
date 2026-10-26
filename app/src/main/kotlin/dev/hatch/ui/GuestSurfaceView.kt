@@ -35,6 +35,15 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
     var controls: String = ""
     private val stickHeld = HashSet<Int>()
 
+    /** Keys and IME text for this window: modifiers from metaState, composing diffs, no stuck keys (see GuestKeyboard). */
+    val keyboard = dev.hatch.wayland.GuestKeyboard(object : dev.hatch.wayland.GuestKeyboard.Sink {
+        override fun key(code: Int, pressed: Boolean) = post { s, w -> s.seat.key(w, code, pressed) }
+        override fun text(t: String) = post { s, w -> s.seat.typeText(w, t) }
+    })
+
+    /** This window lost key focus (store touched, minimised, another window): release held keys, drop composing. */
+    fun releaseKeys() { keyboard.reset() }
+
     /** Press/release one Linux key in the guest window (touch pad, controllers). */
     fun sendKey(code: Int, pressed: Boolean) = post { s, w -> s.seat.key(w, code, pressed) }
     private var target: Long = 0
@@ -50,10 +59,18 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
         holder.addCallback(this)
     }
 
-    fun bind(w: Toplevel) {
+    fun bind(w: Toplevel, focus: Boolean = true) {
         toplevel = w
         rebindTarget()
-        rt.server?.post { rt.server?.seat?.focusWindow(w) }
+        if (focus) rt.server?.post { rt.server?.seat?.focusWindow(w) }
+    }
+
+    /** Take Wayland keyboard focus away from this window (if it has it): wl_keyboard.leave, deactivated. */
+    fun blurGuest() {
+        val w = toplevel ?: return
+        // Any toplevel of this window's client: Wine maps several (owner, dialogs), and the one holding keyboard focus
+        // is often not the one bound here, so an identity check left Notepad++ focused (caret kept blinking).
+        rt.server?.post { val seat = rt.server?.seat; val f = seat?.focus; if (f != null && (f === w || f.client === w.client)) seat.focusWindow(null) }
     }
 
     /** Forget the toplevel (it was destroyed); releases our render target. */
@@ -232,8 +249,7 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
         }
         if (event.isCtrlPressed && keyCode == KeyEvent.KEYCODE_V) syncClipboardToGuest()
         val sc = linuxCode(event); if (sc == 0) return super.onKeyDown(keyCode, event)
-        if (event.repeatCount > 0) post { s, w -> s.seat.key(w, sc, false); s.seat.key(w, sc, true) } // host-side repeat
-        else post { s, w -> s.seat.key(w, sc, true) }
+        keyboard.keyDown(sc, event.metaState, event.repeatCount)   // host-side repeat; IME Shift from metaState
         return true
     }
 
@@ -241,7 +257,7 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
         if (isNavBack(keyCode, event) || toplevel == null) return super.onKeyUp(keyCode, event)
         if (GamepadKeys.isGamepad(event.source)) GamepadKeys.map(controls, keyCode).takeIf { it != 0 }?.let { c -> sendKey(c, false); return true }
         val sc = linuxCode(event); if (sc == 0) return super.onKeyUp(keyCode, event)
-        post { s, w -> s.seat.key(w, sc, false) }
+        keyboard.keyUp(sc)
         return true
     }
 
@@ -266,17 +282,18 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
         return GuestInputConnection(this)
     }
 
+    /**
+     * Never calls BaseInputConnection's own text methods: in non-editor mode they turn composing text into key events
+     * themselves, which (with the later commit) typed the first, auto-capitalised letter twice or without Shift.
+     */
     private inner class GuestInputConnection(v: View) : BaseInputConnection(v, false) {
-        override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
-            val t = text?.toString().orEmpty()
-            if (t.isNotEmpty()) post { s, w -> s.seat.typeText(w, t) }
-            return true
-        }
+        override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean { keyboard.commit(text?.toString().orEmpty()); return true }
+        override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean { keyboard.setComposing(text?.toString().orEmpty()); return true }
+        override fun finishComposingText(): Boolean { keyboard.finishComposing(); return true }
+        override fun setComposingRegion(start: Int, end: Int): Boolean = true
         override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-            post { s, w ->
-                repeat(beforeLength.coerceAtMost(64)) { s.seat.key(w, 14, true); s.seat.key(w, 14, false) }
-                repeat(afterLength.coerceAtMost(64)) { s.seat.key(w, 111, true); s.seat.key(w, 111, false) }
-            }
+            keyboard.deleteBefore(beforeLength)
+            post { s, w -> repeat(afterLength.coerceAtMost(64)) { s.seat.key(w, 111, true); s.seat.key(w, 111, false) } }
             return true
         }
         override fun sendKeyEvent(event: KeyEvent): Boolean {

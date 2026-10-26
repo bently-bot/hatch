@@ -490,6 +490,29 @@ from PIL import Image, ImageChops
 a = Image.open(sys.argv[1]).convert("RGB"); b = Image.open(sys.argv[2]).convert("RGB")
 bbox = ImageChops.difference(a, b).getbbox(); print("diff bbox", bbox); sys.exit(0 if bbox else 1)
 PY
+  # Focus hand-back (DEVICE-VERIFY #20): after typing in Notepad++, tap the store's search field above the window
+  # and type. The text must land in the store, and the Notepad++ window must not change.
+  adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 2
+  # The store is still on Notepad++'s detail page (and the search field still holds "notepad"): back to the list.
+  for t in 1 2 3; do $UI has 'Search apps|^notepad$' dev.hatch && break; adb shell input keyevent 4; sleep 1.5; done
+  $UI tap 'Search apps|^notepad$' dev.hatch || fail "store search field not reachable next to Notepad++"
+  sleep 1; adb shell input keyevent $(printf '67 %.0s' $(seq 1 12)); sleep 1
+  shot 14c-before-store-typing   # after the tap: Notepad++ is unfocused, its caret no longer blinks
+  adb shell input text "focusback"; sleep 3; shot 14d-store-typed
+  $UI has '^focusback$' dev.hatch || fail "focus hand-back: text typed after tapping the store did not reach the store"
+  python3 - "$OUT/14c-before-store-typing.png" "$OUT/14d-store-typed.png" $NL $NT $NR $NB <<'PY' || fail "focus hand-back: Notepad++ changed while typing in the store"
+import sys
+from PIL import Image, ImageChops
+l, t, r, b = map(int, sys.argv[3:7]); box = (l + 48, t + 140, r - 48, b - 48)   # client area: the frame includes ~25 px of shadow where the store shows through
+a = Image.open(sys.argv[1]).convert("RGB").crop(box); c = Image.open(sys.argv[2]).convert("RGB").crop(box)
+d = ImageChops.difference(a, c).getbbox(); print("notepad++ diff while typing in the store:", d)
+# A lone caret blink (a few px wide) is not typing; "focusback" landing in Notepad++ would be ~100 px wide.
+caret = d is not None and d[2] - d[0] <= 6 and d[3] - d[1] <= 60
+if caret: print("WARN: only Notepad++'s caret changed: it still shows as focused (wl_keyboard.leave not honoured?)")
+sys.exit(0 if d is None or caret else 1)
+PY
+  stamp "focus hand-back OK: store got the text, Notepad++ unchanged"
+  hide_ime; adb shell input keyevent $(printf '67 %.0s' $(seq 1 12)); sleep 1
   # One-tap close for a Wine window too (it has unsaved text, so a "Save?" dialog may answer: ✕ again closes anyway).
   # This also hands keyboard focus back to the store for the next leg.
   if [ -n "${NF:-}" ]; then

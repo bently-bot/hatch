@@ -81,6 +81,8 @@ class FloatingWindow(
     private var maximised = false
     private var restoreBounds: Bounds? = null
     private var focusable = false
+    /** Uptime when this window was created (FocusRules: a fresh window may take the keyboard). */
+    val openedAt = SystemClock.uptimeMillis()
 
     /** Hidden by ✕ while the app is asked to close (shown again only if it answers with a dialog). */
     var hiddenForClose = false; private set
@@ -190,10 +192,14 @@ class FloatingWindow(
                 return super.dispatchKeyEvent(event)
             }
             override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-                if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) { releaseFocus(); menu.visibility = View.GONE; return true }
+                if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) {
+                    releaseFocus(); menu.visibility = View.GONE; FloatingWindows.touchedOutside(this@FloatingWindow); return true
+                }
                 // Guest (Wayland) focus right away; the WindowManager focus flag only changes when the finger lifts,
                 // because relayouting a window mid-gesture can cancel the tap on some builds (One UI).
-                if (ev.actionMasked == MotionEvent.ACTION_DOWN) { rt.focusedSlot = this@FloatingWindow; sv.focusGuest() }
+                if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+                    FloatingWindows.touched(this@FloatingWindow); rt.focusedSlot = this@FloatingWindow; sv.focusGuest()
+                }
                 val handled = super.dispatchTouchEvent(ev)
                 // Raising re-adds the view (the only z-order control for overlays), which would cancel a gesture in
                 // flight, so the window comes to the front when the finger lifts.
@@ -420,7 +426,13 @@ class FloatingWindow(
         sv.requestFocus(); sv.syncClipboardToGuest(); sv.focusGuest()
     }
 
+    /** Hand key focus back to Android (the store was touched): see FloatingWindows.nonGuestTouched. */
+    fun dropFocus() = releaseFocus()
+
     private fun releaseFocus() {
+        // Guest side too: release held keys and send wl_keyboard.leave, so nothing typed elsewhere reaches the app.
+        sv.releaseKeys(); sv.blurGuest()
+        if (rt.focusedSlot === this) rt.focusedSlot = null
         if (!focusable) return
         focusable = false
         ctx.getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(root.windowToken, 0)
@@ -435,9 +447,11 @@ class FloatingWindow(
         main.post {
             main.removeCallbacks(orphanCheck)
             statusBox.visibility = View.GONE; problemBox.visibility = View.GONE
-            sv.bind(w); boundAt = SystemClock.uptimeMillis(); relaunching = false
+            val mayFocus = FloatingWindows.mayAutoFocus(this)
+            sv.bind(w, focus = mayFocus); boundAt = SystemClock.uptimeMillis(); relaunching = false
             if (hiddenForClose && !FloatingWindows.isClosing(appId)) unhideAfterClose()
-            takeFocus()
+            // Only if the user is still on this app: a window Wine maps later must not steal the store's keyboard.
+            if (mayFocus) takeFocus() else Log.i(TAG, "bound '$label' without taking key focus (user is elsewhere)")
             if (primary) armBlackCheck(w)
             // A dialog usually draws before its window is bound (windowContent then reaches no slot): fit it now.
             else if (w.hasContent) fitToClient(w)
@@ -624,7 +638,9 @@ class FloatingWindow(
     }
 
     // Text fields focused at window open don't pop the keyboard over the desktop; a tap into one does (⌨ always works).
-    override fun textInput(enabled: Boolean) { if (enabled) main.post { if (sv.recentlyTouched) { takeFocus(); sv.showKeyboard() } } }
+    override fun textInput(enabled: Boolean) {
+        if (enabled) main.post { if (sv.recentlyTouched && FloatingWindows.lastTouched === this) { takeFocus(); sv.showKeyboard() } }
+    }
 
     companion object {
         private const val TAG = "HatchFloat"

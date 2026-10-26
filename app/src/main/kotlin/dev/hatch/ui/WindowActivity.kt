@@ -205,6 +205,10 @@ class WindowActivity : ComponentActivity(), HatchRuntime.WindowSlot {
             rt.focusedSlot = this
             surfaceView?.syncClipboardToGuest()
             surfaceView?.focusGuest()
+        } else {
+            // Another task (the store, another app) took focus: release held keys, leave the guest keyboard focus.
+            surfaceView?.let { it.releaseKeys(); it.blurGuest() }
+            if (rt.focusedSlot === this) rt.focusedSlot = null
         }
     }
 

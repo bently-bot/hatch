@@ -6,6 +6,8 @@ R="${HATCH_ROOTFS:?HATCH_ROOTFS not set}"
 PROOT="${PROOT:-proot}"
 L2S="$R/.l2s"; mkdir -p "$L2S" "${HATCH_PTMP:=/tmp/hatch-ptmp}"
 binds=(-b /dev -b /proc -b /sys -b "$L2S:$L2S")
+# Same as LinuxRuntime.selfPathBinds: /proc/self/maps shows host paths under proot, so make them resolve (VLC plugins).
+RA=$(cd "$R" && pwd); for d in usr opt; do [ -d "$RA/$d" ] && binds+=(-b "$RA/$d:$RA/$d"); done
 [ -d /dev/pts ] && binds+=(-b /dev/pts)
 if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR" ]; then binds+=(-b "$XDG_RUNTIME_DIR:/run/hatch"); fi
 for b in ${HATCH_EXTRA_BINDS:-}; do binds+=(-b "$b"); done
