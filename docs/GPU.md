@@ -10,3 +10,7 @@ Default guest GL is **llvmpipe** (`LIBGL_ALWAYS_SOFTWARE=1`) so apps always rend
 4. PRoot already binds `/dev/kgsl-3d0` when present.
 
 Until kgsl is confirmed on the Fold 8, keep software GL. Performance work after correctness.
+
+## Chromium / Electron and linux-dmabuf
+See [GPU-DMABUF.md](GPU-DMABUF.md): the compositor supports `zwp_linux_dmabuf_v1` v4, but Chromium only composites on
+the GPU via X11 inside an Android app (no DRM render node). **Settings › Diagnostics › GPU test** shows the real renderer.

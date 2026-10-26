@@ -15,8 +15,8 @@ android {
         minSdk = 29
         targetSdk = 35
         // -PversionCodeOverride / -PversionNameOverride: only for the OTA end-to-end test (an "older" and a "newer" build)
-        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 4
-        versionName = (project.findProperty("versionNameOverride") as String?) ?: "0.3.0"
+        versionCode = (project.findProperty("versionCodeOverride") as String?)?.toInt() ?: 5
+        versionName = (project.findProperty("versionNameOverride") as String?) ?: "0.4.0"
         // In-app updates of Hatch itself: GitHub Releases of bently-bot/hatch (public, no token). -PupdateFeed points a
         // test build at a local fake feed (debug builds allow cleartext to the emulator host 10.0.2.2 only).
         buildConfigField("String", "UPDATE_FEED", "\"${(project.findProperty("updateFeed") as String?) ?: "https://api.github.com/repos/bently-bot/hatch/releases/latest"}\"")
