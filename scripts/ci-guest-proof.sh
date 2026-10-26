@@ -314,15 +314,18 @@ sat = sum(1 for (r, g, b) in v.getdata() if max(r, g, b) - min(r, g, b) > 120)
 print(f"vlc-video saturated px={sat} (video area)"); sys.exit(0 if sat > 4000 else 1)
 PY
   }
-  # --no-qt-privacy-ask: the first-run privacy dialog would sit over the video. vout: VLC's default (GL via egl_x11),
-  # then plain xcb_x11 as a second opinion so a GL-only failure is told apart from a decode/playback one.
+  # --no-qt-privacy-ask: the first-run privacy dialog would sit over the video. vouts: VLC's default (GL via EGL/X11),
+  # GL via GLX (what the catalogue recipe uses, same drisw/kopper present as Blender), and plain xcb_x11, so a GL-only
+  # failure is told apart from a decode/playback one. (EGL/X11 swrast present on proot: "MESA: error: Failed to attach
+  # to x11 shm" every frame, and the video stays black.)
   VOK=""
-  for vo in default xcb_x11; do
-    VOPT=""; [ $vo = default ] || VOPT="--vout=$vo"
+  for vo in default glx xcb_x11; do
+    case $vo in default) VOPT="" ;; glx) VOPT="--vout=gl --gl=glx" ;; *) VOPT="--vout=$vo" ;; esac
     if capture vlc-video-$vo 90 --title=Xwayland --settle=20000 -- "${GU[@]}" bash -c "hatch-launch --x11 -- sh -c 'QT_QPA_PLATFORM=xcb vlc --no-qt-privacy-ask --no-video-title-show $VOPT --loop /tmp/hatch-bars.y4m'" \
        && vlc_video_ok "$PROOF/vlc-video-$vo.png"; then stamp "vlc video ($vo vout) OK"; VOK="$VOK $vo"; else stamp "vlc video ($vo vout) FAILED"; fi
   done
-  if [[ " $VOK " == *" default "* ]]; then stamp "vlc video playback OK"; else stamp "vlc video playback FAILED (working vouts:${VOK:- none})"; FAILED+=(vlc-video); fi
+  grep -c 'Failed to attach to x11 shm' "$PROOF/vlc-video-default-client.log" 2>/dev/null | sed 's/^/  EGL x11 shm attach failures (default vout): /' || true
+  if [[ " $VOK " == *" glx "* ]]; then stamp "vlc video playback OK (GL via GLX)"; else stamp "vlc video playback FAILED (working vouts:${VOK:- none})"; FAILED+=(vlc-video); fi
 fi
 
 # GPU path (Turnip/KGSL): no Adreno on CI, but prove the bundled driver unpacks, its deps install and it links in the
