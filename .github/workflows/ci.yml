@@ -17,7 +17,7 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq gcc make weston
+          sudo apt-get install -y -qq gcc make weston libwayland-dev wayland-protocols
       - name: Fetch kotlinc
         run: |
           curl -fsSL -o /tmp/kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
@@ -37,10 +37,24 @@ jobs:
             "$RUNNER_TEMP/wayland" \
             harness-out/simple-shm.png \
             20 -- "$CLIENT"
+      - name: linux-dmabuf v4 proof (feedback, LINEAR import, non-LINEAR refusal)
+        run: |
+          harness/clients/build.sh "$PWD/build/host"
+          ls -l /dev/udmabuf 2>/dev/null || echo "no /dev/udmabuf: the client falls back to a memfd-backed buffer"
+          mkdir -p harness-out/dmabuf
+          java -Dhatch.native=$PWD/build/host/libhatchnative.so \
+            -cp "build/host/classes:/opt/kotlinc/lib/kotlin-stdlib.jar" \
+            dev.hatch.harness.MainKt "$RUNNER_TEMP/wayland-dmabuf" harness-out/dmabuf/dmabuf.png 20 -- build/host/dmabuf-test | tee harness-out/dmabuf/host.log
+          cat harness-out/dmabuf/client.log
+          grep -q 'DMABUF-OK' harness-out/dmabuf/client.log
+          grep -q 'first dma-buf frame 256x192' harness-out/dmabuf/host.log
+          grep -q 'dmabuf rejected: modifier' harness-out/dmabuf/host.log
       - uses: actions/upload-artifact@v4
         with:
           name: simple-shm-png
-          path: harness-out/simple-shm.png
+          path: |
+            harness-out/simple-shm.png
+            harness-out/dmabuf/
 
   arm64-guest-proof:
     # Real Debian 13 arm64 rootfs under proot, apps installed by the app's own guest scripts from

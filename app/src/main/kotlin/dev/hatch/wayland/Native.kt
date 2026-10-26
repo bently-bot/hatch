@@ -31,6 +31,10 @@ object Native {
     @JvmStatic external fun storeFree(store: Long)
     @JvmStatic external fun storeCopy(shm: Long, offset: Int, stride: Int, format: Int, store: Long, rects: IntArray, count: Int, poolSize: Long): Int
     @JvmStatic external fun storeCopyFd(fd: Int, offset: Int, stride: Int, format: Int, store: Long, w: Int, h: Int): Int
+    /** Copy a linear dma-buf (mmap + DMA_BUF_IOCTL_SYNC) into a store; same format codes as storeCopyFd. */
+    @JvmStatic external fun storeCopyDmabuf(fd: Int, offset: Int, stride: Int, format: Int, store: Long, w: Int, h: Int): Int
+    /** st_rdev of a device node, or -1 (dma-buf feedback main_device). */
+    @JvmStatic external fun devId(path: String): Long
     /** (luma mean << 8) | luma stddev over a sample grid of a store; -1 if empty. */
     @JvmStatic external fun storeStats(store: Long): Int
     @JvmStatic external fun targetForSurface(surface: Any, w: Int, h: Int): Long

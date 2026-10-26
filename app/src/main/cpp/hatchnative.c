@@ -225,6 +225,59 @@ JNIEXPORT jint JNICALL J(storeCopyFd)(JNIEnv *env, jclass c, jint fd, jint offse
     return 0;
 }
 
+/* ---------- linux-dmabuf (CPU import of LINEAR buffers) ---------- */
+#ifndef DMA_BUF_IOCTL_SYNC
+struct dma_buf_sync { uint64_t flags; };
+#define DMA_BUF_SYNC_READ (1 << 0)
+#define DMA_BUF_SYNC_START (0 << 2)
+#define DMA_BUF_SYNC_END (1 << 2)
+#define DMA_BUF_IOCTL_SYNC _IOW('b', 0, struct dma_buf_sync)
+#endif
+
+/* Copy a linear 32bpp dma-buf into a store. The guest GPU driver (Turnip/lavapipe/llvmpipe) rendered into it; we map
+ * it read-only and bracket the read with DMA_BUF_IOCTL_SYNC so caches are coherent (no-op / ENOTTY for memfd or
+ * udmabuf-backed test buffers). Returns 0, or <0: -2 mmap failed, -3 too small. */
+JNIEXPORT jint JNICALL J(storeCopyDmabuf)(JNIEnv *env, jclass c, jint fd, jint offset, jint stride, jint format,
+                                          jlong sp, jint w, jint h) {
+    store_t *s = (store_t *)(intptr_t)sp;
+    if (!s || !s->px || fd < 0 || w <= 0 || h <= 0 || stride < w * 4 || offset < 0) return -1;
+    if (s->w != w || s->h != h) return -5;
+    size_t len = (size_t)offset + (size_t)stride * (size_t)(h - 1) + (size_t)w * 4;
+    off_t end = lseek(fd, 0, SEEK_END);
+    if (end > 0 && (size_t)end < len) { fprintf(stderr, "[dmabuf] fd=%d size %lld < %zu\n", fd, (long long)end, len); return -3; }
+    void *m = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
+    if (m == MAP_FAILED) { fprintf(stderr, "[dmabuf] mmap fd=%d len=%zu: %s\n", fd, len, strerror(errno)); return -2; }
+    struct dma_buf_sync sync = { DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ };
+    ioctl(fd, DMA_BUF_IOCTL_SYNC, &sync);
+    const uint8_t *base = (const uint8_t *)m + offset;
+    for (int y = 0; y < h; y++) {
+        const uint32_t *src = (const uint32_t *)(base + (size_t)y * stride);
+        uint32_t *dst = s->px + (size_t)y * (size_t)w;
+        if (format == 0 || format == 1) {
+            for (int i = 0; i < w; i++) {
+                uint32_t v = src[i];
+                uint32_t rgb = (v & 0x0000ff00u) | ((v >> 16) & 0xffu) | ((v & 0xffu) << 16);
+                dst[i] = (format == 1 ? 0xff000000u : (v & 0xff000000u)) | rgb;
+            }
+        } else if (format == 0x34324258) { /* XBGR8888: force opaque */
+            for (int i = 0; i < w; i++) dst[i] = src[i] | 0xff000000u;
+        } else {
+            memcpy(dst, src, (size_t)w * 4);
+        }
+    }
+    sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
+    ioctl(fd, DMA_BUF_IOCTL_SYNC, &sync);
+    munmap(m, len);
+    return 0;
+}
+
+JNIEXPORT jlong JNICALL J(devId)(JNIEnv *env, jclass c, jstring jpath) {
+    const char *p = (*env)->GetStringUTFChars(env, jpath, NULL);
+    struct stat st; int r = stat(p, &st);
+    (*env)->ReleaseStringUTFChars(env, jpath, p);
+    return r == 0 ? (jlong)st.st_rdev : -1;
+}
+
 /* Black-window detection: luma mean and standard deviation over a <=64x64 sample grid of a store.
  * Returns (mean << 8) | min(stddev, 255), or -1. A Chromium/Electron/CEF window whose GPU path failed commits
  * solid black (or fully transparent) frames: mean ~0, stddev 0. */

@@ -107,8 +107,14 @@ class SurfaceRes(c: Client, id: Int) : Res(c, id, 4) {
                 } else {
                     rects = intArrayOf(0, 0, buf.w, buf.h); count = 1
                 }
-                val r = Native.storeCopyFd(buf.pool.fd, buf.offset, buf.stride, buf.format, store, buf.w, buf.h)
-                if (r < 0) client.server.host.log("storeCopyFd failed $r")
+                val r = if (buf.isDmabuf) {
+                    if (client.dmabufCommits++ == 0L) client.server.host.log("client ${client.appTag}: first dma-buf frame ${buf.w}x${buf.h}")
+                    Native.storeCopyDmabuf(buf.dmaFd, buf.offset, buf.stride, buf.format, store, buf.w, buf.h)
+                } else {
+                    client.shmCommits++
+                    Native.storeCopyFd(buf.pool!!.fd, buf.offset, buf.stride, buf.format, store, buf.w, buf.h)
+                }
+                if (r < 0) client.server.host.log("${if (buf.isDmabuf) "storeCopyDmabuf" else "storeCopyFd"} failed $r")
                 else (role as? Role.ToplevelRole)?.t?.let { t ->
                     t.framesCommitted++
                     if (!t.hasContent || !t.varied) {

@@ -11,6 +11,7 @@ fun registerGlobals(s: WaylandServer) {
     s.addGlobal("wp_viewporter", 1) { c, id, v -> ViewporterRes(c, id, v) }
     s.addGlobal("zxdg_decoration_manager_v1", 1) { c, id, v -> DecorationManagerRes(c, id, v) }
     s.addGlobal("zwp_text_input_manager_v3", 1) { c, id, v -> TextInputManagerRes(c, id, v) }
+    if (s.dmabufEnabled) s.addGlobal("zwp_linux_dmabuf_v1", 4) { c, id, v -> LinuxDmabufRes(c, id, v) }
 }
 
 class CompositorRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
@@ -143,12 +144,15 @@ class ShmPoolRes(c: Client, id: Int, rawFd: Int, initialSize: Int) : Res(c, id, 
     }
 }
 
-class BufferRes(c: Client, id: Int, val pool: ShmPoolRes, val offset: Int, val w: Int, val h: Int, val stride: Int, val format: Int) : Res(c, id, 1) {
+/** A wl_buffer: wl_shm ([pool]) or a linear dma-buf ([dmaFd], see Dmabuf.kt). */
+class BufferRes(c: Client, id: Int, val pool: ShmPoolRes?, val offset: Int, val w: Int, val h: Int, val stride: Int, val format: Int,
+                val dmaFd: Int = -1) : Res(c, id, 1) {
     override val iface = "wl_buffer"
     var busy = false
+    val isDmabuf get() = dmaFd >= 0
     override fun request(op: Int, a: Args) { if (op == 0) destroy() else super.request(op, a) }
     fun release() { busy = false; if (alive) event(0).end() }
-    override fun onDestroy() { pool.release() }
+    override fun onDestroy() { pool?.release(); if (dmaFd >= 0) Native.close(dmaFd) }
 }
 
 class OutputRes(c: Client, id: Int, v: Int) : Res(c, id, v) {
