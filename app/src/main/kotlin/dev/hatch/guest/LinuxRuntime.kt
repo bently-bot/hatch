@@ -83,10 +83,20 @@ object LinuxRuntime {
         return base.map { "${it.key}=${it.value}" }.toTypedArray()
     }
 
+    /**
+     * The rootfs's own host paths, bound onto themselves inside the guest. proot doesn't rewrite /proc/self/maps, so
+     * a program that finds its files from its own mapping (VLC: libvlccore → plugins dir; also some JITs and
+     * self-locating vendor apps) sees host paths like /data/user/0/dev.hatch/files/linux/usr/lib/… . With these
+     * binds those paths resolve in the guest too. Only usr and opt (where libraries live), not the whole root, so
+     * tools that walk / see at most one extra copy of those trees.
+     */
+    fun selfPathBinds(rootfs: String): List<String> = listOf("usr", "opt").map { "$rootfs/$it:$rootfs/$it" }
+
     fun bindCandidates(context: Context, waylandHostDir: String?): List<String> {
         val l2s = l2sDir(context).absolutePath
         return buildList {
             add("$l2s:$l2s")
+            addAll(selfPathBinds(rootfsDir(context).absolutePath))
             add("/proc"); add("/sys"); add("/dev")
             if (File("/dev/pts").exists()) add("/dev/pts")
             add("/proc/self/fd:/dev/fd")

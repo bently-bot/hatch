@@ -120,7 +120,7 @@ capture() { # name seconds harness-opts... -- cmd...
   [ $rc -eq 0 ] || { echo "--- $name client log ---"; tail -30 "$PROOF/$name-client.log" 2>/dev/null || true; }
   return $rc
 }
-title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender|steam|doom) echo "Xwayland";; cursor) echo "Cursor";; hdrview) echo "HDRView";; brave-browser) echo "Brave";; org.darktable.Darktable) echo "darktable";; hdrview) echo "HDRView";; *) echo "";; esac; }
+title_for() { case "$1" in notepadpp) echo "Notepad++";; mousepad) echo "Mousepad";; galculator) echo "alculator";; gnome-mines) echo "Mines";; xterm|blender|steam|doom|vlc) echo "Xwayland";; cursor) echo "Cursor";; hdrview) echo "HDRView";; brave-browser) echo "Brave";; org.darktable.Darktable) echo "darktable";; hdrview) echo "HDRView";; *) echo "";; esac; }
 if [ "${SWEEP:-0}" = 1 ]; then . "$ROOT/scripts/app-sweep.sh"; fi
 
 FAILED=()
@@ -269,6 +269,52 @@ sleep 9
 cat "$PROOF/audio-server.log" "$PROOF/audio-host.log"
 peak=$(grep -o 'peak=[0-9]*' "$PROOF/audio-host.log" | cut -d= -f2 || true)
 if [ "${peak:-0}" -gt 5000 ]; then stamp "audio OK (peak $peak)"; else FAILED+=(audio); fi
+
+if [[ " $APPS " == *" vlc "* ]]; then
+  # VLC must really play media, not just open its window: an audio file through Hatch's PulseAudio → PCM path
+  # (peak checked on the host side), and a colour-bar video in the Qt window under Xwayland (frame checked).
+  stamp "== vlc playback =="
+  python3 - "$R/tmp/hatch-bars.y4m" <<'PY'
+import sys
+w, h, n = 320, 240, 50
+bars = [(235,128,128),(210,16,146),(170,166,16),(145,54,34),(106,202,222),(81,90,240),(41,240,110),(16,128,128)]  # Y,Cb,Cr
+Y = bytes(bars[x * 8 // w][0] for x in range(w)) * h
+U = bytes(bars[2 * x * 8 // w][1] for x in range(w // 2)) * (h // 2)
+V = bytes(bars[2 * x * 8 // w][2] for x in range(w // 2)) * (h // 2)
+with open(sys.argv[1], "wb") as f:
+    f.write(b"YUV4MPEG2 W%d H%d F25:1 Ip A1:1 C420jpeg\n" % (w, h))
+    for _ in range(n): f.write(b"FRAME\n" + Y + U + V)
+PY
+  XDG_RUNTIME_DIR="$WORK/xdg-audio" timeout 60 "${GU[@]}" /usr/local/bin/hatch-audio > "$PROOF/vlc-audio-server.log" 2>&1 &
+  sleep 5
+  python3 - > "$PROOF/vlc-audio-host.log" 2>&1 <<'PY' &
+import socket, time, array
+s = socket.create_connection(("127.0.0.1", 47140), timeout=20); buf = b""; t = time.time()
+while time.time() - t < 10:
+    try: d = s.recv(65536)
+    except socket.timeout: break
+    if not d: break
+    buf += d
+a = array.array("h"); a.frombytes(buf[:len(buf) // 2 * 2])
+print(f"host received {len(buf)} bytes, peak={max(map(abs, a), default=0)}")
+PY
+  sleep 1
+  XDG_RUNTIME_DIR="$WORK/xdg-other" timeout 40 "${GU[@]}" bash -c '. /usr/local/bin/hatch-audio-env; cvlc --play-and-exit --no-video /tmp/hatch-sine.wav > /tmp/vlc-play.log 2>&1; echo cvlc rc=$?; grep -iE "error|cannot" /tmp/vlc-play.log | head -5' | tee "$PROOF/vlc-play.log" || true
+  sleep 10
+  cat "$PROOF/vlc-audio-host.log"
+  vpeak=$(grep -o 'peak=[0-9]*' "$PROOF/vlc-audio-host.log" | cut -d= -f2 || true)
+  if grep -q 'cvlc rc=0' "$PROOF/vlc-play.log" && [ "${vpeak:-0}" -gt 5000 ]; then stamp "vlc audio playback OK (peak $vpeak)"; else stamp "vlc audio playback FAILED"; FAILED+=(vlc-audio); fi
+  if capture vlc-video 90 --title=Xwayland --settle=20000 -- "${GU[@]}" bash -c "hatch-launch --x11 -- sh -c 'QT_QPA_PLATFORM=xcb vlc --no-video-title-show --loop /tmp/hatch-bars.y4m'" \
+     && python3 - "$PROOF/vlc-video.png" <<'PY'
+import sys
+from PIL import Image
+im = Image.open(sys.argv[1]).convert("RGB"); w, h = im.size
+# Colour bars: count strongly saturated yellow/cyan/green/magenta/red/blue pixels.
+sat = sum(1 for (r, g, b) in im.resize((w // 4, h // 4)).getdata() if max(r, g, b) - min(r, g, b) > 120)
+print(f"vlc-video saturated px={sat}"); sys.exit(0 if sat > 400 else 1)
+PY
+  then stamp "vlc video playback OK"; else stamp "vlc video playback FAILED"; FAILED+=(vlc-video); fi
+fi
 
 # GPU path (Turnip/KGSL): no Adreno on CI, but prove the bundled driver unpacks, its deps install and it links in the
 # real guest — the self-test must get as far as the /dev/kgsl-3d0 check (only the Fold 8 can go further).
