@@ -68,7 +68,9 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
     /** Take Wayland keyboard focus away from this window (if it has it): wl_keyboard.leave, deactivated. */
     fun blurGuest() {
         val w = toplevel ?: return
-        rt.server?.post { val seat = rt.server?.seat; if (seat?.focus === w) seat.focusWindow(null) }
+        // Any toplevel of this window's client: Wine maps several (owner, dialogs), and the one holding keyboard focus
+        // is often not the one bound here, so an identity check left Notepad++ focused (caret kept blinking).
+        rt.server?.post { val seat = rt.server?.seat; val f = seat?.focus; if (f != null && (f === w || f.client === w.client)) seat.focusWindow(null) }
     }
 
     /** Forget the toplevel (it was destroyed); releases our render target. */
