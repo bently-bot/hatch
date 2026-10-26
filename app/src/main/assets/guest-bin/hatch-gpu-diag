@@ -1,0 +1,100 @@
+#!/bin/sh
+# hatch-gpu-diag (user): Settings › Diagnostics › GPU test, and CI's Chromium GPU evidence.
+#   hatch-gpu-diag                       -> GL/Vulkan renderer of the current environment
+#   hatch-gpu-diag --chromium CMD ARG... -> also launches a throwaway Chromium/Electron instance with CMD (the app's
+#                                           launch command + its current renderer-rung flags), asks it over the
+#                                           DevTools protocol (SystemInfo.getInfo) which GL renderer and which
+#                                           compositing path it really uses, then closes it.
+# Output: "HATCH-GPU key=value" lines (parsed by GpuDiag.kt and ci-guest-proof.sh); anything else is context.
+set -u
+say() { echo "HATCH-GPU $*"; }
+say env="GALLIUM_DRIVER=${GALLIUM_DRIVER:-} MESA_LOADER_DRIVER_OVERRIDE=${MESA_LOADER_DRIVER_OVERRIDE:-} MESA_VK_WSI_DEBUG=${MESA_VK_WSI_DEBUG:-} VK_ICD=${VK_ICD_FILENAMES:-default}"
+say kgsl="$([ -c /dev/kgsl-3d0 ] && echo visible || echo absent)"
+say dri="$(ls /dev/dri 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
+say dma_heap="$(ls /dev/dma_heap 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
+if command -v vulkaninfo >/dev/null 2>&1; then
+  V=$(timeout 30 vulkaninfo --summary 2>/dev/null)
+  say vk_device="$(printf '%s\n' "$V" | sed -n 's/^[[:space:]]*deviceName[[:space:]]*=[[:space:]]*//p' | head -1)"
+  say vk_driver="$(printf '%s\n' "$V" | sed -n 's/^[[:space:]]*driverName[[:space:]]*=[[:space:]]*//p' | head -1)"
+fi
+if command -v glxinfo >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
+  say gl_renderer="$(timeout 30 glxinfo -B 2>/dev/null | sed -n 's/^OpenGL renderer string: //p' | head -1)"
+elif command -v eglinfo >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  say gl_renderer="$(timeout 30 eglinfo -p wayland 2>/dev/null | sed -n 's/^OpenGL core profile renderer: //p' | head -1)"
+fi
+[ "${1:-}" = "--chromium" ] || exit 0
+shift
+command -v python3 >/dev/null 2>&1 || { say chromium_error="python3 missing in the guest"; exit 3; }
+exec python3 - "$@" <<'PY'
+import base64, json, os, shutil, signal, socket, struct, subprocess, sys, tempfile, time
+def say(k, v): print(f"HATCH-GPU {k}={v}", flush=True)
+prof = tempfile.mkdtemp(prefix="hatch-gpu-test-")
+cmd = sys.argv[1:] + ["--remote-debugging-port=0", f"--user-data-dir={prof}", "--no-first-run",
+                      "--no-default-browser-check", "--new-window", "about:blank"]
+print("launch:", " ".join(cmd), flush=True)
+p = subprocess.Popen(cmd, start_new_session=True, stdout=sys.stdout, stderr=sys.stdout)
+port_file = os.path.join(prof, "DevToolsActivePort")
+def finish(code):
+    try: os.killpg(p.pid, signal.SIGTERM); p.wait(10)
+    except Exception:
+        try: os.killpg(p.pid, signal.SIGKILL)
+        except Exception: pass
+    shutil.rmtree(prof, ignore_errors=True); sys.exit(code)
+deadline = time.time() + float(os.environ.get("HATCH_GPU_DIAG_TIMEOUT", "90"))
+while time.time() < deadline and not (os.path.exists(port_file) and len(open(port_file).read().split()) >= 2):
+    if p.poll() is not None: say("chromium_error", f"exited rc={p.returncode} before DevTools came up"); finish(4)
+    time.sleep(0.5)
+if not os.path.exists(port_file): say("chromium_error", "DevTools did not come up"); finish(5)
+port, path = open(port_file).read().split()[:2]
+time.sleep(float(os.environ.get("HATCH_GPU_DIAG_SETTLE", "8")))   # let the GPU process initialise and composite a frame
+
+def ws_call(method, params=None):
+    s = socket.create_connection(("127.0.0.1", int(port)), timeout=30)
+    key = base64.b64encode(os.urandom(16)).decode()
+    s.sendall((f"GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+               f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
+    hdr = b""
+    while b"\r\n\r\n" not in hdr: hdr += s.recv(1)
+    if b" 101 " not in hdr.split(b"\r\n")[0]: raise RuntimeError(hdr.split(b"\r\n")[0].decode())
+    data = json.dumps({"id": 1, "method": method, "params": params or {}}).encode()
+    mask = os.urandom(4); n = len(data)
+    head = bytes([0x81]) + (bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n) if n < 65536 else bytes([0x80 | 127]) + struct.pack(">Q", n))
+    s.sendall(head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(data)))
+    def recvn(k):
+        b = b""
+        while len(b) < k:
+            c = s.recv(k - len(b))
+            if not c: raise RuntimeError("closed")
+            b += c
+        return b
+    msg = b""
+    while True:
+        b0, b1 = recvn(2); ln = b1 & 0x7f
+        if ln == 126: ln = struct.unpack(">H", recvn(2))[0]
+        elif ln == 127: ln = struct.unpack(">Q", recvn(8))[0]
+        payload = recvn(ln); op = b0 & 0x0f
+        if op in (0, 1): msg += payload
+        if b0 & 0x80 and op in (0, 1):
+            j = json.loads(msg); msg = b""
+            if j.get("id") == 1: s.close(); return j
+try:
+    r = ws_call("SystemInfo.getInfo")
+except Exception as e:
+    say("chromium_error", f"CDP: {e}"); finish(6)
+if "error" in r: say("chromium_error", json.dumps(r["error"])); finish(7)
+g = r["result"]["gpu"]; aux = g.get("auxAttributes", {}); fs = g.get("featureStatus", {})
+dev = (g.get("devices") or [{}])[0]
+ren = aux.get("glRenderer", "") or dev.get("deviceString", "")
+say("chromium_gl_renderer", ren)
+say("chromium_gl_vendor", aux.get("glVendor", ""))
+say("chromium_gl_implementation", aux.get("glImplementationParts", aux.get("glImplementation", "")))
+say("chromium_display_type", aux.get("displayType", ""))
+for k in ("gpu_compositing", "webgl", "webgl2", "rasterization", "vulkan", "opengl", "video_decode", "skia_graphite"):
+    if k in fs: say("feature_" + k, fs[k])
+say("driver_bug_workarounds", len(g.get("driverBugWorkarounds", [])))
+comp = fs.get("gpu_compositing", "")
+cpu = any(w in ren.lower() for w in ("swiftshader", "llvmpipe", "lavapipe", "softpipe"))
+say("chromium_renderer_is_cpu", "yes" if cpu else "no")
+say("verdict", "gpu-compositing" if comp.startswith("enabled") else "software-compositing")
+finish(0)
+PY

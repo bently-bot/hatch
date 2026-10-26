@@ -146,6 +146,7 @@ class MainActivity : ComponentActivity() {
                                     g.describe(g.mode(this@MainActivity), g.info(this@MainActivity, LinuxRuntime.rootfsDir(this@MainActivity)))
                                 },
                                 gpuEnabled = { dev.hatch.gpu.Gpu.mode(this@MainActivity) == dev.hatch.gpu.Gpu.Mode.AUTO },
+                                gpuTest = { dev.hatch.gpu.GpuTest.run(this@MainActivity) },
                                 setGpuEnabled = { on ->
                                     dev.hatch.gpu.Gpu.setMode(this@MainActivity, if (on) dev.hatch.gpu.Gpu.Mode.AUTO else dev.hatch.gpu.Gpu.Mode.SOFTWARE)
                                 },

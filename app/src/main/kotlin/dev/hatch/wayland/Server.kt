@@ -32,6 +32,9 @@ class WaylandServer(val host: WindowHost, val tmpDir: String, keymapText: String
      * dev_t for dma-buf feedback: a DRM render node if there is one (CI hosts), else the Adreno KGSL node (Android
      * has no DRM node for apps), else 0. Clients only compare it with their own device.
      */
+    /** appTag → buffer kinds its surfaces committed ("dma-buf", "wl_shm"); Settings › Diagnostics › GPU test reads it. */
+    val presentKinds = java.util.concurrent.ConcurrentHashMap<String, MutableSet<String>>()
+    fun presented(tag: String, kind: String) { presentKinds.getOrPut(tag) { java.util.concurrent.ConcurrentHashMap.newKeySet() }.add(kind) }
     val mainDevice: Long by lazy {
         val dri = java.io.File("/dev/dri").listFiles()?.filter { it.name.startsWith("renderD") }?.sortedBy { it.name }.orEmpty()
         (dri.map { it.path } + "/dev/kgsl-3d0").firstNotNullOfOrNull { p -> runCatching { Native.devId(p) }.getOrNull()?.takeIf { it >= 0 } } ?: 0L
