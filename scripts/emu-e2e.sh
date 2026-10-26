@@ -493,8 +493,11 @@ PY
   # Focus hand-back (DEVICE-VERIFY #20): after typing in Notepad++, tap the store's search field above the window
   # and type. The text must land in the store, and the Notepad++ window must not change.
   adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 2
-  $UI tap 'Search apps' dev.hatch || fail "store search field not reachable next to Notepad++"
-  sleep 2; shot 14c-before-store-typing   # after the tap: Notepad++ is unfocused, its caret no longer blinks
+  # The store is still on Notepad++'s detail page (and the search field still holds "notepad"): back to the list.
+  for t in 1 2 3; do $UI has 'Search apps|^notepad$' dev.hatch && break; adb shell input keyevent 4; sleep 1.5; done
+  $UI tap 'Search apps|^notepad$' dev.hatch || fail "store search field not reachable next to Notepad++"
+  sleep 1; adb shell input keyevent $(printf '67 %.0s' $(seq 1 12)); sleep 1
+  shot 14c-before-store-typing   # after the tap: Notepad++ is unfocused, its caret no longer blinks
   adb shell input text "focusback"; sleep 3; shot 14d-store-typed
   $UI has '^focusback$' dev.hatch || fail "focus hand-back: text typed after tapping the store did not reach the store"
   python3 - "$OUT/14c-before-store-typing.png" "$OUT/14d-store-typed.png" $NL $NT $NR $NB <<'PY' || fail "focus hand-back: Notepad++ changed while typing in the store"
