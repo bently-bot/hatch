@@ -12,14 +12,23 @@ object GpuDiag {
         .mapNotNull { l -> l.removePrefix("HATCH-GPU ").let { kv -> kv.indexOf('=').takeIf { it > 0 }?.let { kv.substring(0, it) to kv.substring(it + 1) } } }
         .toMap()
 
+    /** One line for the Vulkan WSI probe: which buffer kind Turnip's Wayland WSI handed the compositor. */
+    fun vkWsiLine(r: Map<String, String>, presented: Set<String>): String = when {
+        r["vk_wsi"] == "vkcube-missing" -> "not tested (vkcube missing)"
+        "dma-buf" in presented -> "dma-buf (GPU buffer, no guest-side readback)"
+        "wl_shm" in presented -> "wl_shm (driver copied to shared memory)"
+        else -> "no frames${r["vk_wsi_error"]?.let { " ($it)" } ?: r["vk_wsi_rc"]?.let { " (rc $it)" } ?: ""}"
+    }
+
     data class Report(val title: String, val lines: List<String>, val gpuCompositing: Boolean?)
 
     /**
      * [app] = label of the Chromium/Electron app tested (null: none installed), [rung] = renderer rung label,
      * [presented] = buffer kinds the compositor saw from the test client ("dma-buf", "wl_shm").
      */
-    fun report(r: Map<String, String>, app: String?, rung: String?, presented: Set<String>): Report {
+    fun report(r: Map<String, String>, app: String?, rung: String?, presented: Set<String>, vkWsi: String? = null): Report {
         val lines = ArrayList<String>()
+        vkWsi?.let { lines += "Vulkan Wayland present (no sw override): $it" }
         r["vk_device"]?.takeIf { it.isNotBlank() }?.let { lines += "Vulkan: $it${r["vk_driver"]?.takeIf { d -> d.isNotBlank() }?.let { d -> " ($d)" } ?: ""}" }
         r["gl_renderer"]?.takeIf { it.isNotBlank() }?.let { lines += "OpenGL: $it" }
         lines += "Adreno KGSL: ${r["kgsl"] ?: "?"} · DRM render node: ${r["dri"]?.ifBlank { null } ?: "none"} · dma-heap: ${r["dma_heap"]?.ifBlank { null } ?: "none"}"

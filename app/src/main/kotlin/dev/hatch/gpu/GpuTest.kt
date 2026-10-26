@@ -21,6 +21,23 @@ object GpuTest {
     private const val TAG = "HatchGpuTest"
     private val preference = listOf("brave", "code", "cursor", "chromium")
 
+    /** vkcube on Turnip's Wayland WSI without the sw-present override: does the GPU hand us dma-bufs? */
+    private suspend fun vkWsiProbe(context: Context): String {
+        val rt = HatchApp.instance.runtime
+        rt.ensureStarted()
+        val tag = GpuDiag.TAG + "-vk"
+        val dir = rt.ensureAppSocket(tag).absolutePath
+        rt.server?.presentKinds?.remove(tag)
+        val argv = GuestScripts.launchArgv(listOf("${GuestScripts.BIN}/hatch-gpu-diag", "--vk-wsi"), wine = false, x11 = false)
+        if (!AppSession.start(context, tag, argv, dir, extraEnv = Gpu.env(true), header = "GPU test: Vulkan WSI probe")) return "not tested (could not start)"
+        val deadline = System.currentTimeMillis() + 40_000
+        while (AppSession.isRunning(tag) && System.currentTimeMillis() < deadline) delay(300)
+        if (AppSession.isRunning(tag)) AppSession.stop(tag)
+        delay(300)
+        val out = runCatching { AppSession.logFile(context, tag).readText() }.getOrDefault("")
+        return GpuDiag.vkWsiLine(GpuDiag.parse(out), rt.server?.presentKinds?.get(tag)?.toSet().orEmpty())
+    }
+
     suspend fun run(context: Context): GpuDiag.Report = withContext(Dispatchers.IO) {
         val rootfs = LinuxRuntime.rootfsDir(context)
         val gpuOk = Gpu.useGpu(Gpu.mode(context), Gpu.info(context, rootfs))
@@ -29,14 +46,16 @@ object GpuTest {
         if (app == null) {
             val env = Gpu.env(gpuOk).entries.joinToString(" ") { "${it.key}='${it.value}'" }
             val r = LinuxRuntime.run(context, "env $env ${GuestScripts.BIN}/hatch-gpu-diag 2>&1", timeoutMs = 90_000)
-            return@withContext GpuDiag.report(GpuDiag.parse(r?.stdout.orEmpty()), null, null, emptySet())
+            val vk = if (gpuOk) vkWsiProbe(context) else null
+            return@withContext GpuDiag.report(GpuDiag.parse(r?.stdout.orEmpty()), null, null, emptySet(), vk)
         }
         val ladder = Renderers.ladder(Renderers.kind(app.command), gpuOk)
         val cfg = Renderers.current(context, app.id, ladder)
         val rt = HatchApp.instance.runtime
         rt.ensureStarted()
+        val vk = if (gpuOk) vkWsiProbe(context) else null
         val dir = rt.ensureAppSocket(GpuDiag.TAG).absolutePath
-        rt.server?.let { s -> s.post { s.presentKinds.remove(GpuDiag.TAG) } }
+        rt.server?.presentKinds?.remove(GpuDiag.TAG)
         val argv = GuestScripts.launchArgv(listOf("${GuestScripts.BIN}/hatch-gpu-diag", "--chromium") + app.command + cfg.args.filter { it !in app.command },
             wine = false, x11 = cfg.x11 ?: app.x11)
         val env = Gpu.env(cfg.gpu) + cfg.env
@@ -49,6 +68,6 @@ object GpuTest {
         delay(300)   // the log thread flushes after EOF
         val out = runCatching { AppSession.logFile(context, GpuDiag.TAG).readText() }.getOrDefault("")
         val kinds = rt.server?.presentKinds?.get(GpuDiag.TAG)?.toSet().orEmpty()
-        GpuDiag.report(GpuDiag.parse(out), app.name, cfg.label, kinds).also { Log.i(TAG, "${it.title}: ${it.lines}") }
+        GpuDiag.report(GpuDiag.parse(out), app.name, cfg.label, kinds, vk).also { Log.i(TAG, "${it.title}: ${it.lines}") }
     }
 }

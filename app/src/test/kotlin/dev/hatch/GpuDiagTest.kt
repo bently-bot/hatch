@@ -57,3 +57,13 @@ class GpuDiagTest {
         assertEquals("GPU test: no Chromium app installed", GpuDiag.report(emptyMap(), null, null, emptySet()).title)
     }
 }
+
+class GpuVkWsiTest {
+    @Test fun lines() {
+        assertEquals("dma-buf (GPU buffer, no guest-side readback)", GpuDiag.vkWsiLine(emptyMap(), setOf("dma-buf")))
+        assertEquals("wl_shm (driver copied to shared memory)", GpuDiag.vkWsiLine(mapOf("vk_wsi_rc" to "124"), setOf("wl_shm")))
+        assertEquals("no frames (rc 1)", GpuDiag.vkWsiLine(mapOf("vk_wsi_rc" to "1"), emptySet()))
+        assertEquals("not tested (vkcube missing)", GpuDiag.vkWsiLine(mapOf("vk_wsi" to "vkcube-missing"), emptySet()))
+        assertTrue(GpuDiag.report(emptyMap(), null, null, emptySet(), "dma-buf (GPU buffer, no guest-side readback)").lines.first().startsWith("Vulkan Wayland present"))
+    }
+}

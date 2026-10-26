@@ -1,6 +1,7 @@
 #!/bin/sh
 # hatch-gpu-diag (user): Settings › Diagnostics › GPU test, and CI's Chromium GPU evidence.
 #   hatch-gpu-diag                       -> GL/Vulkan renderer of the current environment
+#   hatch-gpu-diag --vk-wsi              -> runs vkcube on Wayland WSI without MESA_VK_WSI_DEBUG=sw (dma-buf probe)
 #   hatch-gpu-diag --chromium CMD ARG... -> also launches a throwaway Chromium/Electron instance with CMD (the app's
 #                                           launch command + its current renderer-rung flags), asks it over the
 #                                           DevTools protocol (SystemInfo.getInfo) which GL renderer and which
@@ -21,6 +22,15 @@ if command -v glxinfo >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
   say gl_renderer="$(timeout 30 glxinfo -B 2>/dev/null | sed -n 's/^OpenGL renderer string: //p' | head -1)"
 elif command -v eglinfo >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then
   say gl_renderer="$(timeout 30 eglinfo -p wayland 2>/dev/null | sed -n 's/^OpenGL core profile renderer: //p' | head -1)"
+fi
+if [ "${1:-}" = "--vk-wsi" ]; then
+  # Vulkan Wayland WSI without Hatch's software-present override: on Turnip/KGSL this is the one path that can hand
+  # Hatch a real GPU dma-buf. The compositor records whether frames came as dma-buf or wl_shm.
+  command -v vkcube >/dev/null 2>&1 || { say vk_wsi=vkcube-missing; exit 0; }
+  env -u MESA_VK_WSI_DEBUG timeout 12 vkcube --wsi wayland --c 300 > /tmp/hatch-vkcube.log 2>&1; rc=$?
+  say vk_wsi_rc=$rc
+  grep -m3 -iE 'error|fail|unsupported' /tmp/hatch-vkcube.log | sed 's/^/HATCH-GPU vk_wsi_error=/' || true
+  exit 0
 fi
 [ "${1:-}" = "--chromium" ] || exit 0
 shift
