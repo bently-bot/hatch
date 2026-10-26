@@ -40,13 +40,15 @@ jobs:
       - name: linux-dmabuf v4 proof (feedback, LINEAR import, non-LINEAR refusal)
         run: |
           harness/clients/build.sh "$PWD/build/host"
-          ls -l /dev/udmabuf 2>/dev/null || echo "no /dev/udmabuf: the client falls back to a memfd-backed buffer"
+          # A real kernel dma-buf when the runner has udmabuf (exercises DMA_BUF_IOCTL_SYNC); else a memfd stand-in.
+          if [ -c /dev/udmabuf ]; then sudo chmod a+rw /dev/udmabuf; UDMA=1; else UDMA=0; echo "no /dev/udmabuf: memfd fallback"; fi
           mkdir -p harness-out/dmabuf
           java -Dhatch.native=$PWD/build/host/libhatchnative.so \
             -cp "build/host/classes:/opt/kotlinc/lib/kotlin-stdlib.jar" \
             dev.hatch.harness.MainKt "$RUNNER_TEMP/wayland-dmabuf" harness-out/dmabuf/dmabuf.png 20 -- build/host/dmabuf-test | tee harness-out/dmabuf/host.log
           cat harness-out/dmabuf/client.log
           grep -q 'DMABUF-OK' harness-out/dmabuf/client.log
+          [ "$UDMA" = 0 ] || grep -q 'DMABUF-OK kind=udmabuf' harness-out/dmabuf/client.log
           grep -q 'first dma-buf frame 256x192' harness-out/dmabuf/host.log
           grep -q 'dmabuf rejected: modifier' harness-out/dmabuf/host.log
       - uses: actions/upload-artifact@v4
