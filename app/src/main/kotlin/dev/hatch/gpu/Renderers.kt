@@ -5,11 +5,14 @@ import android.content.Context
 /**
  * Per-app renderer ladder: GPU first, software last (Bently's policy: always GPU when it works).
  *
- * Why Chromium apps need their own ladder: Hatch's compositor is wl_shm only (no zwp_linux_dmabuf / wl_drm). On a
- * real Adreno, Chromium's Ozone-Wayland GPU process wants GBM/dmabuf presentation, so VS Code, Cursor, Brave
- * (Electron/Chromium) and Steam's CEF web helper either lose their GPU process or present solid black frames.
- * Blender works because X11 GL reaches Zink through Xwayland via drisw/kopper (software present, GPU render), so the
- * first rung puts Chromium on that same proven path.
+ * Why Chromium apps need their own ladder: Chromium's Ozone-Wayland GPU compositing allocates its buffers with GBM on
+ * a DRM render node and hands them over as dma-bufs. Hatch's compositor speaks zwp_linux_dmabuf_v1 v4 (0.4.0), but
+ * an Android app has no DRM node at all (Adreno is /dev/kgsl-3d0), so on Wayland Chromium always falls back to
+ * software compositing ("drmGetDevices2() has not found any devices" → gpu_compositing: disabled_software; its
+ * Vulkan compositor additionally refuses Wayland outright). Measured, see docs/GPU-DMABUF.md.
+ * On X11 (rootful Xwayland) Chromium composites with GL through ANGLE → Zink → Turnip and presents via the
+ * X server (kopper software present), and gpu_compositing is enabled, the same path Blender uses. So gpu-x11 is
+ * the top rung; the Wayland rungs keep GPU raster for when X11 fails.
  *
  * A rung "worked" once its window showed real pixels (WaylandServer black-frame check); that rung is remembered.
  * If a window stays black / the app dies before drawing, the launcher moves to the next rung automatically.
@@ -56,7 +59,7 @@ object Renderers {
                 Config("gpu-x11", "GPU (Zink, X11 + ANGLE/GL)", gpu = true, x11 = true,
                     args = CHROMIUM_BASE + listOf("--ozone-platform=x11", "--use-gl=angle", "--use-angle=gl", "--ignore-gpu-blocklist"),
                     env = mapOf("ELECTRON_OZONE_PLATFORM_HINT" to "x11", "XDG_SESSION_TYPE" to "x11")),
-                Config("gpu-wayland", "GPU (Turnip, Wayland + ANGLE/Vulkan)", gpu = true, x11 = false,
+                Config("gpu-wayland", "GPU raster (Turnip, Wayland + ANGLE/Vulkan)", gpu = true, x11 = false,
                     args = CHROMIUM_BASE + listOf("--ozone-platform=wayland", "--use-gl=angle", "--use-angle=vulkan",
                         "--enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan", "--ignore-gpu-blocklist"),
                     env = mapOf("ELECTRON_OZONE_PLATFORM_HINT" to "wayland")),

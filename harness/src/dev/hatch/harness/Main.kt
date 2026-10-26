@@ -44,7 +44,7 @@ fun main(args: Array<String>) {
         }
         override fun log(msg: String) { println("[host] $msg"); System.out.flush() }
     }
-    val server = WaylandServer(host, sockDir.absolutePath, keymap)
+    val server = WaylandServer(host, sockDir.absolutePath, keymap, dmabufEnabled = System.getProperty("hatch.dmabuf") != "0")
     server.scale = 1; server.outputWidth = 1280; server.outputHeight = 800
     val sock = File(sockDir, "wayland-0").absolutePath; File(sock).delete()
     server.start()

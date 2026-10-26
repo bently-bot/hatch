@@ -164,7 +164,7 @@ if [ "${GPU_PROXY:-0}" = 1 ]; then
   # Same GL stack the app uses on Adreno (Gpu.env(true): Zink → Vulkan → MESA_VK_WSI_DEBUG=sw present into Hatch),
   # with lavapipe standing in for Turnip/KGSL, which only exists on Qualcomm hardware.
   stamp "== GPU path proxy: GL → Zink → Vulkan (lavapipe for Turnip) → sw WSI → Hatch compositor =="
-  "${G[@]}" bash -c 'DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends mesa-vulkan-drivers mesa-utils libvulkan1 >/tmp/gpu-apt.log 2>&1; tail -1 /tmp/gpu-apt.log; ls /usr/share/vulkan/icd.d/'
+  "${G[@]}" bash -c 'DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends mesa-vulkan-drivers mesa-utils libvulkan1 vulkan-tools python3-minimal >/tmp/gpu-apt.log 2>&1; tail -1 /tmp/gpu-apt.log; ls /usr/share/vulkan/icd.d/'
   LVP=$("${G[@]}" bash -c 'ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -1' | tr -d '\r')
   ZENV="LIBGL_ALWAYS_SOFTWARE=0 GALLIUM_DRIVER=zink MESA_LOADER_DRIVER_OVERRIDE=zink VK_ICD_FILENAMES=$LVP VK_DRIVER_FILES=$LVP MESA_VK_WSI_DEBUG=sw LIBGL_KOPPER_DRI2=1 D3D_ALWAYS_SOFTWARE=1 HATCH_GPU=1"  # D3D_ALWAYS_SOFTWARE: proxy only, lets Zink accept the CPU Vulkan device
   SENV="LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe MESA_LOADER_DRIVER_OVERRIDE=llvmpipe"
@@ -192,6 +192,30 @@ PY
   grep -qE 'GL_RENDERER *= *zink|renderer string: zink' "$PROOF/gpu-glxgears-zink-client.log" \
     && grep -q 'HATCH-FPS renderer=zink' "$PROOF/gpu-blender-zink-client.log" && stamp "GPU proxy OK: glxgears and Blender run on Zink over Vulkan, presented through Hatch" \
     || { stamp "GPU proxy FAILED: Zink not active"; FAILED+=(gpu-proxy-zink); }
+
+  if [[ " $APPS " == *" brave-browser "* ]]; then
+    # Chromium GPU evidence (docs/GPU-DMABUF.md): Brave on each GPU rung of Renderers.ladder, asked over DevTools
+    # (hatch-gpu-diag = Settings › Diagnostics › GPU test) which GL renderer and compositing path it really got,
+    # plus which buffer kind (dma-buf / wl_shm) reached the compositor. The compositor offers linux-dmabuf v4.
+    stamp "== Chromium GPU rungs (Brave, Zink over lavapipe) =="
+    BR="brave-browser --no-sandbox --test-type --no-sandbox --disable-gpu-sandbox --disable-dev-shm-usage --ignore-gpu-blocklist"
+    declare -A RUNG=(
+      [x11]="--x11 -- hatch-gpu-diag --chromium $BR --ozone-platform=x11 --use-gl=angle --use-angle=gl"
+      [wayland-vulkan]="-- hatch-gpu-diag --chromium $BR --ozone-platform=wayland --use-gl=angle --use-angle=vulkan --enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan"
+      [wayland-gl]="-- hatch-gpu-diag --chromium $BR --ozone-platform=wayland --use-gl=angle --use-angle=gl"
+    )
+    for r in x11 wayland-vulkan wayland-gl; do
+      E="$ZENV ELECTRON_OZONE_PLATFORM_HINT=$([ $r = x11 ] && echo x11 || echo wayland) HATCH_GPU_DIAG_SETTLE=15 HATCH_GPU_DIAG_TIMEOUT=150"
+      capture "gpu-chromium-$r" 240 --wait-exit --settle=20000 -- "${GU[@]}" bash -c "env $E hatch-launch ${RUNG[$r]}" || true
+      grep -E 'first (dma-buf|wl_shm) frame|dmabuf rejected' "$PROOF/gpu-chromium-$r-host.log" | sed "s/^/  [$r] /" || true
+      grep -E 'HATCH-GPU (chromium_|feature_gpu_compositing|feature_rasterization|feature_webgl|verdict)' "$PROOF/gpu-chromium-$r-client.log" | sed "s/^/  [$r] /" || stamp "WARN: no GPU test result for $r"
+      grep -hE 'drm_render_node|not compatible with Vulkan|Failed to create vulkan surface|GBM|gbm' "$PROOF/gpu-chromium-$r-client.log" | sed 's/^\[[^]]*\]//' | sort -u | head -5 | sed "s/^/  [$r] chromium: /" || true
+    done
+    grep -q 'HATCH-GPU feature_gpu_compositing=enabled' "$PROOF/gpu-chromium-x11-client.log" \
+      && grep -q 'HATCH-GPU chromium_gl_renderer=.*zink' "$PROOF/gpu-chromium-x11-client.log" \
+      && stamp "Chromium GPU OK: Brave on the gpu-x11 rung composites on the GPU (ANGLE GL → Zink → Vulkan)" \
+      || { stamp "Chromium GPU FAILED: no GPU compositing on the gpu-x11 rung"; FAILED+=(gpu-chromium-x11); }
+  fi
 fi
 
 if [[ " $APPS " == *" doom "* ]]; then

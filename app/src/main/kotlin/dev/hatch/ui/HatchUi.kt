@@ -591,6 +591,7 @@ private fun SettingsTab(actions: StoreActions, update: dev.hatch.update.SelfUpda
             Hint(actions.gpuStatus())
             Hint("Apps start on the GPU. If an app's window stays black or it quits before drawing, Hatch retries it with the next renderer and falls back to software last, then remembers what worked. To force software for one app, use its menu (⋮ on the window, or the ▾ next to Open).")
         }
+        actions.gpuTest?.let { test -> DiagnosticsCard(test) }
         SettingCard("Help") {
             Hint("Each app launch is logged on this phone. Share logs bundles them with Hatch's own log and device info and opens the share sheet. Nothing is sent until you pick where it goes.")
             OutlinedButton(onClick = actions.shareLogs, Modifier.testTag("share-logs")) { Text("Share logs") }
@@ -605,6 +606,26 @@ private fun SettingsTab(actions: StoreActions, update: dev.hatch.update.SelfUpda
         actions.storage?.let { StorageSection(it, onUninstall = actions.uninstall) }
             ?: SettingCard("Storage") { Hint(if (storage.isEmpty()) "Linux system: unknown" else "Linux system and apps: $storage") }
         SettingCard("About") { Hint("Hatch ${actions.versionName} · Debian 13 ($deviceArch) under proot · Wayland compositor · Wine") }
+    }
+}
+
+/** Settings › Diagnostics: "GPU test" (GpuTest.kt) — which renderer a Chromium/Electron app really ends up on. */
+@Composable
+fun DiagnosticsCard(test: suspend () -> dev.hatch.gpu.GpuDiag.Report, initial: dev.hatch.gpu.GpuDiag.Report? = null) {
+    val scope = rememberCoroutineScope()
+    var running by remember { mutableStateOf(false) }
+    var report by remember { mutableStateOf(initial) }
+    SettingCard("Diagnostics") {
+        Hint("GPU test starts a throwaway copy of an installed Chromium or Electron app (Brave, VS Code, Cursor…) on the renderer it currently uses and asks it which GPU and compositing path it really got. Takes up to a minute; a test window may flash up.")
+        OutlinedButton(onClick = {
+            running = true
+            scope.launch { report = runCatching { test() }.getOrElse { dev.hatch.gpu.GpuDiag.Report("GPU test failed: ${it.message}", emptyList(), null) }; running = false }
+        }, enabled = !running, modifier = Modifier.testTag("gpu-test")) { Text(if (running) "Testing…" else "GPU test") }
+        report?.let { r ->
+            Text(r.title, fontWeight = FontWeight.SemiBold, color = when (r.gpuCompositing) { true -> HatchBlue; false -> MaterialTheme.colorScheme.error; null -> MaterialTheme.colorScheme.onSurface },
+                modifier = Modifier.testTag("gpu-test-title"))
+            r.lines.forEach { Hint(it) }
+        }
     }
 }
 

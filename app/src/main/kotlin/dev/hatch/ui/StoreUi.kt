@@ -207,6 +207,8 @@ data class StoreActions(
     val setSoftwareRendering: (StoreApp, Boolean) -> Unit = { _, _ -> },
     val rendererInfo: (StoreApp) -> String = { "" },
     val shareLogs: () -> Unit = {},
+    /** Settings › Diagnostics › GPU test (null hides the button). */
+    val gpuTest: (suspend () -> dev.hatch.gpu.GpuDiag.Report)? = null,
     /** Catalogue `import` spec (e.g. DOOM's "Import WAD"): pick files in Android storage and copy them into the guest. */
     val importFiles: (StoreApp) -> Unit = {},
     val isPinned: (StoreApp) -> Boolean = { false },

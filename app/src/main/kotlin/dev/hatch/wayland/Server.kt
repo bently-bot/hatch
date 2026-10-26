@@ -27,7 +27,18 @@ class Global(val name: Int, val iface: String, val version: Int, val bind: (Clie
  * A single-threaded Wayland server. All protocol state is touched only on the server thread;
  * other threads hand work over with [post] / [call].
  */
-class WaylandServer(val host: WindowHost, val tmpDir: String, keymapText: String) {
+class WaylandServer(val host: WindowHost, val tmpDir: String, keymapText: String, val dmabufEnabled: Boolean = true) {
+    /**
+     * dev_t for dma-buf feedback: a DRM render node if there is one (CI hosts), else the Adreno KGSL node (Android
+     * has no DRM node for apps), else 0. Clients only compare it with their own device.
+     */
+    /** appTag → buffer kinds its surfaces committed ("dma-buf", "wl_shm"); Settings › Diagnostics › GPU test reads it. */
+    val presentKinds = java.util.concurrent.ConcurrentHashMap<String, MutableSet<String>>()
+    fun presented(tag: String, kind: String) { presentKinds.getOrPut(tag) { java.util.concurrent.ConcurrentHashMap.newKeySet() }.add(kind) }
+    val mainDevice: Long by lazy {
+        val dri = java.io.File("/dev/dri").listFiles()?.filter { it.name.startsWith("renderD") }?.sortedBy { it.name }.orEmpty()
+        (dri.map { it.path } + "/dev/kgsl-3d0").firstNotNullOfOrNull { p -> runCatching { Native.devId(p) }.getOrNull()?.takeIf { it >= 0 } } ?: 0L
+    }
     /** Output scale: logical units -> target pixels. */
     @Volatile var scale: Int = 2
     var outputWidth = 1920; var outputHeight = 1080
@@ -138,6 +149,9 @@ abstract class Res(val client: Client, val id: Int, val version: Int) {
 }
 
 class Client(val server: WaylandServer, val fd: Int, val appTag: String) {
+    /** Frames committed per buffer kind (GPU test: did this app present through dma-buf or wl_shm?). */
+    @Volatile var dmabufCommits = 0L
+    @Volatile var shmCommits = 0L
     val objects = HashMap<Int, Res>()
     val out = Out()
     private val inBuf: ByteBuffer = ByteBuffer.allocateDirect(256 * 1024).order(ByteOrder.LITTLE_ENDIAN)
