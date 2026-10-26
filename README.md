@@ -71,8 +71,8 @@ Release rules: every release must carry `hatch-<version>.apk` (signed with the r
    - Apps run as a normal user (`hatch`); installs run as fake root.
 2. **Guest scripts** (`app/src/main/assets/guest-bin`) do all the installing and launching. CI runs the very same scripts inside a Debian 13 arm64 rootfs, so what CI proves is what ships.
 3. **Compositor** (`dev.hatch.wayland`, C + Kotlin): each `xdg_toplevel` is backed by a SurfaceView. That's an overlay window from `FloatingWindows` by default, or a `WindowActivity` in tasks mode. Buffers come in as `wl_shm` or as LINEAR dma-bufs (`zwp_linux_dmabuf_v1` v4 with feedback).
-5. **GPU**: Turnip (KGSL) + Zink. Chromium/Electron apps have their own renderer ladder; X11 + ANGLE/GL is the rung with real GPU compositing, because Android apps have no DRM render node for Chromium's Wayland GPU path. **Settings › Diagnostics › GPU test** shows the renderer an installed Chromium app really gets. See [docs/GPU-DMABUF.md](docs/GPU-DMABUF.md).
 4. **Flathub without bubblewrap**: `hatch-flatpak` writes a spec (skeleton root, binds, env) that `FlatpakSpec.kt` and `scripts/guest-run.sh` turn into a proot invocation. A bwrap stub makes glycin and WebKit fall back cleanly instead of hanging.
+5. **GPU**: Turnip (KGSL) + Zink. Chromium/Electron apps have their own renderer ladder; X11 + ANGLE/GL is the rung with real GPU compositing, because Android apps have no DRM render node for Chromium's Wayland GPU path. **Settings › Diagnostics › GPU test** shows the renderer an installed Chromium app really gets. See [docs/GPU-DMABUF.md](docs/GPU-DMABUF.md).
 
 ## Tests
 
