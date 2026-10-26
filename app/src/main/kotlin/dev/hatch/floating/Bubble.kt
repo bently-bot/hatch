@@ -82,7 +82,7 @@ object Bubble {
         var sx = 0f; var sy = 0f; var ox = 0; var oy = 0; var moved = false
         root.setOnTouchListener { _, e ->
             when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { sx = e.rawX; sy = e.rawY; ox = p.x; oy = p.y; moved = false }
+                MotionEvent.ACTION_DOWN -> { sx = e.rawX; sy = e.rawY; ox = p.x; oy = p.y; moved = false; FloatingWindows.nonGuestTouched() }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (e.rawX - sx).toInt(); val dy = (e.rawY - sy).toInt()
                     if (moved || abs(dx) + abs(dy) > dp(ctx, 6f)) { moved = true; p.x = ox + dx; p.y = oy + dy; runCatching { wm.updateViewLayout(root, p) } }

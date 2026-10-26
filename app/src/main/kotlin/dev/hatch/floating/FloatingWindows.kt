@@ -166,8 +166,30 @@ object FloatingWindows {
 
     internal fun removed(fw: FloatingWindow, ctx: Context) = onMain {
         windows.remove(fw)
+        if (lastTouched === fw) lastTouched = null
         Bubble.sync(ctx)
     }
+
+    // ---- Key focus follows the last touch (see FocusRules) ----
+    /** The guest window the user last touched; null once the store, the bubble or another app was touched. */
+    var lastTouched: FloatingWindow? = null; private set
+    private var nonGuestTouchAt = 0L
+
+    fun touched(fw: FloatingWindow) = onMain { lastTouched = fw }
+
+    /** A touch outside [fw] (another app or Hatch's own UI). */
+    fun touchedOutside(fw: FloatingWindow) = onMain {
+        if (lastTouched === fw) { lastTouched = null; nonGuestTouchAt = android.os.SystemClock.uptimeMillis() }
+    }
+
+    /** The store, the bubble or another non-guest Hatch UI was touched: no guest window keeps key focus. */
+    fun nonGuestTouched() = onMain {
+        lastTouched = null; nonGuestTouchAt = android.os.SystemClock.uptimeMillis()
+        windows.forEach { it.dropFocus() }
+    }
+
+    fun mayAutoFocus(fw: FloatingWindow): Boolean =
+        FocusRules.mayAutoFocus(fw.appId, lastTouched === fw, lastTouched?.appId, nonGuestTouchAt, fw.openedAt)
 
     /** Hide all (e.g. bubble long-press) / restore all. */
     fun minimiseAll() = onMain { windows.forEach { it.minimise() } }

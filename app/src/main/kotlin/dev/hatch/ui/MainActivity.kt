@@ -208,6 +208,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Touching the store hands key focus back from any floating guest window (DEVICE-VERIFY #20). */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) dev.hatch.floating.FloatingWindows.nonGuestTouched()
+        return super.dispatchTouchEvent(ev)
+    }
+
     private var resumed = false
     override fun onResume() { super.onResume(); resumed = true; flushPins(); dev.hatch.update.SelfUpdater.onResume(this) }
     override fun onPause() { resumed = false; super.onPause() }

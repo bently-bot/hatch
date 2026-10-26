@@ -59,10 +59,16 @@ class GuestSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
         holder.addCallback(this)
     }
 
-    fun bind(w: Toplevel) {
+    fun bind(w: Toplevel, focus: Boolean = true) {
         toplevel = w
         rebindTarget()
-        rt.server?.post { rt.server?.seat?.focusWindow(w) }
+        if (focus) rt.server?.post { rt.server?.seat?.focusWindow(w) }
+    }
+
+    /** Take Wayland keyboard focus away from this window (if it has it): wl_keyboard.leave, deactivated. */
+    fun blurGuest() {
+        val w = toplevel ?: return
+        rt.server?.post { val seat = rt.server?.seat; if (seat?.focus === w) seat.focusWindow(null) }
     }
 
     /** Forget the toplevel (it was destroyed); releases our render target. */

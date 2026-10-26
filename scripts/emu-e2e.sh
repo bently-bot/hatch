@@ -490,6 +490,22 @@ from PIL import Image, ImageChops
 a = Image.open(sys.argv[1]).convert("RGB"); b = Image.open(sys.argv[2]).convert("RGB")
 bbox = ImageChops.difference(a, b).getbbox(); print("diff bbox", bbox); sys.exit(0 if bbox else 1)
 PY
+  # Focus hand-back (DEVICE-VERIFY #20): after typing in Notepad++, tap the store's search field above the window
+  # and type. The text must land in the store, and the Notepad++ window must not change.
+  adb shell am start -W -n dev.hatch/.ui.MainActivity >/dev/null; sleep 2
+  $UI tap 'Search apps' dev.hatch || fail "store search field not reachable next to Notepad++"
+  sleep 2; shot 14c-before-store-typing   # after the tap: Notepad++ is unfocused, its caret no longer blinks
+  adb shell input text "focusback"; sleep 3; shot 14d-store-typed
+  $UI has '^focusback$' dev.hatch || fail "focus hand-back: text typed after tapping the store did not reach the store"
+  python3 - "$OUT/14c-before-store-typing.png" "$OUT/14d-store-typed.png" $NL $NT $NR $NB <<'PY' || fail "focus hand-back: Notepad++ changed while typing in the store"
+import sys
+from PIL import Image, ImageChops
+l, t, r, b = map(int, sys.argv[3:7]); box = (l + 20, t + 120, r - 20, b - 20)   # client area below the caption
+a = Image.open(sys.argv[1]).convert("RGB").crop(box); c = Image.open(sys.argv[2]).convert("RGB").crop(box)
+d = ImageChops.difference(a, c).getbbox(); print("notepad++ diff while typing in the store:", d); sys.exit(0 if d is None else 1)
+PY
+  stamp "focus hand-back OK: store got the text, Notepad++ unchanged"
+  hide_ime; adb shell input keyevent $(printf '67 %.0s' $(seq 1 12)); sleep 1
   # One-tap close for a Wine window too (it has unsaved text, so a "Save?" dialog may answer: ✕ again closes anyway).
   # This also hands keyboard focus back to the store for the next leg.
   if [ -n "${NF:-}" ]; then
