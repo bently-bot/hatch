@@ -328,16 +328,28 @@ PY
   cat "$PROOF/vlc-audio-host.log"
   vpeak=$(grep -o 'peak=[0-9]*' "$PROOF/vlc-audio-host.log" | cut -d= -f2 || true)
   if grep -q 'cvlc rc=0' "$PROOF/vlc-play.log" && [ "${vpeak:-0}" -gt 5000 ]; then stamp "vlc audio playback OK (peak $vpeak)"; else stamp "vlc audio playback FAILED"; FAILED+=(vlc-audio); fi
-  if capture vlc-video 90 --title=Xwayland --settle=20000 -- "${GU[@]}" bash -c "hatch-launch --x11 -- sh -c 'QT_QPA_PLATFORM=xcb vlc --no-video-title-show --loop /tmp/hatch-bars.y4m'" \
-     && python3 - "$PROOF/vlc-video.png" <<'PY'
+  vlc_video_ok() { python3 - "$1" <<'PY'
 import sys
 from PIL import Image
 im = Image.open(sys.argv[1]).convert("RGB"); w, h = im.size
-# Colour bars: count strongly saturated yellow/cyan/green/magenta/red/blue pixels.
-sat = sum(1 for (r, g, b) in im.resize((w // 4, h // 4)).getdata() if max(r, g, b) - min(r, g, b) > 120)
-print(f"vlc-video saturated px={sat}"); sys.exit(0 if sat > 400 else 1)
+# Colour bars inside the video area only (not the menu bar or the blue seek bar/volume at the bottom).
+v = im.crop((0, h // 20, w, h - h // 10)).resize((w // 4, (h - h // 20 - h // 10) // 4))
+sat = sum(1 for (r, g, b) in v.getdata() if max(r, g, b) - min(r, g, b) > 120)
+print(f"vlc-video saturated px={sat} (video area)"); sys.exit(0 if sat > 4000 else 1)
 PY
-  then stamp "vlc video playback OK"; else stamp "vlc video playback FAILED"; FAILED+=(vlc-video); fi
+  }
+  # --no-qt-privacy-ask: the first-run privacy dialog would sit over the video. vouts: VLC's default (GL via EGL/X11),
+  # GL via GLX (what the catalogue recipe uses, same drisw/kopper present as Blender), and plain xcb_x11, so a GL-only
+  # failure is told apart from a decode/playback one. (EGL/X11 swrast present on proot: "MESA: error: Failed to attach
+  # to x11 shm" every frame, and the video stays black.)
+  VOK=""
+  for vo in default glx xcb_x11; do
+    case $vo in default) VOPT="" ;; glx) VOPT="--vout=gl --gl=glx" ;; *) VOPT="--vout=$vo" ;; esac
+    if capture vlc-video-$vo 90 --title=Xwayland --settle=20000 -- "${GU[@]}" bash -c "hatch-launch --x11 -- sh -c 'QT_QPA_PLATFORM=xcb vlc --no-qt-privacy-ask --no-video-title-show $VOPT --loop /tmp/hatch-bars.y4m'" \
+       && vlc_video_ok "$PROOF/vlc-video-$vo.png"; then stamp "vlc video ($vo vout) OK"; VOK="$VOK $vo"; else stamp "vlc video ($vo vout) FAILED"; fi
+  done
+  grep -c 'Failed to attach to x11 shm' "$PROOF/vlc-video-default-client.log" 2>/dev/null | sed 's/^/  EGL x11 shm attach failures (default vout): /' || true
+  if [[ " $VOK " == *" glx "* ]]; then stamp "vlc video playback OK (GL via GLX)"; else stamp "vlc video playback FAILED (working vouts:${VOK:- none})"; FAILED+=(vlc-video); fi
 fi
 
 # GPU path (Turnip/KGSL): no Adreno on CI, but prove the bundled driver unpacks, its deps install and it links in the
