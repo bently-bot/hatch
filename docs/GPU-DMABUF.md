@@ -24,7 +24,7 @@ buffers, not a Linux dma-buf from the guest. That rules out an EGLImage/AHardwar
 copy happens on Hatch's side. The guest no longer needs its own readback into shm, though.
 
 ## Evidence (Chrome 156 on Hatch's compositor, Zink over lavapipe, box run 2026-10-26)
-Logs are in `proofs/v0.4.0/gpu/`.
+The quotes below are from the Chrome and Xwayland logs; the full logs are kept with the release proofs, which are outside git. CI regenerates the same evidence for Brave on every run (`gpu-chromium-*` in the arm64 proof artifacts).
 
 | Rung | Flags | `gpu_compositing` | Renderer | Why |
 |---|---|---|---|---|
