@@ -503,7 +503,7 @@ PY
   python3 - "$OUT/14c-before-store-typing.png" "$OUT/14d-store-typed.png" $NL $NT $NR $NB <<'PY' || fail "focus hand-back: Notepad++ changed while typing in the store"
 import sys
 from PIL import Image, ImageChops
-l, t, r, b = map(int, sys.argv[3:7]); box = (l + 20, t + 120, r - 20, b - 20)   # client area below the caption
+l, t, r, b = map(int, sys.argv[3:7]); box = (l + 48, t + 140, r - 48, b - 48)   # client area: the frame includes ~25 px of shadow where the store shows through
 a = Image.open(sys.argv[1]).convert("RGB").crop(box); c = Image.open(sys.argv[2]).convert("RGB").crop(box)
 d = ImageChops.difference(a, c).getbbox(); print("notepad++ diff while typing in the store:", d); sys.exit(0 if d is None else 1)
 PY
